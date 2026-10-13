@@ -479,13 +479,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
+          preferredSize: const Size.fromHeight(50),
           child: Container(
+            height: 42,
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               color: AppTheme.lightSurface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.lightBorder.withValues(alpha: 0.6)),
             ),
             child: TabBar(
               controller: _tabController,
@@ -493,22 +495,42 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               unselectedLabelColor: const Color(0xFF64748B),
               indicator: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    offset: const Offset(0, 1.5),
                   ),
                 ],
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
-              unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 12.5),
+              labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+              unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 12),
               tabs: const [
-                Tab(icon: Icon(Icons.calendar_today_rounded, size: 16), text: 'المحاضرات الأسبوعية'),
-                Tab(icon: Icon(Icons.assignment_rounded, size: 16), text: 'جدول الامتحانات'),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today_rounded, size: 15),
+                      SizedBox(width: 8),
+                      Text('المحاضرات الأسبوعية'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.assignment_rounded, size: 15),
+                      SizedBox(width: 8),
+                      Text('جدول الامتحانات'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -614,10 +636,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final isPdf = schedule.isPdf;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.lightBorder),
         boxShadow: AppTheme.cardShadow,
       ),
@@ -626,19 +648,19 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         children: [
           // رأس البطاقة الأنيق مع إخفاء اسم الناشر
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // أيقونة شارة مستند مميزة
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: isPdf
                         ? const Color(0xFFFEF2F2)
                         : (isExam ? const Color(0xFFFFFBEB) : const Color(0xFFEEF2FF)),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isPdf
                           ? const Color(0xFFFCA5A5)
@@ -652,7 +674,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       color: isPdf
                           ? const Color(0xFFEF4444)
                           : (isExam ? const Color(0xFFD97706) : AppTheme.primary),
-                      size: 24,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -669,7 +691,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                             child: Text(
                               schedule.title,
                               style: GoogleFonts.cairo(
-                                fontSize: 14,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.textPrimary,
                               ),
@@ -677,12 +699,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 6),
                           // شارة نوع الجدول الرسمية
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                             decoration: BoxDecoration(
                               color: isExam ? const Color(0xFFFFF7ED) : AppTheme.primarySubtle,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                               border: Border.all(
                                 color: isExam ? const Color(0xFFFDBA74) : AppTheme.primary.withValues(alpha: 0.2),
                               ),
@@ -690,7 +713,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                             child: Text(
                               isExam ? 'جدول امتحانات' : 'جدول أسبوعي',
                               style: GoogleFonts.cairo(
-                                fontSize: 10.5,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                                 color: isExam ? const Color(0xFFC2410C) : AppTheme.primary,
                               ),
@@ -698,18 +721,18 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
 
                       // سطر القسم والمرحلة والتاريخ (محمي من كشف هوية الناشر)
                       Row(
                         children: [
-                          const Icon(Icons.school_outlined, size: 14, color: AppTheme.textMuted),
+                          const Icon(Icons.school_outlined, size: 13, color: AppTheme.textMuted),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               '${schedule.department} • ${schedule.stage}',
                               style: GoogleFonts.cairo(
-                                fontSize: 11.5,
+                                fontSize: 11,
                                 color: AppTheme.textSecondary,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -733,7 +756,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   IconButton(
                     icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
                     tooltip: 'حذف',
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.all(4),
                     constraints: const BoxConstraints(),
                     onPressed: () async {
                       final ok = await SupabaseService().deleteSchedule(schedule.id);
@@ -757,35 +780,38 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
           // صف الأزرار: زر معاينة سريعة وزر تنزيل رسمي
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
             child: Row(
               children: [
                 // زر معاينة
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: schedule.fileUrl != null
-                        ? () {
-                            AppMediaPreviewModal.show(
-                              context: context,
-                              title: schedule.title,
-                              subtitle: '${schedule.department} • ${schedule.stage}',
-                              url: _resolveUrl(schedule.fileUrl!),
-                              downloadUrl: _resolveUrl(schedule.fileUrl!),
-                              fileName: schedule.fileName ?? schedule.title,
-                              mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
-                            );
-                          }
-                        : null,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primary,
-                      side: const BorderSide(color: AppTheme.primary, width: 1.2),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.visibility_rounded, size: 18),
-                    label: Text(
-                      'معاينة سريعة',
-                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  child: SizedBox(
+                    height: 38,
+                    child: OutlinedButton.icon(
+                      onPressed: schedule.fileUrl != null
+                          ? () {
+                              AppMediaPreviewModal.show(
+                                context: context,
+                                title: schedule.title,
+                                subtitle: '${schedule.department} • ${schedule.stage}',
+                                url: _resolveUrl(schedule.fileUrl!),
+                                downloadUrl: _resolveUrl(schedule.fileUrl!),
+                                fileName: schedule.fileName ?? schedule.title,
+                                mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                              );
+                            }
+                          : null,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary, width: 1.2),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.visibility_rounded, size: 16),
+                      label: Text(
+                        'معاينة سريعة',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
                     ),
                   ),
                 ),
@@ -793,19 +819,22 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
                 // زر تنزيل
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                    label: Text(
-                      'تنزيل رسمي',
-                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  child: SizedBox(
+                    height: 38,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                      label: Text(
+                        'تنزيل رسمي',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
                     ),
                   ),
                 ),

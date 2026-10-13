@@ -984,10 +984,10 @@ void main() {
       expect(testSchedule.formattedDate, '2026/10/13');
       expect(testSchedule.isExam, false);
 
-      // 2. التحقق من رابط التوجيه الفوري لبوت الحضور مع وسيط البدء
-      final botDeepLink = '${AppConstants.telegramBotUrl}?start=get_code';
-      expect(botDeepLink, contains('start=get_code'));
+      // 2. التحقق من رابط التوجيه النظيف لبوت الحضور لاسترجاع القيد فوراً عبر chat_id
+      final botDeepLink = AppConstants.telegramBotUrl;
       expect(botDeepLink, contains(AppConstants.telegramBotUsername));
+      expect(botDeepLink.contains('start=get_code'), false, reason: 'يجب عدم إرسال باراميتر get_code لتجنب خطأ لم يتم العثور على القيد');
     });
   });
 }

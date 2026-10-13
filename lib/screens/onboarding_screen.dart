@@ -38,8 +38,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// فتح بوت التليجرام الرسمي للحصول على الكود فوراً
   Future<void> _openTelegramBot() async {
-    final directBotUrl = '${AppConstants.telegramBotUrl}?start=get_code';
-    final tgAppUrl = 'tg://resolve?domain=${AppConstants.telegramBotUsername}&start=get_code';
+    final directBotUrl = AppConstants.telegramBotUrl;
+    final tgAppUrl = 'tg://resolve?domain=${AppConstants.telegramBotUsername}';
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
