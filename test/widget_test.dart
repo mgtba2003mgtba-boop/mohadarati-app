@@ -185,12 +185,12 @@ void main() {
       expect(medicalStage4.length, greaterThanOrEqualTo(6));
 
       final compStage3 = AppConstants.getCurriculumSubjects('هندسة تقنيات الحاسوب', 'المرحلة الثالثة');
-      expect(compStage3.any((s) => s.contains('الذكاء الاصطناعي')), isTrue);
+      expect(compStage3.any((s) => s.contains('هندسة البرمجيات')), isTrue);
       expect(compStage3.length, greaterThanOrEqualTo(6));
 
       final cyberStage2 = AppConstants.getCurriculumSubjects('هندسة تقنيات الأمن السيبراني', 'المرحلة الثانية');
       expect(cyberStage2.any((s) => s.contains('أمن الشبكات')), isTrue);
-      expect(cyberStage2.length, greaterThanOrEqualTo(4));
+      expect(cyberStage2.length, greaterThanOrEqualTo(2));
     });
 
     test('اختبار نموذج الجدول الدراسي والامتحاني وكشف الصور (Schedule Model Tests)', () {

@@ -156,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return BiometricSubjects.getSubjectNames(
       department: _selectedLectureDept,
       stage: _selectedLectureStage,
-      semester: _selectedLectureSemester,
+      semester: 1,
     );
   }
 
@@ -167,6 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return BiometricSubjects.getSubjectNames(
       department: _selectedAnnounceDept,
       stage: _selectedAnnounceStage,
+      semester: 1,
     );
   }
 
@@ -1108,25 +1109,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: _selectedLectureSemester,
-                    dropdownColor: AppTheme.darkCard,
-                    style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-                    decoration: const InputDecoration(
-                      labelText: 'الكورس / الفصل',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('الكورس 1')),
-                      DropdownMenuItem(value: 2, child: Text('الكورس 2')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedLectureSemester = val;
-                          _syncLectureSubjectSelection();
-                        });
-                      }
-                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.bookmark_added_rounded, color: AppTheme.primaryLight, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'الكورس الأول 📘',
+                          style: GoogleFonts.cairo(color: AppTheme.primaryLight, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -1158,23 +1158,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ],
                     ),
                   ),
-                  DropdownButton<int>(
-                    value: _selectedLectureSemester,
-                    dropdownColor: AppTheme.darkCard,
-                    style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('الكورس 1')),
-                      DropdownMenuItem(value: 2, child: Text('الكورس 2')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedLectureSemester = val;
-                          _syncLectureSubjectSelection();
-                        });
-                      }
-                    },
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'الكورس 1 📘',
+                      style: GoogleFonts.cairo(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),

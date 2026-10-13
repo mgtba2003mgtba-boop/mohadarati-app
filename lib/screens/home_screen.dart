@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
+import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/attendance_model.dart';
@@ -103,10 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
             department: _user!.department,
             stage: _user!.stage,
             section: userSection,
+            semester: 1,
           ),
           service.fetchCourses(
             department: _user!.department,
             stage: _user!.stage,
+            semester: 1,
           ),
         ]);
 
@@ -129,35 +132,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// جلب كافة المواد الدراسية الرسمية للقسم والمرحلة
+  /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول)
   List<String> get _subjectNames {
-    final names = <String>{};
-
-    // 1. الخطة الدراسية والمقررات المعتمدة والمعدلة
-    if (_coursesList.isNotEmpty) {
-      names.addAll(_coursesList);
-    } else if (_user != null) {
-      final curriculum = AppConstants.getCurriculumSubjects(_user!.department, _user!.stage);
-      names.addAll(curriculum);
-    }
-
-    // 2. سجلات الحضور
-    if (_attendanceSummary != null) {
-      for (final s in _attendanceSummary!.subjectsStats) {
-        if (s.subjectName.trim().isNotEmpty) {
-          names.add(s.subjectName.trim());
-        }
-      }
-    }
-
-    // 3. المحاضرات المرفوعة
-    for (final l in _lectures) {
-      if (l.subjectName.trim().isNotEmpty) {
-        names.add(l.subjectName.trim());
-      }
-    }
-
-    return names.toList();
+    if (_user == null) return [];
+    return BiometricSubjects.getSubjectNames(
+      department: _user!.department,
+      stage: _user!.stage,
+      semester: 1,
+    );
   }
 
   @override

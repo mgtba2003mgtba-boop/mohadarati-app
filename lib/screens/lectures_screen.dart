@@ -250,9 +250,28 @@ class _LecturesScreenState extends State<LecturesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
             child: Row(
               children: [
-                _buildSemesterToggle(1, 'الفصل الأول (الكورس 1)'),
-                const SizedBox(width: 8),
-                _buildSemesterToggle(2, 'الفصل الثاني (الكورس 2)'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bookmark_added_rounded, color: AppTheme.primaryLight, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'الفصل الأول (الكورس 1) 📘',
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 14),
                 Container(width: 1, height: 24, color: AppTheme.darkBorder),
                 const SizedBox(width: 14),

@@ -759,78 +759,18 @@ class SupabaseService {
     );
   }
 
-  /// ── جلب المقررات الدراسية المعتمدة والمعدلة للمرحلة والقسم ──────────────────
+  /// ── جلب المقررات الدراسية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول) ────────
   Future<List<String>> fetchCourses({
     required String department,
     required String stage,
     int? semester,
   }) async {
-    // 1. الخطة الدراسية الأساسية الثابتة المستخرجة من نظام البصمة
-    final defaultSubjects = AppConstants.getCurriculumSubjects(department, stage, semester: semester);
-    final Set<String> subjects = Set<String>.from(defaultSubjects);
-
-    // 2. فحص الكاش المحلي أولاً للسرعة
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheKey = 'custom_courses_${department}_$stage';
-      final cachedJson = prefs.getString(cacheKey);
-      if (cachedJson != null && cachedJson.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(cachedJson);
-        subjects.clear();
-        subjects.addAll(decoded.map((e) => e.toString()));
-      }
-    } catch (_) {}
-
-    // 3. جلب سجل تعديلات المقررات من سيرفر Supabase
-    try {
-      final res = await client
-          .from('announcements')
-          .select('*')
-          .eq('subject_name', 'COURSE')
-          .order('created_at', ascending: true);
-
-      final list = (res as List).where((item) {
-        final dept = item['department']?.toString() ?? 'ALL';
-        final stg = item['stage']?.toString() ?? 'ALL';
-        final matchDept = dept == 'ALL' || dept == department;
-        final matchStage = stg == 'ALL' || stg == stage;
-        return matchDept && matchStage;
-      }).toList();
-
-      final Set<String> activeSubjects = Set<String>.from(defaultSubjects);
-      for (final item in list) {
-        final title = (item['title']?.toString() ?? '').trim();
-        final content = item['content']?.toString() ?? '';
-        if (title.isEmpty) continue;
-
-        if (content.contains('[COURSE_REGISTRY:ADD]')) {
-          activeSubjects.add(title);
-        } else if (content.contains('[COURSE_REGISTRY:EDIT]')) {
-          final oldNameMatch = RegExp(r'old_name:(.*)').firstMatch(content);
-          if (oldNameMatch != null) {
-            final oldName = oldNameMatch.group(1)?.trim();
-            if (oldName != null && oldName.isNotEmpty) {
-              activeSubjects.remove(oldName);
-            }
-          }
-          activeSubjects.add(title);
-        } else if (content.contains('[COURSE_REGISTRY:DELETE]')) {
-          activeSubjects.remove(title);
-        }
-      }
-
-      // حفظ الكاش المحلي المحدث
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final cacheKey = 'custom_courses_${department}_$stage';
-        await prefs.setString(cacheKey, jsonEncode(activeSubjects.toList()));
-      } catch (_) {}
-
-      return activeSubjects.toList();
-    } catch (e) {
-      debugPrint('[-] Error fetching courses from registry: $e');
-      return subjects.toList();
-    }
+    final targetSemester = semester ?? 1;
+    return BiometricSubjects.getSubjectNames(
+      department: department,
+      stage: stage,
+      semester: targetSemester,
+    );
   }
 
   /// ── إضافة مقرر دراسي جديد (للممثلين والمشرفين) ───────────────────────────
