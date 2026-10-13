@@ -465,7 +465,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AppFullscreenModal.show(
       context: context,
       title: announcement.title,
-      subtitle: 'الناشر: ${announcement.authorName} • ${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
+      subtitle: '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
       contentText: announcement.displayContent,
@@ -728,7 +728,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${lec.subjectName} • ${lec.typeLabel} • ${lec.section == 'ALL' ? '🌐 عام' : '🏷️ شعبة ${lec.section}'}',
+                              '${lec.subjectName} • ${lec.typeLabel}',
                               style: GoogleFonts.cairo(
                                 fontSize: 11,
                                 color: AppTheme.textSecondary,

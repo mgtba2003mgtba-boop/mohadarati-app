@@ -737,12 +737,24 @@ void main() {
       }
     });
 
-    test('اختبار قفل صلاحيات ومنشورات ممثل الشعبة وحصرها بطلبة شعبته فقط (Section Representative Scoping & Student Isolation)', () {
-      // 1. مستخدم ممثل لشعبة B
-      final repSectionB = AppUserModel(
+    test('اختبار توحيد المحاضرات لكافة شُعب المرحلة وعزل التبليغات لكل شعبة حصراً (Unified Stage Lectures & Strict Section Announcements)', () {
+      // 1. ممثلان لشعبتين مختلفتين في نفس المرحلة
+      final repA = AppUserModel(
+        id: 'rep-a-1',
+        studentId: 'ST-NUST-001-A',
+        name: 'أحمد علي',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        role: AppConstants.roleRepresentative,
+        canPublishLectures: true,
+        canPublishAnnouncements: true,
+      );
+
+      final repB = AppUserModel(
         id: 'rep-b-1',
-        studentId: '2023101',
-        name: 'ممثل شعبة B',
+        studentId: 'ST-NUST-002-B',
+        name: 'كرار حسين',
         department: 'هندسة تقنيات الحاسوب',
         stage: 'المرحلة الثالثة',
         section: 'B',
@@ -751,68 +763,137 @@ void main() {
         canPublishAnnouncements: true,
       );
 
-      expect(repSectionB.isRepresentative, true);
-      expect(repSectionB.isAdmin, false);
-      expect(repSectionB.isProfessor, false);
-      expect(repSectionB.section, 'B');
+      final studentA = AppUserModel(
+        id: 'std-a-1',
+        studentId: 'ST-NUST-003-A',
+        name: 'طالب في شعبة A',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        role: AppConstants.roleStudent,
+      );
 
-      // 2. محاكاة محاضرات منشورة لشعب مختلفة وعامة
-      final lecGeneral = LectureModel(
-        id: 'lec-all',
-        uploaderId: 'rep-b-1',
-        uploaderName: 'ممثل الدفعة',
-        title: 'محاضرة عامة للكل',
-        subjectName: 'شبكات الحاسوب',
+      final studentB = AppUserModel(
+        id: 'std-b-1',
+        studentId: 'ST-NUST-004-B',
+        name: 'طالب في شعبة B',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'B',
+        role: AppConstants.roleStudent,
+      );
+
+      // 2. محاضرات مرفوعة من ممثل شعبة A وممثل شعبة B
+      final lecA = LectureModel(
+        id: 'lec-1',
+        uploaderId: repA.studentId,
+        uploaderName: repA.name,
+        title: 'محاضرة البرمجيات - الفصل الأول',
+        subjectName: 'هندسة البرمجيات',
         department: 'هندسة تقنيات الحاسوب',
         stage: 'المرحلة الثالثة',
         section: 'ALL',
         semester: 1,
         type: 'theory',
-        driveUrl: 'https://example.com/all',
+        driveUrl: 'https://example.com/lec1',
         createdAt: DateTime.now(),
       );
 
-      final lecSectionA = LectureModel(
-        id: 'lec-a',
-        uploaderId: 'rep-a-1',
-        uploaderName: 'ممثل شعبة A',
-        title: 'محاضرة لشعبة A فقط',
-        subjectName: 'شبكات الحاسوب',
+      final lecB = LectureModel(
+        id: 'lec-2',
+        uploaderId: repB.studentId,
+        uploaderName: repB.name,
+        title: 'محاضرة شبكات متقدمة',
+        subjectName: 'شبكات الحاسوب II',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'ALL',
+        semester: 1,
+        type: 'practical',
+        driveUrl: 'https://example.com/lec2',
+        createdAt: DateTime.now(),
+      );
+
+      final allStageLectures = [lecA, lecB];
+
+      // المحاضرات تظهر لجميع طلبة المرحلة بغض النظر عن شعبتهم
+      expect(allStageLectures.length, 2, reason: 'المحاضرات موحدة لكافة شُعب المرحلة والقسم');
+
+      // 3. تبليغات منفصلة لكل شعبة
+      final announceA = AnnouncementModel(
+        id: 'ann-1',
+        title: 'كويز خاص بشعبة A',
+        content: 'امتحان كويز يوم الأحد لشعبة A',
+        authorId: repA.studentId,
+        authorName: repA.name,
+        authorRole: 'representative',
         department: 'هندسة تقنيات الحاسوب',
         stage: 'المرحلة الثالثة',
         section: 'A',
-        semester: 1,
-        type: 'practical',
-        driveUrl: 'https://example.com/a',
         createdAt: DateTime.now(),
       );
 
-      final lecSectionB = LectureModel(
-        id: 'lec-b',
-        uploaderId: 'rep-b-1',
-        uploaderName: 'ممثل شعبة B',
-        title: 'محاضرة لشعبة B فقط',
-        subjectName: 'شبكات الحاسوب',
+      final announceB = AnnouncementModel(
+        id: 'ann-2',
+        title: 'تأجيل مختبر لشعبة B',
+        content: 'تأجيل مختبر شعبة B ليوم الثلاثاء',
+        authorId: repB.studentId,
+        authorName: repB.name,
+        authorRole: 'representative',
         department: 'هندسة تقنيات الحاسوب',
         stage: 'المرحلة الثالثة',
         section: 'B',
-        semester: 1,
-        type: 'theory',
-        driveUrl: 'https://example.com/b',
         createdAt: DateTime.now(),
       );
 
-      final allLectures = [lecGeneral, lecSectionA, lecSectionB];
+      final announceGeneral = AnnouncementModel(
+        id: 'ann-3',
+        title: 'عطلة رسمية للكلية',
+        content: 'إعلان عام لجميع الطلاب',
+        authorId: 'ADMIN',
+        authorName: 'مجتبى عواد',
+        authorRole: 'admin',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'ALL',
+        createdAt: DateTime.now(),
+      );
 
-      // فلترة طالب شعبة B: يرى العامة + شعبة B فقط، ولا يرى شعبة A إطلاقاً
-      final studentBVisible = allLectures.where((l) => l.section == 'ALL' || l.section == 'B').toList();
-      expect(studentBVisible.length, 2);
-      expect(studentBVisible.any((l) => l.id == 'lec-a'), false, reason: 'طالب شعبة B لا يرى محاضرات شعبة A أبداً');
-      expect(studentBVisible.any((l) => l.id == 'lec-b'), true);
-      expect(studentBVisible.any((l) => l.id == 'lec-all'), true);
+      final allAnnouncements = [announceA, announceB, announceGeneral];
 
-      // فلترة الآدمن: يرى كل المحاضرات
-      expect(allLectures.length, 3);
+      // طالب شعبة A يرى فقط تبليغات شعبة A والتبليغات العامة، ولا يرى تبليغ شعبة B
+      final studentAAnnouncements = allAnnouncements.where((a) => a.section == 'ALL' || a.section == studentA.section).toList();
+      expect(studentAAnnouncements.length, 2);
+      expect(studentAAnnouncements.any((a) => a.id == 'ann-1'), true);
+      expect(studentAAnnouncements.any((a) => a.id == 'ann-3'), true);
+      expect(studentAAnnouncements.any((a) => a.id == 'ann-2'), false, reason: 'طالب شعبة A لا يرى تبليغات شعبة B أبداً');
+
+      // طالب شعبة B يرى فقط تبليغات شعبة B والتبليغات العامة، ولا يرى تبليغ شعبة A
+      final studentBAnnouncements = allAnnouncements.where((a) => a.section == 'ALL' || a.section == studentB.section).toList();
+      expect(studentBAnnouncements.length, 2);
+      expect(studentBAnnouncements.any((a) => a.id == 'ann-2'), true);
+      expect(studentBAnnouncements.any((a) => a.id == 'ann-3'), true);
+      expect(studentBAnnouncements.any((a) => a.id == 'ann-1'), false, reason: 'طالب شعبة B لا يرى تبليغات شعبة A أبداً');
+
+      // 4. فحص صلاحيات الحذف (الممثل يحذف فقط ما رفعه هو، والمشرف العام يحذف أي شيء)
+      final bool repACanDeleteLecA = repA.studentId == lecA.uploaderId || repA.isAdmin;
+      final bool repACanDeleteLecB = repA.studentId == lecB.uploaderId || repA.isAdmin;
+      expect(repACanDeleteLecA, true, reason: 'الممثل يحذف المحاضرة التي قام هو برفعها');
+      expect(repACanDeleteLecB, false, reason: 'الممثل لا يستطيع حذف محاضرة ممثل آخر');
+
+      final adminMujtaba = AppUserModel(
+        id: 'adm-1',
+        studentId: 'ST-NUST-001630760-413',
+        name: 'مجتبى عواد طالب',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleAdmin,
+      );
+
+      final bool adminCanDeleteLecA = adminMujtaba.studentId == lecA.uploaderId || adminMujtaba.isAdmin || adminMujtaba.name.contains('مجتبى');
+      final bool adminCanDeleteLecB = adminMujtaba.studentId == lecB.uploaderId || adminMujtaba.isAdmin || adminMujtaba.name.contains('مجتبى');
+      expect(adminCanDeleteLecA, true, reason: 'المشرف العام يملك صلاحية حذف أي محاضرة');
+      expect(adminCanDeleteLecB, true, reason: 'المشرف العام يملك صلاحية حذف أي محاضرة');
     });
 
     test('اختبار ترميز وفك وسم الشعبة [SECTION:...] في المحاضرات والتبليغات (Section Tag Serialization & Deserialization)', () {

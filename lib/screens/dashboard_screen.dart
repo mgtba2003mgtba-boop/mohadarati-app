@@ -396,7 +396,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     final targetDept = _currentUser?.isAdmin == true ? _selectedLectureDept : (_currentUser?.department ?? _selectedLectureDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedLectureStage : (_currentUser?.stage ?? _selectedLectureStage);
-    final targetSection = _currentUser?.isAdmin == true ? _selectedLectureSection : (_currentUser?.section ?? 'ALL');
+    const targetSection = 'ALL';
 
     if (_selectedFile == null) {
       _showSnackbar('يرجى اختيار ملف المحاضرة أولاً (PDF / مستند / صورة)', isError: true);
@@ -1253,52 +1253,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 14),
 
-          // ── الشعبة المستهدفة لنشر المحاضرة ──
-          if (_currentUser?.isAdmin == true) ...[
-            DropdownButtonFormField<String>(
-              value: _selectedLectureSection,
-              style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
-              decoration: const InputDecoration(
-                labelText: 'الشعبة المستهدفة لنشر المحاضرة',
-                prefixIcon: Icon(Icons.groups_rounded, color: AppTheme.primaryLight),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
-                DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-              ],
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedLectureSection = val);
-              },
+          // ── نطاق نشر المحاضرة الموحد ──
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
             ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_rounded, size: 20, color: AppTheme.accent),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'نطاق النشر مقفل تلقائياً لطلاب: شعبة (${_currentUser?.section ?? "A"})',
-                      style: GoogleFonts.cairo(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.accent,
-                      ),
+            child: Row(
+              children: [
+                const Icon(Icons.school_rounded, size: 20, color: AppTheme.primaryLight),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'نشر عام موحد لكافة شُعب المرحلة الدراسية 🌐',
+                    style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryLight,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
           const SizedBox(height: 14),
 
           // نوع المحاضرة: نظري أو عملي

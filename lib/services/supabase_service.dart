@@ -537,7 +537,7 @@ class SupabaseService {
     return deleteAnnouncement(id);
   }
 
-  /// ── جلب المحاضرات مع روابط Google Drive (وفلترة الشعبة) ─────────────────
+  /// ── جلب المحاضرات (موحدة لكافة شُعب المرحلة والقسم) ──────────────────
   Future<List<LectureModel>> fetchLectures({
     String? department,
     String? stage,
@@ -559,14 +559,8 @@ class SupabaseService {
 
       final res = await query.order('created_at', ascending: false);
 
-      var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
-
-      // فلترة الشعبة: المنشورات العامة (ALL) وتلك الموجهة لشعبة الطالب
-      if (section != null && section.isNotEmpty && section != 'ALL') {
-        list = list.where((l) => l.section == 'ALL' || l.section == section).toList();
-      }
-
-      return list;
+      // المحاضرات تظهر لكافة طلبة المرحلة والشعب بصورة موحدة
+      return (res as List).map((item) => LectureModel.fromJson(item)).toList();
     } catch (e) {
       debugPrint('[-] Error fetching lectures: $e');
       return [];

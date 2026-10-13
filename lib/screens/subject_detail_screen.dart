@@ -540,31 +540,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
 
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: (lecture.section == 'ALL' ? AppTheme.accent : const Color(0xFF6366F1)).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  lecture.section == 'ALL' ? '🌐 عام لجميع الشعب' : '🏷️ شعبة ${lecture.section}',
-                  style: GoogleFonts.cairo(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: lecture.section == 'ALL' ? AppTheme.accent : const Color(0xFF818CF8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'نشر: ${lecture.uploaderName}',
-                style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
-              ),
-            ],
-          ),
+          const SizedBox(height: 2),
 
           if (lecture.displayDescription.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -686,7 +662,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             AppFullscreenModal.show(
               context: context,
               title: item.title,
-              subtitle: 'الناشر: ${item.authorName} • ${item.createdAt.year}/${item.createdAt.month.toString().padLeft(2, '0')}/${item.createdAt.day.toString().padLeft(2, '0')}',
+              subtitle: '${item.createdAt.year}/${item.createdAt.month.toString().padLeft(2, '0')}/${item.createdAt.day.toString().padLeft(2, '0')}',
               icon: Icons.campaign_rounded,
               contentText: item.displayContent,
               accentColor: AppTheme.primary,
@@ -746,9 +722,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'الناشر: ${item.authorName}',
-                      style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primarySubtle,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'تبليغ رسمي',
+                        style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
+                      ),
                     ),
                     Row(
                       children: [
@@ -1059,7 +1042,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         subjectName: widget.subjectName,
         department: widget.department,
         stage: widget.stage,
-        section: _targetSection,
+        section: 'ALL',
         semester: 1,
         lectureType: _lectureType,
         description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
@@ -1099,6 +1082,10 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
     setState(() => _isSubmitting = true);
 
     try {
+      final announceSection = widget.currentUser?.isAdmin == true
+          ? _targetSection
+          : (widget.currentUser?.section ?? 'ALL');
+
       final newAnnounce = AnnouncementModel(
         id: '',
         title: title,
@@ -1108,7 +1095,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         authorRole: widget.currentUser?.role ?? 'representative',
         department: widget.department,
         stage: widget.stage,
-        section: _targetSection,
+        section: announceSection,
         category: 'academic',
         subjectName: widget.subjectName,
         createdAt: DateTime.now(),
@@ -1337,56 +1324,31 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               ),
               const SizedBox(height: 12),
 
-              // الشعبة المستهدفة للنشر
-              if (widget.currentUser?.isAdmin == true) ...[
-                DropdownButtonFormField<String>(
-                  value: _targetSection,
-                  dropdownColor: AppTheme.darkCard,
-                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'الشعبة المستهدفة',
-                    labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
-                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _targetSection = val);
-                  },
+              // نطاق المحاضرة الموحد
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primarySubtle,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.lock_rounded, size: 18, color: AppTheme.accent),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'نطاق النشر مقفل تلقائياً لطلاب: شعبة ($_targetSection)',
-                          style: GoogleFonts.cairo(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.accent,
-                          ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.school_rounded, size: 18, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'نشر عام موحد لكافة شُعب المرحلة الدراسية 🌐',
+                        style: GoogleFonts.cairo(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
               const SizedBox(height: 12),
 
               // مساحة اختيار ملف المحاضرة (مستند PDF أو صورة أو عرض تقديمي)
@@ -1488,7 +1450,60 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                   alignLabelWithHint: true,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+
+              // الشعبة المستهدفة بالتبليغ
+              if (widget.currentUser?.isAdmin == true) ...[
+                DropdownButtonFormField<String>(
+                  value: _targetSection,
+                  dropdownColor: AppTheme.darkCard,
+                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'الشعبة المستهدفة بالتبليغ',
+                    labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _targetSection = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_rounded, size: 18, color: AppTheme.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'نطاق التبليغ مقفل تلقائياً لطلاب: شعبة (${widget.currentUser?.section ?? "A"})',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(

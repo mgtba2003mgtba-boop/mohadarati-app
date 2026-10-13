@@ -388,51 +388,29 @@ class _LecturesScreenState extends State<LecturesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // الرأس: اسم المادة ونوعها والشعبة المستهدفة
+          // الرأس: نوع المحاضرة وتاريخ الإضافة
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: lecture.isPractical
-                          ? AppTheme.accent.withValues(alpha: 0.15)
-                          : AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      lecture.typeLabel,
-                      style: GoogleFonts.cairo(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: lecture.isPractical ? AppTheme.accent : AppTheme.primaryLight,
-                      ),
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: lecture.isPractical
+                      ? AppTheme.accent.withValues(alpha: 0.15)
+                      : AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  lecture.typeLabel,
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: lecture.isPractical ? AppTheme.accent : AppTheme.primaryLight,
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: lecture.section == 'ALL'
-                          ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
-                          : AppTheme.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      lecture.section == 'ALL' ? '🌐 عام' : '🏷️ شعبة ${lecture.section}',
-                      style: GoogleFonts.cairo(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: lecture.section == 'ALL' ? const Color(0xFF60A5FA) : AppTheme.accent,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               Text(
-                '${lecture.createdAt.year}/${lecture.createdAt.month}/${lecture.createdAt.day}',
+                '${lecture.createdAt.year}/${lecture.createdAt.month.toString().padLeft(2, '0')}/${lecture.createdAt.day.toString().padLeft(2, '0')}',
                 style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B)),
               ),
             ],
@@ -446,9 +424,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
           ),
           const SizedBox(height: 2),
 
-          // اسم المادة ونطاق الشعبة
+          // اسم المادة
           Text(
-            'المادة: ${lecture.subjectName} • ${lecture.section == 'ALL' ? 'عام لكافة الشعب' : 'خاص بطلبة شعبة ${lecture.section}'}',
+            'المادة: ${lecture.subjectName}',
             style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8)),
           ),
 
@@ -527,21 +505,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
               ],
             ),
           ],
-          const SizedBox(height: 12),
-
-          // معلومات الناشر
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'نُشرت بواسطة: ${lecture.uploaderName} (${lecture.uploaderRole == 'representative' ? 'ممثل الدفعة' : 'الأستاذ'})',
-                  style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

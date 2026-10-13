@@ -254,18 +254,22 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.person_pin_rounded, size: 16, color: AppTheme.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      announcement.authorName,
-                      style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                if (announcement.subjectName != null && announcement.subjectName!.isNotEmpty && announcement.subjectName != 'عام')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                  ],
-                ),
+                    child: Text(
+                      announcement.subjectName!,
+                      style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
+                    ),
+                  )
+                else
+                  const SizedBox.shrink(),
                 Text(
-                  'معاينة',
+                  'معاينة التبليغ ←',
                   style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -280,7 +284,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     AppFullscreenModal.show(
       context: context,
       title: announcement.title,
-      subtitle: 'الناشر: ${announcement.authorName} • ${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
+      subtitle: '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: announcement.imageUrl,
       contentText: announcement.displayContent,
