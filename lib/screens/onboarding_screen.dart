@@ -36,10 +36,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  /// فتح بوت التليجرام الرسمي للحصول على الكود فوراً
+  /// فتح بوت التليجرام الرسمي للحصول على الكود فوراً باختصار id
   Future<void> _openTelegramBot() async {
-    final directBotUrl = AppConstants.telegramBotUrl;
-    final tgAppUrl = 'tg://resolve?domain=${AppConstants.telegramBotUsername}';
+    final directBotUrl = '${AppConstants.telegramBotUrl}?start=id';
+    final tgAppUrl = 'tg://resolve?domain=${AppConstants.telegramBotUsername}&start=id';
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -51,7 +51,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'جارٍ فتح البوت... اضغط بدء (Start) لنسخ معرفك ولصقه هنا',
+                  'جارٍ فتح البوت باختصار المعرف (id)... اضغط على معرفك لنسخه',
                   style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -95,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      setState(() => _errorMessage = 'يرجى إدخال الرقم الجامعي أو المعرف أولاً');
+      setState(() => _errorMessage = 'يرجى إدخال المعرف الجامعي أو اسم الطالب الثلاثي');
       return;
     }
 
@@ -124,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'لم يتم العثور على قيد مطابق. يرجى التأكد من صحة المعرف.';
+        _errorMessage = 'لم يتم العثور على قيد مطابق. تأكد من إدخال اسمك الثلاثي كاملاً أو المعرف بشكل دقيق.';
       });
     }
   }
@@ -417,15 +417,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       controller: _codeController,
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'المعرف الجامعي',
-                        prefixIcon: const Icon(Icons.qr_code_2_rounded, color: AppTheme.primary),
+                        labelText: 'المعرف الجامعي أو اسم الطالب الثلاثي',
+                        hintText: 'مثال: ST-NUST-... أو اكتب اسمك الثلاثي',
+                        prefixIcon: const Icon(Icons.person_search_rounded, color: AppTheme.primary),
                         filled: true,
                         fillColor: AppTheme.lightSurface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '💡 يمكنك التحقق مباشرة بكتابة اسمك الثلاثي، أو طلب المعرف من البوت',
+                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
                       ),
                     ),
                     const SizedBox(height: 14),
 
-                    // زر التحقق
+                    // زر التحقق المباشر
                     ElevatedButton(
                       onPressed: _isLoading ? null : _verifyCode,
                       style: ElevatedButton.styleFrom(
@@ -440,11 +450,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               width: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : Text('التحقق', style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold)),
+                          : Text('التحقق المباشر', style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 10),
 
-                    // زر التوجيه الفوري لبوت التيليجرام
+                    // زر التوجيه الفوري لبوت التيليجرام باختصار id
                     ElevatedButton.icon(
                       onPressed: _openTelegramBot,
                       style: ElevatedButton.styleFrom(
@@ -456,7 +466,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       icon: const Icon(Icons.send_rounded, size: 16),
                       label: Text(
-                        'طلب المعرف من بوت تيليجرام ⚡',
+                        'طلب المعرف من بوت تيليجرام (اختصار id) ⚡',
                         style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.bold),
                       ),
                     ),
