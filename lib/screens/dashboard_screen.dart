@@ -9,6 +9,7 @@ import '../models/announcement_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_network_image.dart';
+import '../widgets/app_fullscreen_modal.dart';
 import 'package:file_picker/file_picker.dart';
 
 class RepresentativeActivityItem {
@@ -120,6 +121,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _repStageFilter = 'ALL';
   String _repSearchQuery = '';
 
+  // ── فلاتر دليل الطلاب والممثلين ──
+  String _userDirectoryRoleFilter = 'ALL'; // 'ALL', 'REPS', 'STUDENTS'
+  String _userDirectoryStageFilter = 'ALL';
+
+  // ── فلاتر مركز إدارة وحذف المحتوى ──
+  String _contentFilterType = 'ALL'; // 'ALL', 'lecture', 'announcement', 'banner', 'schedule'
+  String _contentDeptFilter = 'ALL';
+  String _contentStageFilter = 'ALL';
+  String _contentSearchQuery = '';
+
   List<AppUserModel> get _representatives => _allUsers
       .where((u) => u.isRepresentative || u.canPublishLectures || u.canPublishAnnouncements)
       .toList();
@@ -225,9 +236,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
       items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      final banners = _allAnnouncements
+          .where((a) => a.imageUrl != null && a.imageUrl!.isNotEmpty && a.subjectName != 'SCHEDULE' && a.subjectName != 'COURSE')
+          .toList();
+
       if (mounted) {
         setState(() {
           _activities = items;
+          _existingBanners = banners;
           _isLoadingDashboard = false;
         });
       }
@@ -443,7 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: Colors.white,
+              backgroundColor: AppTheme.darkCard,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
                 'ترقية وإدارة صلاحيات: ${user.name}',
@@ -626,9 +642,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: _isMujtaba
               ? const [
-                  Tab(icon: Icon(Icons.radar_rounded), text: 'رادار نشاط الممثلين'),
-                  Tab(icon: Icon(Icons.badge_rounded), text: 'ممثلو الشعب والمراحل'),
-                  Tab(icon: Icon(Icons.auto_stories_rounded), text: 'إدارة المحتوى'),
+                  Tab(icon: Icon(Icons.analytics_rounded), text: 'إحصائيات الطلاب والرادار'),
+                  Tab(icon: Icon(Icons.people_alt_rounded), text: 'الطلاب والممثلين'),
+                  Tab(icon: Icon(Icons.auto_stories_rounded), text: 'إدارة المحتوى والنشر'),
                   Tab(icon: Icon(Icons.photo_library_rounded), text: 'بوسترات الواجهة'),
                   Tab(icon: Icon(Icons.campaign_rounded), text: 'نشر مركزي'),
                 ]
@@ -1330,20 +1346,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── لوحة المؤشرات والإحصائيات الحيوية للنظام ──
+          // ── لوحة المؤشرات والإحصائيات القيادية الحية للنظام ──
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppTheme.primary.withValues(alpha: 0.25),
-                  AppTheme.accent.withValues(alpha: 0.12),
+                  AppTheme.primary.withValues(alpha: 0.35),
+                  AppTheme.accent.withValues(alpha: 0.15),
                 ],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1353,46 +1369,124 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.hub_rounded, color: AppTheme.accent, size: 22),
-                        const SizedBox(width: 8),
-                        Text(
-                          'نبض المنظومة وإحصائيات الكلية',
-                          style: GoogleFonts.cairo(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accent.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
                           ),
+                          child: const Icon(Icons.analytics_rounded, color: AppTheme.accent, size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'لوحة المؤشرات والتحليل المباشر',
+                              style: GoogleFonts.cairo(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'إشراف عام: مجتبى عواد • مزامنة حية مع السيرفر',
+                              style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.accent, size: 20),
-                      tooltip: 'تحديث فوري',
+                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.accent, size: 22),
+                      tooltip: 'تحديث فوري للبيانات',
                       onPressed: _loadDashboardData,
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+
+                // ── بطاقة إجمالي الطلاب الكبرى ──
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.groups_rounded, color: AppTheme.accent, size: 30),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'إجمالي الطلاب المسجلين بالمنظومة',
+                              style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1)),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  '${_allUsers.length}',
+                                  style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'طالب مسجل',
+                                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.accent, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accent,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => _tabController.animateTo(1),
+                        child: Text(
+                          'عرض الطلاب',
+                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 12),
+
+                // ── البطاقات الإحصائية المصغرة ──
                 Row(
                   children: [
                     Expanded(
                       child: _buildMetricMiniCard(
                         title: 'الطلبة',
-                        value: '${_allUsers.length}',
-                        icon: Icons.people_alt_rounded,
+                        value: '${_allUsers.where((u) => u.isStudent).length}',
+                        icon: Icons.person_rounded,
                         color: AppTheme.primaryLight,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: _buildMetricMiniCard(
-                        title: 'ممثلو الشعب',
+                        title: 'الممثلون',
                         value: '${_representatives.length}',
                         icon: Icons.badge_rounded,
                         color: AppTheme.accent,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: _buildMetricMiniCard(
                         title: 'المحاضرات',
@@ -1401,7 +1495,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         color: Colors.purpleAccent,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: _buildMetricMiniCard(
                         title: 'التبليغات',
@@ -1412,10 +1506,177 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMetricMiniCard(
+                        title: 'البوسترات',
+                        value: '${_existingBanners.length}',
+                        icon: Icons.photo_library_rounded,
+                        color: Colors.pinkAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _buildMetricMiniCard(
+                        title: 'الجداول',
+                        value: '${_allAnnouncements.where((a) => a.subjectName == 'SCHEDULE' || a.content.contains('[SCHEDULE_TIMETABLE]')).length}',
+                        icon: Icons.calendar_month_rounded,
+                        color: Colors.tealAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _buildMetricMiniCard(
+                        title: 'المشرفون',
+                        value: '${_allUsers.where((u) => u.isAdmin).length}',
+                        icon: Icons.shield_rounded,
+                        color: Colors.cyanAccent,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
           const SizedBox(height: 16),
+
+          // ── بطاقة تفصيل الأقسام الأكاديمية ──
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.darkBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.account_balance_rounded, color: AppTheme.accent, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'توزيع الطلاب حسب الأقسام العلمية',
+                      style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...AppConstants.departments.map((dept) {
+                  final deptCount = _allUsers.where((u) => u.department.contains(dept) || dept.contains(u.department)).length;
+                  final double pct = _allUsers.isEmpty ? 0.0 : (deptCount / _allUsers.length);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(dept, style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                            Text(
+                              '$deptCount طالب (${(pct * 100).toStringAsFixed(0)}%)',
+                              style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            backgroundColor: Colors.white10,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              dept.contains('طبية')
+                                  ? const Color(0xFF10B981)
+                                  : (dept.contains('حاسوب') ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B)),
+                            ),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── بطاقة تفصيل المراحل الدراسية ──
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.darkBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.stairs_rounded, color: AppTheme.primaryLight, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'توزيع الطلاب حسب المراحل الدراسية',
+                      style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: AppConstants.stages.map((stage) {
+                    final stageCount = _allUsers.where((u) => u.stage.contains(stage) || stage.contains(u.stage)).length;
+                    return Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              stage.replaceAll('المرحلة ', ''),
+                              style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8), fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$stageCount',
+                              style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                            ),
+                            Text(
+                              'طالب',
+                              style: GoogleFonts.cairo(fontSize: 9, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // ── عنوان رادار نشاط النشر ──
+          Row(
+            children: [
+              const Icon(Icons.radar_rounded, color: AppTheme.accent, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'رادار نشاط وعمليات النشر المباشرة',
+                style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
 
           // ── شريط البحث والفلاتر ──
           TextField(
@@ -1787,17 +2048,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // ══════════════════════════════════════════════════════════════
-  // تبويب دليل وإدارة ممثلي الشعب والمراحل لمجتبى
+  // ══════════════════════════════════════════════════════════════
+  // تبويب دليل وإدارة الطلاب وممثلي الشعب لمجتبى
   // ══════════════════════════════════════════════════════════════
   Widget _buildRepsDirectoryTab() {
-    final filtered = _representatives.where((rep) {
-      final matchDept = _repDeptFilter == 'ALL' || rep.department == _repDeptFilter;
-      final matchStage = _repStageFilter == 'ALL' || rep.stage == _repStageFilter;
+    final filtered = _allUsers.where((user) {
+      if (_userDirectoryRoleFilter == 'REPS') {
+        if (!user.isRepresentative && !user.canPublishLectures && !user.canPublishAnnouncements) return false;
+      } else if (_userDirectoryRoleFilter == 'STUDENTS') {
+        if (!user.isStudent) return false;
+      }
+
+      final matchDept = _repDeptFilter == 'ALL' || user.department.contains(_repDeptFilter) || _repDeptFilter.contains(user.department);
+      final matchStage = _userDirectoryStageFilter == 'ALL' || user.stage.contains(_userDirectoryStageFilter) || _userDirectoryStageFilter.contains(user.stage);
       final q = _repSearchQuery.trim().toLowerCase();
       final matchSearch = q.isEmpty ||
-          rep.name.toLowerCase().contains(q) ||
-          rep.studentId.toLowerCase().contains(q) ||
-          (rep.section != null && rep.section!.toLowerCase().contains(q));
+          user.name.toLowerCase().contains(q) ||
+          user.studentId.toLowerCase().contains(q) ||
+          (user.section != null && user.section!.toLowerCase().contains(q)) ||
+          user.department.toLowerCase().contains(q);
       return matchDept && matchStage && matchSearch;
     }).toList();
 
@@ -1806,7 +2075,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // زر تكليف ممثل جديد
+          // رأس التبويب وزر تكليف ممثل
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1814,11 +2083,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'دليل ممثلي الشعب والمراحل',
-                    style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    'سجل الطلاب وممثلي الشعب',
+                    style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
                   Text(
-                    '${filtered.length} ممثلين نشطين في المنظومة',
+                    '${filtered.length} مستخدم معروض من إجمالي ${_allUsers.length} طالب',
                     style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent),
                   ),
                 ],
@@ -1840,12 +2109,57 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 14),
 
+          // ── تصنيف الرتب (الكل / الممثلين / الطلاب) ──
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: Text('جميع المسجلين (${_allUsers.length})'),
+                  selected: _userDirectoryRoleFilter == 'ALL',
+                  onSelected: (s) => setState(() => _userDirectoryRoleFilter = 'ALL'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _userDirectoryRoleFilter == 'ALL' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('ممثلو الشعب ⭐ (${_representatives.length})'),
+                  selected: _userDirectoryRoleFilter == 'REPS',
+                  onSelected: (s) => setState(() => _userDirectoryRoleFilter = 'REPS'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _userDirectoryRoleFilter == 'REPS' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('الطلبة فقط 🎓 (${_allUsers.where((u) => u.isStudent).length})'),
+                  selected: _userDirectoryRoleFilter == 'STUDENTS',
+                  onSelected: (s) => setState(() => _userDirectoryRoleFilter = 'STUDENTS'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _userDirectoryRoleFilter == 'STUDENTS' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // شريط البحث
           TextField(
             style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
             onChanged: (val) => setState(() => _repSearchQuery = val),
             decoration: InputDecoration(
-              hintText: 'ابحث عن ممثل أو شعبة أو قسم...',
+              hintText: 'ابحث بالاسم، المعرف الجامعي (ST-...)، الشعبة، أو القسم...',
               hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
               prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.accent, size: 20),
               filled: true,
@@ -1894,6 +2208,43 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ],
             ),
           ),
+          const SizedBox(height: 8),
+
+          // فلترة المراحل
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('كافة المراحل'),
+                  selected: _userDirectoryStageFilter == 'ALL',
+                  onSelected: (s) => setState(() => _userDirectoryStageFilter = 'ALL'),
+                  selectedColor: AppTheme.primaryLight,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _userDirectoryStageFilter == 'ALL' ? Colors.white : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                ...AppConstants.stages.map((stage) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(stage),
+                      selected: _userDirectoryStageFilter == stage,
+                      onSelected: (s) => setState(() => _userDirectoryStageFilter = s ? stage : 'ALL'),
+                      selectedColor: AppTheme.primaryLight,
+                      labelStyle: GoogleFonts.cairo(
+                        color: _userDirectoryStageFilter == stage ? Colors.white : const Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
 
           if (filtered.isEmpty)
@@ -1906,21 +2257,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               child: Center(
                 child: Text(
-                  'لم يتم العثور على ممثلين مطابقين للبحث',
+                  'لم يتم العثور على طلاب أو ممثلين مطابقين للبحث',
                   style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
                 ),
               ),
             )
           else
-            ...filtered.map((rep) => _buildRepCard(rep)),
+            ...filtered.map((user) => _buildRepCard(user)),
         ],
       ),
     );
   }
 
   Widget _buildRepCard(AppUserModel rep) {
+    final bool isRep = rep.isRepresentative || rep.canPublishLectures || rep.canPublishAnnouncements;
+    final bool isAdmin = rep.isAdmin;
     final lectureCount = _allLectures.where((l) => l.uploaderId == rep.studentId).length;
     final announceCount = _allAnnouncements.where((a) => a.authorId == rep.studentId).length;
+
+    Color avatarColor = AppTheme.primaryLight;
+    if (isAdmin) {
+      avatarColor = Colors.greenAccent;
+    } else if (isRep) {
+      avatarColor = AppTheme.accent;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1928,7 +2288,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       decoration: BoxDecoration(
         color: AppTheme.darkCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.darkBorder),
+        border: Border.all(
+          color: isAdmin
+              ? Colors.greenAccent.withValues(alpha: 0.4)
+              : (isRep ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.darkBorder),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1936,10 +2300,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: AppTheme.accent.withValues(alpha: 0.2),
+                backgroundColor: avatarColor.withValues(alpha: 0.15),
                 child: Text(
-                  rep.name.isNotEmpty ? rep.name[0] : 'R',
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: AppTheme.accent),
+                  rep.name.isNotEmpty ? rep.name[0] : 'S',
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: avatarColor),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1958,138 +2322,164 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppTheme.accent.withValues(alpha: 0.15),
+                            color: avatarColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+                            border: Border.all(color: avatarColor.withValues(alpha: 0.4)),
                           ),
                           child: Text(
-                            'شعبة ${rep.section ?? 'عامة'}',
-                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                            isAdmin ? 'مشرف عام 🛡️' : (isRep ? 'ممثل الشعبة ⭐' : 'طالب 🎓'),
+                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: avatarColor),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${rep.studentId} • ${rep.department} (${rep.stage})',
+                      '${rep.studentId} • ${rep.department} (${rep.stage})${rep.section != null && rep.section!.isNotEmpty ? ' • شعبة ${rep.section}' : ''}',
                       style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
                     ),
+                    if (rep.createdAt != null)
+                      Text(
+                        'تاريخ التسجيل: ${rep.createdAt!.year}/${rep.createdAt!.month.toString().padLeft(2, '0')}/${rep.createdAt!.day.toString().padLeft(2, '0')}',
+                        style: GoogleFonts.cairo(fontSize: 9.5, color: const Color(0xFF64748B)),
+                      ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
 
-          // إحصائية نشاط الممثل
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(8),
+          if (isRep) ...[
+            const SizedBox(height: 10),
+            // إحصائية نشاط الممثل
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bar_chart_rounded, size: 16, color: AppTheme.primaryLight),
+                  const SizedBox(width: 6),
+                  Text(
+                    'نشاط النشر: $lectureCount محاضرات • $announceCount تبليغات',
+                    style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
+            const SizedBox(height: 8),
+
+            // مفاتيح التحكم السريع بالصلاحيات بنقرة زر
+            Row(
               children: [
-                const Icon(Icons.bar_chart_rounded, size: 16, color: AppTheme.primaryLight),
-                const SizedBox(width: 6),
-                Text(
-                  'نشاط النشر: $lectureCount محاضرات • $announceCount تبليغات',
-                  style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), fontWeight: FontWeight.bold),
+                Expanded(
+                  child: SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('رفع المحاضرات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary)),
+                    value: rep.canPublishLectures,
+                    activeColor: AppTheme.primaryLight,
+                    onChanged: (val) async {
+                      setState(() {
+                        final idx = _allUsers.indexWhere((u) => u.studentId == rep.studentId);
+                        if (idx != -1) {
+                          _allUsers[idx] = AppUserModel(
+                            id: rep.id,
+                            studentId: rep.studentId,
+                            name: rep.name,
+                            department: rep.department,
+                            stage: rep.stage,
+                            section: rep.section,
+                            role: rep.role,
+                            canPublishLectures: val,
+                            canPublishAnnouncements: rep.canPublishAnnouncements,
+                          );
+                        }
+                      });
+                      await SupabaseService().updateUserRole(
+                        studentId: rep.studentId,
+                        role: rep.role,
+                        canPublishLectures: val,
+                        canPublishAnnouncements: rep.canPublishAnnouncements,
+                        section: rep.section,
+                      );
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('نشر التبليغات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary)),
+                    value: rep.canPublishAnnouncements,
+                    activeColor: AppTheme.accent,
+                    onChanged: (val) async {
+                      setState(() {
+                        final idx = _allUsers.indexWhere((u) => u.studentId == rep.studentId);
+                        if (idx != -1) {
+                          _allUsers[idx] = AppUserModel(
+                            id: rep.id,
+                            studentId: rep.studentId,
+                            name: rep.name,
+                            department: rep.department,
+                            stage: rep.stage,
+                            section: rep.section,
+                            role: rep.role,
+                            canPublishLectures: rep.canPublishLectures,
+                            canPublishAnnouncements: val,
+                          );
+                        }
+                      });
+                      await SupabaseService().updateUserRole(
+                        studentId: rep.studentId,
+                        role: rep.role,
+                        canPublishLectures: rep.canPublishLectures,
+                        canPublishAnnouncements: val,
+                        section: rep.section,
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-
-          // مفاتيح التحكم السريع بالصلاحيات بنقرة زر
-          Row(
-            children: [
-              Expanded(
-                child: SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('رفع المحاضرات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary)),
-                  value: rep.canPublishLectures,
-                  activeColor: AppTheme.primaryLight,
-                  onChanged: (val) async {
-                    setState(() {
-                      final idx = _allUsers.indexWhere((u) => u.studentId == rep.studentId);
-                      if (idx != -1) {
-                        _allUsers[idx] = AppUserModel(
-                          id: rep.id,
-                          studentId: rep.studentId,
-                          name: rep.name,
-                          department: rep.department,
-                          stage: rep.stage,
-                          section: rep.section,
-                          role: rep.role,
-                          canPublishLectures: val,
-                          canPublishAnnouncements: rep.canPublishAnnouncements,
-                        );
-                      }
-                    });
-                    await SupabaseService().updateUserRole(
-                      studentId: rep.studentId,
-                      role: rep.role,
-                      canPublishLectures: val,
-                      canPublishAnnouncements: rep.canPublishAnnouncements,
-                      section: rep.section,
-                    );
-                  },
-                ),
-              ),
-              Expanded(
-                child: SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('نشر التبليغات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary)),
-                  value: rep.canPublishAnnouncements,
-                  activeColor: AppTheme.accent,
-                  onChanged: (val) async {
-                    setState(() {
-                      final idx = _allUsers.indexWhere((u) => u.studentId == rep.studentId);
-                      if (idx != -1) {
-                        _allUsers[idx] = AppUserModel(
-                          id: rep.id,
-                          studentId: rep.studentId,
-                          name: rep.name,
-                          department: rep.department,
-                          stage: rep.stage,
-                          section: rep.section,
-                          role: rep.role,
-                          canPublishLectures: rep.canPublishLectures,
-                          canPublishAnnouncements: val,
-                        );
-                      }
-                    });
-                    await SupabaseService().updateUserRole(
-                      studentId: rep.studentId,
-                      role: rep.role,
-                      canPublishLectures: rep.canPublishLectures,
-                      canPublishAnnouncements: val,
-                      section: rep.section,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+          ],
 
           const Divider(color: AppTheme.darkBorder, height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton.icon(
-                icon: const Icon(Icons.edit_note_rounded, color: AppTheme.accent, size: 18),
-                label: Text('تعديل الشعبة والصلاحيات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent)),
-                onPressed: () => _showPromoteDialog(rep),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                icon: const Icon(Icons.person_remove_rounded, color: AppTheme.danger, size: 18),
-                label: Text('سحب التكليف', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.danger)),
-                onPressed: () => _confirmDemoteRep(rep),
-              ),
+              if (isRep) ...[
+                TextButton.icon(
+                  icon: const Icon(Icons.edit_note_rounded, color: AppTheme.accent, size: 18),
+                  label: Text('تعديل الشعبة والصلاحيات', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent)),
+                  onPressed: () => _showPromoteDialog(rep),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.person_remove_rounded, color: AppTheme.danger, size: 18),
+                  label: Text('سحب التكليف', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.danger)),
+                  onPressed: () => _confirmDemoteRep(rep),
+                ),
+              ] else ...[
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.star_rounded, color: Colors.black, size: 16),
+                  label: Text('ترقية إلى ممثل شعبة ⭐', style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
+                  onPressed: () => _showPromoteDialog(rep),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.tune_rounded, color: const Color(0xFF94A3B8), size: 18),
+                  label: Text('إدارة الصلاحيات', style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8))),
+                  onPressed: () => _showPromoteDialog(rep),
+                ),
+              ],
             ],
           ),
         ],
@@ -2384,52 +2774,488 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // ── تبويب 4: إدارة المحتوى المنشور (حذف وتعديل) ───────────────
+  // ── تبويب 3: مركز إدارة وحذف المحتوى المنشور الموحد ───────────────
   Widget _buildContentManagementTab() {
-    return FutureBuilder<List<LectureModel>>(
-      future: SupabaseService().fetchLectures(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primaryLight));
+    // تجميع كافة المحتويات المنشورة في نموذج موحد
+    final List<Map<String, dynamic>> allItems = [];
+
+    for (final lec in _allLectures) {
+      allItems.add({
+        'id': lec.id,
+        'type': 'lecture',
+        'title': lec.title,
+        'subjectName': lec.subjectName,
+        'department': lec.department,
+        'stage': lec.stage,
+        'authorName': lec.uploaderName,
+        'authorRole': lec.uploaderRole,
+        'createdAt': lec.createdAt,
+        'fileUrl': lec.streamUrl ?? lec.driveUrl,
+        'content': lec.description,
+      });
+    }
+
+    for (final ann in _allAnnouncements) {
+      if (ann.subjectName == 'COURSE') continue; // سجل المقررات داخلي
+      String type = 'announcement';
+      if (ann.subjectName == 'SCHEDULE' || ann.content.contains('[SCHEDULE_TIMETABLE]')) {
+        type = 'schedule';
+      } else if (ann.imageUrl != null && ann.imageUrl!.isNotEmpty) {
+        type = 'banner';
+      }
+
+      allItems.add({
+        'id': ann.id,
+        'type': type,
+        'title': ann.title,
+        'subjectName': ann.subjectName ?? 'عام',
+        'department': ann.department,
+        'stage': ann.stage,
+        'authorName': ann.authorName,
+        'authorRole': ann.authorRole,
+        'createdAt': ann.createdAt,
+        'fileUrl': ann.imageUrl,
+        'content': ann.content,
+      });
+    }
+
+    allItems.sort((a, b) => (b['createdAt'] as DateTime).compareTo(a['createdAt'] as DateTime));
+
+    final filtered = allItems.where((item) {
+      final type = item['type'] as String;
+      if (_contentFilterType != 'ALL' && type != _contentFilterType) return false;
+
+      final dept = item['department'] as String;
+      if (_contentDeptFilter != 'ALL' && !dept.contains(_contentDeptFilter) && !_contentDeptFilter.contains(dept)) {
+        return false;
+      }
+
+      final stage = item['stage'] as String;
+      if (_contentStageFilter != 'ALL' && !stage.contains(_contentStageFilter) && !_contentStageFilter.contains(stage)) {
+        return false;
+      }
+
+      final q = _contentSearchQuery.trim().toLowerCase();
+      if (q.isNotEmpty) {
+        final title = (item['title'] as String).toLowerCase();
+        final subject = (item['subjectName'] as String).toLowerCase();
+        final author = (item['authorName'] as String).toLowerCase();
+        final content = ((item['content'] as String?) ?? '').toLowerCase();
+        if (!title.contains(q) && !subject.contains(q) && !author.contains(q) && !content.contains(q)) {
+          return false;
         }
-        final lectures = snapshot.data!;
-        if (lectures.isEmpty) {
-          return Center(
-            child: Text('لا توجد محاضرات منشورة لإدارتها', style: GoogleFonts.cairo(color: const Color(0xFF94A3B8))),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(14),
-          itemCount: lectures.length,
-          itemBuilder: (context, index) {
-            final item = lectures[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
+      }
+
+      return true;
+    }).toList();
+
+    return RefreshIndicator(
+      onRefresh: _loadDashboardData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // رأس لوحة إدارة المحتوى
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'مركز إدارة وحذف المحتوى المنشور',
+                    style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  Text(
+                    '${filtered.length} عنصر معروض من إجمالي ${allItems.length}',
+                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: AppTheme.accent, size: 22),
+                tooltip: 'تحديث فوري',
+                onPressed: _loadDashboardData,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // ── تصنيف نوع المحتوى ──
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: Text('الكل (${allItems.length})'),
+                  selected: _contentFilterType == 'ALL',
+                  onSelected: (s) => setState(() => _contentFilterType = 'ALL'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentFilterType == 'ALL' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('محاضرات 📘 (${allItems.where((i) => i['type'] == 'lecture').length})'),
+                  selected: _contentFilterType == 'lecture',
+                  onSelected: (s) => setState(() => _contentFilterType = 'lecture'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentFilterType == 'lecture' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('تبليغات 📢 (${allItems.where((i) => i['type'] == 'announcement').length})'),
+                  selected: _contentFilterType == 'announcement',
+                  onSelected: (s) => setState(() => _contentFilterType = 'announcement'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentFilterType == 'announcement' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('بوسترات 🖼️ (${allItems.where((i) => i['type'] == 'banner').length})'),
+                  selected: _contentFilterType == 'banner',
+                  onSelected: (s) => setState(() => _contentFilterType = 'banner'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentFilterType == 'banner' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: Text('جداول 📅 (${allItems.where((i) => i['type'] == 'schedule').length})'),
+                  selected: _contentFilterType == 'schedule',
+                  onSelected: (s) => setState(() => _contentFilterType = 'schedule'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentFilterType == 'schedule' ? Colors.black : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // شريط البحث في المحتوى
+          TextField(
+            style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
+            onChanged: (val) => setState(() => _contentSearchQuery = val),
+            decoration: InputDecoration(
+              hintText: 'ابحث في العنوان، المادة، الناشر، أو المحتوى...',
+              hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
+              prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.accent, size: 20),
+              filled: true,
+              fillColor: AppTheme.darkCard,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: AppTheme.darkBorder),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // فلاتر الأقسام
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('كافة الأقسام'),
+                  selected: _contentDeptFilter == 'ALL',
+                  onSelected: (s) => setState(() => _contentDeptFilter = 'ALL'),
+                  selectedColor: AppTheme.primaryLight,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _contentDeptFilter == 'ALL' ? Colors.white : const Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                ...AppConstants.departments.map((dept) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(dept),
+                      selected: _contentDeptFilter == dept,
+                      onSelected: (s) => setState(() => _contentDeptFilter = s ? dept : 'ALL'),
+                      selectedColor: AppTheme.primaryLight,
+                      labelStyle: GoogleFonts.cairo(
+                        color: _contentDeptFilter == dept ? Colors.white : const Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          if (filtered.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(36),
               decoration: BoxDecoration(
                 color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.darkBorder),
               ),
-              child: ListTile(
-                title: Text(item.title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-                subtitle: Text('${item.subjectName} • ${item.department}', style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8))),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger),
-                  onPressed: () async {
-                    final ok = await SupabaseService().deleteLecture(item.id);
-                    if (ok) {
-                      setState(() {});
-                      _showSnackbar('تم حذف المحاضرة');
-                    }
-                  },
+              child: Center(
+                child: Text(
+                  'لا توجد عناصر منشورة تطابق الفلاتر المحددة',
+                  style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
                 ),
               ),
-            );
-          },
-        );
-      },
+            )
+          else
+            ...filtered.map((item) => _buildUnifiedContentCard(item)),
+        ],
+      ),
     );
+  }
+
+  Widget _buildUnifiedContentCard(Map<String, dynamic> item) {
+    final String type = item['type'];
+    final String title = item['title'];
+    final String subjectName = item['subjectName'];
+    final String department = item['department'];
+    final String stage = item['stage'];
+    final String authorName = item['authorName'];
+    final DateTime createdAt = item['createdAt'];
+    final String? fileUrl = item['fileUrl'];
+    final String? content = item['content'];
+
+    IconData typeIcon = Icons.article_rounded;
+    Color typeColor = AppTheme.accent;
+    String typeLabel = 'تبليغ';
+
+    if (type == 'lecture') {
+      typeIcon = Icons.menu_book_rounded;
+      typeColor = const Color(0xFF38BDF8);
+      typeLabel = 'محاضرة';
+    } else if (type == 'banner') {
+      typeIcon = Icons.photo_library_rounded;
+      typeColor = const Color(0xFFF43F5E);
+      typeLabel = 'بوستر واجهة';
+    } else if (type == 'schedule') {
+      typeIcon = Icons.calendar_month_rounded;
+      typeColor = const Color(0xFF10B981);
+      typeLabel = 'جدول دراسي';
+    }
+
+    final bool hasImage = fileUrl != null &&
+        fileUrl.isNotEmpty &&
+        (type == 'banner' || type == 'schedule' || fileUrl.contains('.jpg') || fileUrl.contains('.png') || fileUrl.contains('.webp') || fileUrl.contains('api.telegram.org'));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: typeColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(typeIcon, color: typeColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: typeColor.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            typeLabel,
+                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: typeColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'مادة: $subjectName • $department ($stage)',
+                      style: GoogleFonts.cairo(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // في حال وجود صورة مصغرة (بوستر أو جدول)
+          if (hasImage) ...[
+            GestureDetector(
+              onTap: () {
+                AppFullscreenModal.show(
+                  context: context,
+                  title: title,
+                  subtitle: '$department • $stage',
+                  imageUrl: fileUrl,
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    AppNetworkImage(
+                      imageUrl: fileUrl,
+                      width: double.infinity,
+                      height: 140,
+                      fit: BoxFit.cover,
+                    ),
+                    Container(
+                      margin: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text('اضغط لتكبير الصورة', style: GoogleFonts.cairo(fontSize: 10, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ] else if (content != null && content.isNotEmpty && !content.contains('[SCHEDULE_TIMETABLE]')) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                content,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // تذييل البطاقة مع اسم الناشر والتاريخ وأزرار الإجراء
+          Row(
+            children: [
+              Text(
+                'نُشر بواسطة: $authorName • ${createdAt.year}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.day.toString().padLeft(2, '0')}',
+                style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B)),
+              ),
+              const Spacer(),
+              if (type == 'lecture' && fileUrl != null && fileUrl.isNotEmpty)
+                IconButton(
+                  tooltip: 'معاينة الملف السحابي',
+                  icon: const Icon(Icons.remove_red_eye_rounded, color: AppTheme.primaryLight, size: 20),
+                  onPressed: () => _launchUrlExternal(fileUrl, errorMsg: 'تعذر فتح الملف'),
+                ),
+              IconButton(
+                tooltip: 'حذف المحتوى نهائياً',
+                icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                onPressed: () => _confirmDeleteUnifiedContent(item),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteUnifiedContent(Map<String, dynamic> item) async {
+    final String type = item['type'];
+    final String id = item['id'];
+    final String title = item['title'];
+    final String authorName = item['authorName'];
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        title: Text(
+          'تأكيد حذف المحتوى الإشرافي',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
+        ),
+        content: Text(
+          'هل تريد بالتأكيد حذف "$title" المنشور بواسطة $authorName؟\nسيتم حذفه نهائياً من قاعدة بيانات السيرفر والتطبيق لكافة الطلبة.',
+          style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('إلغاء', style: GoogleFonts.cairo(color: const Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      bool ok = false;
+      if (type == 'lecture') {
+        ok = await SupabaseService().deleteLecture(id);
+      } else {
+        ok = await SupabaseService().deleteAnnouncement(id);
+      }
+
+      if (ok) {
+        _showSnackbar('تم حذف المحتوى بنجاح');
+        _loadDashboardData();
+        if (type == 'banner') _loadBanners();
+      } else {
+        _showSnackbar('تعذر حذف المحتوى، تحقق من الاتصال', isError: true);
+      }
+    }
   }
 
   // ── إدارة البوسترات المصورة (خاص بمجتبى عواد عبر سيرفر تيليجرام) ───────────
@@ -2844,22 +3670,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: banner.imageUrl != null && banner.imageUrl!.isNotEmpty
-                ? AppNetworkImage(
-                    imageUrl: banner.imageUrl!,
-                    width: 70,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorWidget: Container(
+          GestureDetector(
+            onTap: () {
+              if (banner.imageUrl != null && banner.imageUrl!.isNotEmpty) {
+                AppFullscreenModal.show(
+                  context: context,
+                  title: banner.title,
+                  subtitle: '${banner.department} • ${banner.stage}',
+                  imageUrl: banner.imageUrl,
+                );
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: banner.imageUrl != null && banner.imageUrl!.isNotEmpty
+                  ? AppNetworkImage(
+                      imageUrl: banner.imageUrl!,
                       width: 70,
                       height: 50,
-                      color: AppTheme.primary,
-                      child: const Icon(Icons.broken_image, color: Colors.white54, size: 20),
-                    ),
-                  )
-                : Container(width: 70, height: 50, color: AppTheme.primary),
+                      fit: BoxFit.cover,
+                      errorWidget: Container(
+                        width: 70,
+                        height: 50,
+                        color: AppTheme.primary,
+                        child: const Icon(Icons.broken_image, color: Colors.white54, size: 20),
+                      ),
+                    )
+                  : Container(width: 70, height: 50, color: AppTheme.primary),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2873,7 +3711,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  ' • ',
+                  '${banner.department} • ${banner.stage}',
                   style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
                 ),
               ],

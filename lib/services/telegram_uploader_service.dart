@@ -191,10 +191,26 @@ class TelegramUploaderService {
           final result = data['result'];
           final msgId = result['message_id'] as int?;
           final doc = result['document'];
-          final fileId = doc?['file_id']?.toString();
-          final mimeType = doc?['mime_type']?.toString() ?? 'application/octet-stream';
+          String? fileId = doc?['file_id']?.toString();
+          String mimeType = doc?['mime_type']?.toString() ?? 'application/octet-stream';
 
-          // جلب مسار التحميل المباشر
+          if (fileId == null) {
+            if (result['photo'] is List && (result['photo'] as List).isNotEmpty) {
+              fileId = (result['photo'] as List).last['file_id']?.toString();
+              mimeType = 'image/jpeg';
+            } else if (result['sticker'] != null) {
+              fileId = result['sticker']['file_id']?.toString();
+              mimeType = 'image/webp';
+            } else if (result['video'] != null) {
+              fileId = result['video']['file_id']?.toString();
+              mimeType = result['video']['mime_type']?.toString() ?? 'video/mp4';
+            } else if (result['animation'] != null) {
+              fileId = result['animation']['file_id']?.toString();
+              mimeType = result['animation']['mime_type']?.toString() ?? 'video/mp4';
+            }
+          }
+
+          // جلب مسار التحميل المباشر السحابي
           String? directUrl;
           if (fileId != null) {
             try {
@@ -212,7 +228,7 @@ class TelegramUploaderService {
             }
           }
 
-          directUrl ??= '${AppConstants.telegramStreamerBaseUrl}/api/file/$msgId';
+          directUrl ??= '';
 
           return UploadGeneralFileResult(
             success: true,
@@ -310,8 +326,21 @@ class TelegramUploaderService {
           final result = data['result'];
           final msgId = result['message_id'] as int?;
           final doc = result['document'];
-          final fileId = doc?['file_id']?.toString();
-          final realMime = doc?['mime_type']?.toString() ?? 'application/octet-stream';
+          String? fileId = doc?['file_id']?.toString();
+          String realMime = doc?['mime_type']?.toString() ?? 'application/octet-stream';
+
+          if (fileId == null) {
+            if (result['video'] != null) {
+              fileId = result['video']['file_id']?.toString();
+              realMime = result['video']['mime_type']?.toString() ?? 'video/mp4';
+            } else if (result['photo'] is List && (result['photo'] as List).isNotEmpty) {
+              fileId = (result['photo'] as List).last['file_id']?.toString();
+              realMime = 'image/jpeg';
+            } else if (result['animation'] != null) {
+              fileId = result['animation']['file_id']?.toString();
+              realMime = result['animation']['mime_type']?.toString() ?? 'video/mp4';
+            }
+          }
 
           // 3. جلب مسار التحميل المباشر السحابي الدائم
           String? directUrl;
