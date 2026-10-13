@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import 'app_icon_badge.dart';
 
@@ -189,7 +190,7 @@ class AppFullscreenModal extends StatelessWidget {
                           maxScale: 4.5,
                           child: Center(
                             child: Image.network(
-                              imageUrl!,
+                              AppConstants.resolveImageUrl(imageUrl!),
                               fit: BoxFit.contain,
                               loadingBuilder: (context, child, progress) {
                                 if (progress == null) return child;

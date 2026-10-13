@@ -1,0 +1,32 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/proxy",
+      "destination": "/api/proxy.js"
+    },
+    {
+      "source": "/telegram-cdn/:path*",
+      "destination": "https://api.telegram.org/file/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        }
+      ]
+    }
+  ]
+}

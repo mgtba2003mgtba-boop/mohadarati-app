@@ -69,20 +69,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   String _resolveUrl(String? url) {
     if (url == null || url.trim().isEmpty) return '';
-    final clean = url.trim();
-    if (clean.startsWith('https://api.telegram.org')) {
-      return clean;
-    }
-    if (kIsWeb) {
-      if (clean.contains('/api/file/')) {
-        final pathPart = clean.substring(clean.indexOf('/api/file/'));
-        final host = Uri.base.host;
-        final port = Uri.base.port;
-        final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
-        return '${Uri.base.scheme}://$host$portStr$pathPart';
-      }
-    }
-    return clean;
+    return AppConstants.resolveImageUrl(url);
   }
 
   void _openFullscreenViewer(String imageUrl, String title) {

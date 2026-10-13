@@ -12,6 +12,7 @@ import '../services/attendance_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
+import '../widgets/app_network_image.dart';
 import 'courses_screen.dart';
 import 'schedule_screen.dart';
 import 'dashboard_screen.dart';
@@ -377,10 +378,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       fit: StackFit.expand,
                       children: [
                         // الصورة الرسمية
-                        Image.network(
-                          imageSrc,
+                        AppNetworkImage(
+                          imageUrl: imageSrc,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, err, stack) => Container(
+                          errorWidget: Container(
                             color: AppTheme.primary,
                             child: const Center(
                               child: Icon(Icons.image_outlined, color: Colors.white54, size: 40),

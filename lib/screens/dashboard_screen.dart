@@ -8,6 +8,7 @@ import '../models/lecture_model.dart';
 import '../models/announcement_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
+import '../widgets/app_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 
 class RepresentativeActivityItem {
@@ -2846,12 +2847,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: banner.imageUrl != null && banner.imageUrl!.isNotEmpty
-                ? Image.network(
-                    banner.imageUrl!,
+                ? AppNetworkImage(
+                    imageUrl: banner.imageUrl!,
                     width: 70,
                     height: 50,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorWidget: Container(
                       width: 70,
                       height: 50,
                       color: AppTheme.primary,

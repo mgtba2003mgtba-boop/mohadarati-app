@@ -31,6 +31,38 @@ class AppConstants {
     return 'http://192.168.100.25:8050';
   }
 
+  /// تحويل أي رابط صورة سحابي (تيليجرام أو خارجي) إلى رابط مدعوم بـ CORS
+  static String resolveImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return '';
+    final clean = url.trim();
+
+    // إذا كان الرابط base64، يُرجع كما هو
+    if (clean.startsWith('data:image')) return clean;
+
+    // على الويب، أي رابط قادم من سحابة تيليجرام يتم توجيهه عبر البروكسي لتجاوز حظر CORS
+    if (kIsWeb) {
+      if (clean.contains('api.telegram.org/file/')) {
+        final host = Uri.base.host;
+        final port = Uri.base.port;
+        final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
+        final encoded = Uri.encodeComponent(clean);
+        if (host.isNotEmpty) {
+          return '${Uri.base.scheme}://$host$portStr/api/proxy?url=$encoded';
+        }
+        return '/api/proxy?url=$encoded';
+      }
+      if (clean.contains('/api/file/')) {
+        final pathPart = clean.substring(clean.indexOf('/api/file/'));
+        final host = Uri.base.host;
+        final port = Uri.base.port;
+        final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
+        return '${Uri.base.scheme}://$host$portStr$pathPart';
+      }
+    }
+
+    return clean;
+  }
+
   // ── Telegram Bots ───────────────────────────────────────────────────
   // بوت نظام البصمة والحضور (لأكواد التحقق والاستعادة وتأكيد الحسابات)
   static const String attendanceBotUsername = 'UnivercityAttendance_mujtba_Bot';
