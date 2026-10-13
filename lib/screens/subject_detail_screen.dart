@@ -65,6 +65,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadSubjectData();
   }
 
@@ -172,12 +175,20 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
         ),
         actions: [
-          if (_canPublish)
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.primary),
-              tooltip: 'نشر في هذه المادة',
-              onPressed: _showPublishSheet,
-            ),
+          if (_canPublish) ...[
+            if (_tabController.index == 0)
+              IconButton(
+                icon: const Icon(Icons.upload_file_rounded, color: AppTheme.primary),
+                tooltip: 'نشر محاضرة جديدة',
+                onPressed: () => _showPublishSheet(initialMode: 'lecture'),
+              )
+            else if (_tabController.index == 1)
+              IconButton(
+                icon: const Icon(Icons.campaign_rounded, color: AppTheme.accent),
+                tooltip: 'نشر تبليغ للمادة',
+                onPressed: () => _showPublishSheet(initialMode: 'announcement'),
+              ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
             tooltip: 'تحديث البيانات',
@@ -206,18 +217,30 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ],
         ),
       ),
-      floatingActionButton: _canPublish
-          ? FloatingActionButton.extended(
-              onPressed: _showPublishSheet,
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              elevation: 4,
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: Text(
-                'نشر في المادة',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-            )
+      floatingActionButton: (_canPublish && _tabController.index != 2)
+          ? (_tabController.index == 0
+              ? FloatingActionButton.extended(
+                  onPressed: () => _showPublishSheet(initialMode: 'lecture'),
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  icon: const Icon(Icons.upload_file_rounded, size: 20),
+                  label: Text(
+                    'نشر محاضرة جديدة',
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                )
+              : FloatingActionButton.extended(
+                  onPressed: () => _showPublishSheet(initialMode: 'announcement'),
+                  backgroundColor: AppTheme.accent,
+                  foregroundColor: Colors.black,
+                  elevation: 4,
+                  icon: const Icon(Icons.campaign_rounded, size: 20),
+                  label: Text(
+                    'نشر تبليغ للمادة',
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ))
           : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
@@ -383,6 +406,19 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                         'لا توجد محاضرات منشورة لهذه المادة حالياً',
                         style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
                       ),
+                      if (_canPublish) ...[
+                        const SizedBox(height: 14),
+                        ElevatedButton.icon(
+                          onPressed: () => _showPublishSheet(initialMode: 'lecture'),
+                          icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.white),
+                          label: Text('نشر أول محاضرة الآن', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 )
@@ -583,6 +619,19 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               'لا توجد تبليغات خاصة بهذه المادة حالياً',
               style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
             ),
+            if (_canPublish) ...[
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () => _showPublishSheet(initialMode: 'announcement'),
+                icon: const Icon(Icons.campaign_rounded, size: 18, color: Colors.black),
+                label: Text('نشر أول تبليغ الآن', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accent,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -777,7 +826,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     );
   }
 
-  Future<void> _showPublishSheet() async {
+  Future<void> _showPublishSheet({String initialMode = 'lecture'}) async {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -787,6 +836,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         department: _effectiveDepartment,
         stage: _effectiveStage,
         currentUser: _user,
+        initialMode: initialMode,
         onSuccess: () {
           _loadSubjectData();
         },
@@ -863,6 +913,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
   final String department;
   final String stage;
   final AppUserModel? currentUser;
+  final String initialMode;
   final VoidCallback onSuccess;
 
   const _PublishToSubjectSheet({
@@ -870,6 +921,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
     required this.department,
     required this.stage,
     required this.currentUser,
+    this.initialMode = 'lecture',
     required this.onSuccess,
   });
 
@@ -878,8 +930,14 @@ class _PublishToSubjectSheet extends StatefulWidget {
 }
 
 class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
-  bool _isLectureMode = true; // true = محاضرة, false = تبليغ
+  late bool _isLectureMode;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLectureMode = widget.initialMode != 'announcement';
+  }
 
   // حقول المحاضرة
   final _titleController = TextEditingController();
