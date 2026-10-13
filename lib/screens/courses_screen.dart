@@ -105,31 +105,38 @@ class _CoursesScreenState extends State<CoursesScreen> {
         centerTitle: false,
         title: Row(
           children: [
-            const StudyBookAnimation(size: 38, showGlow: false),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'المقررات والمواد الدراسية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
+            const StudyBookAnimation(size: 34, showGlow: false),
+            const SizedBox(width: 10),
+            Text(
+              'المقررات',
+              style: GoogleFonts.cairo(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primarySubtle,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${subjects.length}',
+                style: GoogleFonts.cairo(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primary,
                 ),
-                Text(
-                  '${_user?.department ?? ''} • ${_user?.stage ?? ''}',
-                  style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
-                ),
-              ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
-            tooltip: 'تحديث المقررات',
+            tooltip: 'تحديث',
             onPressed: _loadCourses,
           ),
         ],
@@ -161,84 +168,31 @@ class _CoursesScreenState extends State<CoursesScreen> {
               color: AppTheme.primary,
               child: Column(
                 children: [
-                  // شريط البحث الأنيق
+                  // شريط البحث المقتضب
                   Container(
                     color: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Column(
-                      children: [
-                        TextField(
-                          style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
-                          onChanged: (val) => setState(() => _searchQuery = val),
-                          decoration: InputDecoration(
-                            hintText: 'ابحث باسم المادة أو المقرر الدراسي...',
-                            hintStyle: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13),
-                            prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: AppTheme.textMuted),
-                                    onPressed: () => setState(() => _searchQuery = ''),
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: AppTheme.lightSurface,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: TextField(
+                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      decoration: InputDecoration(
+                        hintText: 'بحث في المواد...',
+                        hintStyle: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
+                                onPressed: () => setState(() => _searchQuery = ''),
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppTheme.lightSurface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
-                        const SizedBox(height: 10),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primarySubtle,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.bookmark_added_rounded, color: AppTheme.primary, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                'الفصل الدراسي الأول (الكورس 1) 📘 • نظام البصمة المعتمد',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'الخطة الدراسية',
-                              style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primarySubtle,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${subjects.length} مواد متاحة',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
 

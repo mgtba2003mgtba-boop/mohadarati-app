@@ -30,6 +30,7 @@ class ScheduleModel {
 
   bool get isExam => type == 'exams';
   bool get hasFile => fileUrl != null && fileUrl!.trim().isNotEmpty;
+  String get formattedDate => '${createdAt.year}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.day.toString().padLeft(2, '0')}';
   bool get isImage {
     if (!hasFile) return false;
     final lower = fileUrl!.toLowerCase();

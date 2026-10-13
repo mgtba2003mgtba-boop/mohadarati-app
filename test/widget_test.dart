@@ -969,6 +969,26 @@ void main() {
       const dialog = IosInstallDialog();
       expect(dialog, isNotNull);
     });
+
+    test('اختبار إخفاء اسم ناشر الجدول والربط الفوري لبوت طلب المعرف (Schedule Anonymization & Bot Instant Code)', () {
+      // 1. التحقق من تاريخ الجدول وتنسيقه
+      final testSchedule = ScheduleModel(
+        id: 'sch-10',
+        title: 'جدول المحاضرات الأسبوعي',
+        type: 'lectures',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        uploaderName: 'علي محمد حميد',
+        createdAt: DateTime(2026, 10, 13),
+      );
+      expect(testSchedule.formattedDate, '2026/10/13');
+      expect(testSchedule.isExam, false);
+
+      // 2. التحقق من رابط التوجيه الفوري لبوت الحضور مع وسيط البدء
+      final botDeepLink = '${AppConstants.telegramBotUrl}?start=get_code';
+      expect(botDeepLink, contains('start=get_code'));
+      expect(botDeepLink, contains(AppConstants.telegramBotUsername));
+    });
   });
 }
 

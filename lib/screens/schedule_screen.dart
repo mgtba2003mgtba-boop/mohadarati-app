@@ -478,16 +478,40 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             onPressed: _loadSchedules,
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppTheme.primary,
-          unselectedLabelColor: const Color(0xFF94A3B8),
-          indicatorColor: AppTheme.primary,
-          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: const [
-            Tab(icon: Icon(Icons.calendar_today_rounded, size: 18), text: 'المحاضرات الأسبوعية'),
-            Tab(icon: Icon(Icons.assignment_rounded, size: 18), text: 'جدول الامتحانات'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppTheme.lightSurface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppTheme.primary,
+              unselectedLabelColor: const Color(0xFF64748B),
+              indicator: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
+              unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 12.5),
+              tabs: const [
+                Tab(icon: Icon(Icons.calendar_today_rounded, size: 16), text: 'المحاضرات الأسبوعية'),
+                Tab(icon: Icon(Icons.assignment_rounded, size: 16), text: 'جدول الامتحانات'),
+              ],
+            ),
+          ),
         ),
       ),
       body: _isLoading
@@ -586,128 +610,207 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Widget _buildScheduleFileCard(ScheduleModel schedule) {
+    final isExam = schedule.isExam;
+    final isPdf = schedule.isPdf;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.lightBorder),
         boxShadow: AppTheme.cardShadow,
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    AppIconBadge.indigo(
-                      icon: schedule.isPdf ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
-                      size: 42,
-                      iconSize: 22,
+          // رأس البطاقة الأنيق مع إخفاء اسم الناشر
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // أيقونة شارة مستند مميزة
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: isPdf
+                        ? const Color(0xFFFEF2F2)
+                        : (isExam ? const Color(0xFFFFFBEB) : const Color(0xFFEEF2FF)),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isPdf
+                          ? const Color(0xFFFCA5A5)
+                          : (isExam ? const Color(0xFFFCD34D) : const Color(0xFFC7D2FE)),
+                      width: 1,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isPdf ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
+                      color: isPdf
+                          ? const Color(0xFFEF4444)
+                          : (isExam ? const Color(0xFFD97706) : AppTheme.primary),
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // تفاصيل الجدول (القسم والمرحلة والتاريخ حصراً بدون أسماء شخصية)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            schedule.title,
-                            style: GoogleFonts.cairo(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
+                          Expanded(
+                            child: Text(
+                              schedule.title,
+                              style: GoogleFonts.cairo(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            'بواسطة: ${schedule.uploaderName ?? 'العمادة'}',
-                            style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
+                          // شارة نوع الجدول الرسمية
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isExam ? const Color(0xFFFFF7ED) : AppTheme.primarySubtle,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isExam ? const Color(0xFFFDBA74) : AppTheme.primary.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Text(
+                              isExam ? 'جدول امتحانات' : 'جدول أسبوعي',
+                              style: GoogleFonts.cairo(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isExam ? const Color(0xFFC2410C) : AppTheme.primary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 5),
+
+                      // سطر القسم والمرحلة والتاريخ (محمي من كشف هوية الناشر)
+                      Row(
+                        children: [
+                          const Icon(Icons.school_outlined, size: 14, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${schedule.department} • ${schedule.stage}',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11.5,
+                                color: AppTheme.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            schedule.formattedDate,
+                            style: GoogleFonts.cairo(
+                              fontSize: 10.5,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              if (_user?.canManageLectures == true || _user?.isAdmin == true)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
-                  tooltip: 'حذف',
-                  onPressed: () async {
-                    final ok = await SupabaseService().deleteSchedule(schedule.id);
-                    if (ok && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('تم حذف الجدول', style: GoogleFonts.cairo()),
-                          backgroundColor: AppTheme.success,
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                      _loadSchedules();
-                    }
-                  },
-                ),
-            ],
+
+                // زر الحذف للمشرفين وممثلي الدفعة
+                if (_user?.canManageLectures == true || _user?.isAdmin == true)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                    tooltip: 'حذف',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () async {
+                      final ok = await SupabaseService().deleteSchedule(schedule.id);
+                      if (ok && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('تم حذف الجدول', style: GoogleFonts.cairo()),
+                            backgroundColor: AppTheme.success,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        _loadSchedules();
+                      }
+                    },
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
 
-          // صف الأزرار: زر معاينة وزر تنزيل
-          Row(
-            children: [
-              // زر معاينة
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: schedule.fileUrl != null
-                      ? () {
-                          AppMediaPreviewModal.show(
-                            context: context,
-                            title: schedule.title,
-                            subtitle: '${schedule.department} • ${schedule.stage}',
-                            url: _resolveUrl(schedule.fileUrl!),
-                            downloadUrl: _resolveUrl(schedule.fileUrl!),
-                            fileName: schedule.fileName ?? schedule.title,
-                            mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
-                          );
-                        }
-                      : null,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: const BorderSide(color: AppTheme.primary, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.visibility_rounded, size: 18),
-                  label: Text(
-                    'معاينة',
-                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+          const Divider(color: AppTheme.lightBorder, height: 1),
+
+          // صف الأزرار: زر معاينة سريعة وزر تنزيل رسمي
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // زر معاينة
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: schedule.fileUrl != null
+                        ? () {
+                            AppMediaPreviewModal.show(
+                              context: context,
+                              title: schedule.title,
+                              subtitle: '${schedule.department} • ${schedule.stage}',
+                              url: _resolveUrl(schedule.fileUrl!),
+                              downloadUrl: _resolveUrl(schedule.fileUrl!),
+                              fileName: schedule.fileName ?? schedule.title,
+                              mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                            );
+                          }
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      side: const BorderSide(color: AppTheme.primary, width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.visibility_rounded, size: 18),
+                    label: Text(
+                      'معاينة سريعة',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 10),
 
-              // زر تنزيل
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                  label: Text(
-                    'تنزيل',
-                    style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                // زر تنزيل
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      'تنزيل رسمي',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

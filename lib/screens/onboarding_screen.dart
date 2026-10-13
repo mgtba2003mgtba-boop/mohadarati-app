@@ -36,17 +36,56 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  /// فتح بوت التليجرام الرسمي
+  /// فتح بوت التليجرام الرسمي للحصول على الكود فوراً
   Future<void> _openTelegramBot() async {
-    final uri = Uri.parse(AppConstants.telegramBotUrl);
+    final directBotUrl = '${AppConstants.telegramBotUrl}?start=get_code';
+    final tgAppUrl = 'tg://resolve?domain=${AppConstants.telegramBotUsername}&start=get_code';
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'جارٍ فتح البوت... اضغط بدء (Start) لنسخ معرفك ولصقه هنا',
+                  style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF229ED9),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final tgUri = Uri.parse(tgAppUrl);
+      if (await canLaunchUrl(tgUri)) {
+        await launchUrl(tgUri, mode: LaunchMode.externalApplication);
+        return;
       }
+    } catch (_) {}
+
+    try {
+      final webUri = Uri.parse(directBotUrl);
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح الرابط تلقائياً. ابحث عن البوت في تيليجرام.')),
+          SnackBar(
+            content: Text(
+              'تعذر فتح الرابط تلقائياً. ابحث عن @${AppConstants.telegramBotUsername} في تيليجرام',
+              style: GoogleFonts.cairo(),
+            ),
+            backgroundColor: AppTheme.danger,
+          ),
         );
       }
     }
@@ -405,17 +444,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // زر التوجيه لبوت التيليجرام
-                    OutlinedButton.icon(
+                    // زر التوجيه الفوري لبوت التيليجرام
+                    ElevatedButton.icon(
                       onPressed: _openTelegramBot,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: const BorderSide(color: AppTheme.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF229ED9),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
                       ),
                       icon: const Icon(Icons.send_rounded, size: 16),
-                      label: Text('طلب الكود من البوت', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'طلب المعرف من بوت تيليجرام ⚡',
+                        style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ] else ...[
                     // تم التحقق بنجاح من بيانات الطالب
