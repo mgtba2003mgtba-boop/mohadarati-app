@@ -11,6 +11,7 @@ import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/app_fullscreen_modal.dart';
+import '../widgets/app_media_preview_modal.dart';
 import 'package:file_picker/file_picker.dart';
 
 class RepresentativeActivityItem {
@@ -2313,7 +2314,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                     icon: const Icon(Icons.remove_red_eye_rounded, size: 16, color: AppTheme.primaryLight),
                     label: Text('معاينة المحتوى', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primaryLight, fontWeight: FontWeight.bold)),
-                    onPressed: () => _launchUrlExternal(item.streamUrl ?? item.driveUrl, errorMsg: 'تعذر فتح الملف'),
+                    onPressed: () {
+                      final target = item.streamUrl ?? item.driveUrl;
+                      if (target != null && target.isNotEmpty) {
+                        AppMediaPreviewModal.show(
+                          context: context,
+                          title: item.title,
+                          subtitle: '${item.subjectName} • ${item.actorName}',
+                          url: target,
+                          fileName: item.title,
+                        );
+                      }
+                    },
                   ),
                 ),
               if (item.type == 'announcement')
@@ -3534,7 +3546,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 IconButton(
                   tooltip: 'معاينة الملف السحابي',
                   icon: const Icon(Icons.remove_red_eye_rounded, color: AppTheme.primaryLight, size: 20),
-                  onPressed: () => _launchUrlExternal(fileUrl, errorMsg: 'تعذر فتح الملف'),
+                  onPressed: () {
+                    AppMediaPreviewModal.show(
+                      context: context,
+                      title: title,
+                      subtitle: '$department • $authorName',
+                      url: fileUrl,
+                      fileName: title,
+                    );
+                  },
                 ),
               IconButton(
                 tooltip: 'حذف المحتوى نهائياً',

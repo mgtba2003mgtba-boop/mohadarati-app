@@ -10,6 +10,7 @@ import '../services/supabase_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
+import '../widgets/app_media_preview_modal.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/telegram_uploader_service.dart';
 
@@ -663,11 +664,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 child: OutlinedButton.icon(
                   onPressed: schedule.fileUrl != null
                       ? () {
-                          if (schedule.isPdf) {
-                            _launchUrl(_resolveUrl(schedule.fileUrl!));
-                          } else {
-                            _openFullscreenViewer(schedule.fileUrl!, schedule.title);
-                          }
+                          AppMediaPreviewModal.show(
+                            context: context,
+                            title: schedule.title,
+                            subtitle: '${schedule.department} • ${schedule.stage}',
+                            url: _resolveUrl(schedule.fileUrl!),
+                            downloadUrl: _resolveUrl(schedule.fileUrl!),
+                            fileName: schedule.fileName ?? schedule.title,
+                            mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                          );
                         }
                       : null,
                   style: OutlinedButton.styleFrom(

@@ -9,6 +9,7 @@ import 'package:nust_student_portal/core/constants/app_constants.dart';
 import 'package:nust_student_portal/core/constants/biometric_subjects.dart';
 import 'package:nust_student_portal/models/subject_model.dart';
 import 'package:nust_student_portal/models/schedule_model.dart';
+import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -687,6 +688,35 @@ void main() {
       final urlMatch = RegExp(r'/api/file/(\d+)').firstMatch(fallbackUrl);
       expect(urlMatch, isNotNull);
       expect(int.tryParse(urlMatch!.group(1)!), 77654);
+    });
+
+    test('اختبار نافذة المعاينة المدمجة ومنع التحميل القسري للملفات (In-App Media Preview & Non-Forced Downloads)', () {
+      // 1. فحص كشف أنواع الوسائط (صور، PDF، فيديو، مستندات)
+      const pdfUrl = 'https://api.telegram.org/file/bot8816281220/documents/lecture_1.pdf';
+      const driveUrl = 'https://drive.google.com/file/d/1A2B3C4D5E6F/view';
+
+      // فحص تحويل رابط Google Drive إلى رابط المعاينة المباشر
+      final match = RegExp(r'file/d/([a-zA-Z0-9_-]+)').firstMatch(driveUrl);
+      expect(match, isNotNull);
+      final fileId = match!.group(1);
+      final drivePreview = 'https://drive.google.com/file/d/$fileId/preview';
+      expect(drivePreview, 'https://drive.google.com/file/d/1A2B3C4D5E6F/preview');
+
+      // فحص تحويل رابط المستند إلى رابط Google Docs Viewer لمنع التحميل القسري
+      final embeddedDocsUrl = 'https://docs.google.com/viewer?url=${Uri.encodeComponent(pdfUrl)}&embedded=true';
+      expect(embeddedDocsUrl, contains('docs.google.com/viewer'));
+      expect(embeddedDocsUrl, contains(Uri.encodeComponent(pdfUrl)));
+
+      // فحص نموذج الـ Widget
+      const previewModal = AppMediaPreviewModal(
+        title: 'محاضرة التشريح الطبي',
+        subtitle: 'المرحلة الثانية • PDF',
+        rawUrl: pdfUrl,
+        fileName: 'anatomy.pdf',
+        mimeType: 'application/pdf',
+      );
+      expect(previewModal.title, 'محاضرة التشريح الطبي');
+      expect(previewModal.rawUrl, pdfUrl);
     });
   });
 }

@@ -13,6 +13,7 @@ import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
+import '../widgets/app_media_preview_modal.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final String subjectName;
@@ -173,10 +174,23 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
 
     if (targetUrl != null && targetUrl.isNotEmpty) {
-      await _launchUrlExternal(
-        targetUrl,
-        errorMsg: isDownload ? 'تعذر بدء تحميل المحاضرة' : 'تعذر فتح معاينة المحاضرة',
-      );
+      if (isDownload) {
+        await _launchUrlExternal(
+          targetUrl,
+          errorMsg: 'تعذر بدء تحميل المحاضرة',
+        );
+      } else {
+        if (!mounted) return;
+        AppMediaPreviewModal.show(
+          context: context,
+          title: lecture.title,
+          subtitle: '${lecture.subjectName} • ${lecture.typeLabel}${lecture.formattedFileSize.isNotEmpty ? " • ${lecture.formattedFileSize}" : ""}',
+          url: targetUrl,
+          downloadUrl: lecture.downloadUrl ?? targetUrl,
+          fileName: lecture.fileName ?? lecture.title,
+          mimeType: lecture.mimeType,
+        );
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

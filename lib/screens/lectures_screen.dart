@@ -7,6 +7,7 @@ import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
+import '../widgets/app_media_preview_modal.dart';
 import 'dashboard_screen.dart';
 
 class LecturesScreen extends StatefulWidget {
@@ -135,21 +136,16 @@ class _LecturesScreenState extends State<LecturesScreen> {
       return;
     }
 
-    final uri = Uri.parse(url);
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح مشغل الفيديو للبث المباشر')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ في البث: $e')),
-        );
-      }
-    }
+    if (!mounted) return;
+    AppMediaPreviewModal.show(
+      context: context,
+      title: target is LectureModel ? target.title : 'معاينة المحاضرة',
+      subtitle: target is LectureModel ? '${target.subjectName} • ${target.typeLabel}' : null,
+      url: url,
+      downloadUrl: target is LectureModel ? target.downloadUrl : null,
+      fileName: target is LectureModel ? (target.fileName ?? target.title) : null,
+      mimeType: target is LectureModel ? target.mimeType : null,
+    );
   }
 
   /// تحميل المحاضرة مباشرة من سحابة تيليجرام
