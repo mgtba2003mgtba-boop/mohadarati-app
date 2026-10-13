@@ -518,6 +518,43 @@ void main() {
       expect(activities.first['uploaderName'], 'كرار علي');
       expect(activities.first['type'], 'lecture');
     });
+
+    test('اختبار النشر السحابي المباشر وروابط تيليجرام الدائمة (Telegram Cloud Native Upload & Direct Links)', () {
+      final cloudLecture = LectureModel(
+        id: 'lec-cloud-1',
+        title: 'محاضرة الليزر والتشخيص المتقدم',
+        subjectName: 'أنظمة الليزر الطبية',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        semester: 1,
+        type: 'theory',
+        driveUrl: 'https://api.telegram.org/file/bot8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8/documents/file_10.pdf',
+        telegramChannelId: -1003875986734,
+        telegramMessageId: 99,
+        telegramFileId: 'BQACAgIAAyEGAATnBt0uAAMXas45U1iRIoj7ejH9RTxbDMfUWl8AAiGqAAIqBXhKEhZPqdwdIyc9BA',
+        fileName: 'laser_diagnostics.pdf',
+        fileSizeBytes: 2048576,
+        mimeType: 'application/pdf',
+        uploaderId: 'ST-NUST-001630760-413',
+        uploaderName: 'مجتبى عواد',
+        createdAt: DateTime.now(),
+      );
+
+      expect(cloudLecture.hasTelegramMedia, true);
+      expect(cloudLecture.streamUrl, contains('https://api.telegram.org/file/bot'));
+      expect(cloudLecture.downloadUrl, contains('https://api.telegram.org/file/bot'));
+      expect(cloudLecture.telegramFileId, 'BQACAgIAAyEGAATnBt0uAAMXas45U1iRIoj7ejH9RTxbDMfUWl8AAiGqAAIqBXhKEhZPqdwdIyc9BA');
+      expect(cloudLecture.formattedFileSize, '2.0 MB');
+
+      final json = cloudLecture.toJson();
+      expect(json['telegram_file_id'], cloudLecture.telegramFileId);
+      expect(json['drive_url'], cloudLecture.driveUrl);
+
+      final fromJson = LectureModel.fromJson(json);
+      expect(fromJson.telegramFileId, cloudLecture.telegramFileId);
+      expect(fromJson.hasTelegramMedia, true);
+      expect(fromJson.streamUrl, cloudLecture.streamUrl);
+    });
   });
 }
 

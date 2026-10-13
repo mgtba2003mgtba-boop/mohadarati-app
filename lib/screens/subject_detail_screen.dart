@@ -156,6 +156,36 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
   }
 
+  Future<void> _launchLectureMedia(LectureModel lecture, {required bool isDownload}) async {
+    String? targetUrl = isDownload ? lecture.downloadUrl : lecture.streamUrl;
+
+    if (lecture.telegramFileId != null && lecture.telegramFileId!.isNotEmpty) {
+      final fresh = await TelegramUploaderService().resolveFileUrl(lecture.telegramFileId!);
+      if (fresh != null && fresh.isNotEmpty) {
+        targetUrl = fresh;
+      }
+    }
+
+    if (targetUrl == null || targetUrl.isEmpty) {
+      if (lecture.hasDriveUrl) {
+        targetUrl = lecture.cleanDriveViewUrl;
+      }
+    }
+
+    if (targetUrl != null && targetUrl.isNotEmpty) {
+      await _launchUrlExternal(
+        targetUrl,
+        errorMsg: isDownload ? 'تعذر بدء تحميل المحاضرة' : 'تعذر فتح معاينة المحاضرة',
+      );
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('رابط المحاضرة غير متوفر')),
+        );
+      }
+    }
+  }
+
   void _copyToClipboard(String text, String message) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -550,7 +580,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       'معاينة',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
-                    onPressed: () => _launchUrlExternal(lecture.streamUrl, errorMsg: 'تعذر تشغيل البث المباشر'),
+                    onPressed: () => _launchLectureMedia(lecture, isDownload: false),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -566,7 +596,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       'تنزيل',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
                     ),
-                    onPressed: () => _launchUrlExternal(lecture.downloadUrl, errorMsg: 'تعذر بدء التحميل'),
+                    onPressed: () => _launchLectureMedia(lecture, isDownload: true),
                   ),
                 ),
               ],

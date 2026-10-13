@@ -45,6 +45,7 @@ class AppConstants {
   // بوت المحاضرات والـ CDN (لرفع وبث الفيديوهات والملفات عبر تيليجرام)
   static const String lecturesBotToken = '8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8';
   static const String lecturesBotUsername = 'NUST_ETC_ATT_LEC_BOT';
+  static const int lecturesChannelId = -1003875986734;
 
   // ── الأقسام الأكاديمية الرسمية ───────────────────────────────────
   static const List<String> departments = [

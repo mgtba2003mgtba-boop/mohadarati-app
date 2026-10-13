@@ -20,6 +20,7 @@ class LectureModel {
 
   final int? telegramChannelId;
   final int? telegramMessageId;
+  final String? telegramFileId;
   final String? fileName;
   final int? fileSizeBytes;
   final String? mimeType;
@@ -45,6 +46,7 @@ class LectureModel {
     required this.createdAt,
     this.telegramChannelId,
     this.telegramMessageId,
+    this.telegramFileId,
     this.fileName,
     this.fileSizeBytes,
     this.mimeType,
@@ -55,22 +57,40 @@ class LectureModel {
   bool get isPractical => type == 'practical';
   String get typeLabel => isPractical ? 'مختبر وعملي' : 'نظري';
 
-  /// هل تتوفر المحاضرة عبر سيرفر تيليجرام
-  bool get hasTelegramMedia => telegramMessageId != null;
+  /// هل تتوفر المحاضرة عبر سحابة تيليجرام
+  bool get hasTelegramMedia =>
+      (telegramMessageId != null) ||
+      (telegramFileId != null && telegramFileId!.isNotEmpty) ||
+      driveUrl.contains('api.telegram.org');
 
-  /// هل تتوفر المحاضرة عبر رابط Google Drive
-  bool get hasDriveUrl => driveUrl.trim().isNotEmpty && driveUrl != 'telegram';
+  /// هل تتوفر المحاضرة عبر رابط Google Drive خارجي
+  bool get hasDriveUrl =>
+      driveUrl.trim().isNotEmpty &&
+      driveUrl != 'telegram' &&
+      !driveUrl.contains('api.telegram.org');
 
-  /// رابط البث المباشر للفيديو
+  /// رابط البث المباشر أو المعاينة السحابية
   String? get streamUrl {
-    if (!hasTelegramMedia) return null;
-    return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/stream';
+    final cleanDrive = driveUrl.trim();
+    if (cleanDrive.isNotEmpty && cleanDrive != 'telegram') {
+      return cleanDrive;
+    }
+    if (telegramMessageId != null) {
+      return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/stream';
+    }
+    return null;
   }
 
-  /// رابط التحميل المباشر
+  /// رابط التحميل المباشر من السحابة
   String? get downloadUrl {
-    if (!hasTelegramMedia) return null;
-    return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/download';
+    final cleanDrive = driveUrl.trim();
+    if (cleanDrive.isNotEmpty && cleanDrive != 'telegram') {
+      return cleanDrive;
+    }
+    if (telegramMessageId != null) {
+      return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/download';
+    }
+    return null;
   }
 
   /// حجم الملف بصيغة مقروءة (MB أو KB)
@@ -127,6 +147,7 @@ class LectureModel {
       createdAt: created,
       telegramChannelId: int.tryParse(json['telegram_channel_id']?.toString() ?? ''),
       telegramMessageId: int.tryParse(json['telegram_message_id']?.toString() ?? ''),
+      telegramFileId: json['telegram_file_id']?.toString(),
       fileName: json['file_name']?.toString(),
       fileSizeBytes: int.tryParse(json['file_size_bytes']?.toString() ?? ''),
       mimeType: json['mime_type']?.toString(),
@@ -152,6 +173,7 @@ class LectureModel {
       'uploader_role': uploaderRole,
       'telegram_channel_id': telegramChannelId,
       'telegram_message_id': telegramMessageId,
+      'telegram_file_id': telegramFileId,
       'file_name': fileName,
       'file_size_bytes': fileSizeBytes,
       'mime_type': mimeType,

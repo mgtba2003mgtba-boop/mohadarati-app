@@ -70,6 +70,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   String _resolveUrl(String? url) {
     if (url == null || url.trim().isEmpty) return '';
     final clean = url.trim();
+    if (clean.startsWith('https://api.telegram.org')) {
+      return clean;
+    }
     if (kIsWeb) {
       if (clean.contains('/api/file/')) {
         final pathPart = clean.substring(clean.indexOf('/api/file/'));

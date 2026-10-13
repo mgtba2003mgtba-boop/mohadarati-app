@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../core/constants/app_constants.dart';
+import '../models/lecture_model.dart';
+import 'supabase_service.dart';
 
 /// نتيجة عملية رفع المحاضرة
 class UploadLectureResult {
@@ -101,38 +103,80 @@ class TelegramUploaderService {
     }
   }
 
+  /// قراءة بايتات الملف بأمان عبر مختلف المنصات (Web و Desktop و Mobile)
+  Future<Uint8List> _getFileBytes(PlatformFile file) async {
+    return await file.readAsBytes();
+  }
+
   /// حساب حجم الملف بالبايت
   Future<int> getFileSize(PlatformFile file) async {
     try {
       final len = await file.length();
       if (len != null) return len;
-      final syncLen = file.lengthSync();
-      if (syncLen != null) return syncLen;
     } catch (_) {}
     return 0;
   }
 
-  /// رفع أي ملف أو صورة مباشرة إلى سحابة وسيرفر تيليجرام
+  /// جلب رابط مباشر جديد للملف في حال الحاجة لتحديث الرابط
+  Future<String?> resolveFileUrl(String fileId) async {
+    try {
+      final botToken = AppConstants.lecturesBotToken;
+      final uri = Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId');
+      final res = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        final path = data['result']?['file_path'];
+        if (path != null) {
+          return 'https://api.telegram.org/file/bot$botToken/$path';
+        }
+      }
+    } catch (e) {
+      debugPrint('[-] Error resolving file URL: $e');
+    }
+    return null;
+  }
+
+  /// رفع أي ملف أو صورة مباشرة إلى سحابة تيليجرام (للجداول والبوسترات)
   Future<UploadGeneralFileResult> uploadFileToTelegram({
     required PlatformFile file,
     String? caption,
     String fileType = 'general', // 'schedule' أو 'banner' أو 'general'
   }) async {
     try {
-      final uploadUrl = Uri.parse('${AppConstants.telegramStreamerBaseUrl}/api/upload-file');
-      final request = http.MultipartRequest('POST', uploadUrl);
-
-      if (caption != null && caption.trim().isNotEmpty) {
-        request.fields['caption'] = caption.trim();
+      final Uint8List fileBytes = await _getFileBytes(file);
+      if (fileBytes.isEmpty) {
+        return UploadGeneralFileResult(
+          success: false,
+          message: 'تعذر قراءة بيانات الملف من المتصفح، يرجى المحاولة مرة أخرى.',
+        );
       }
-      request.fields['file_type'] = fileType;
 
-      final Uint8List fileBytes = await file.readAsBytes();
-      final int actualSize = fileBytes.length;
+      if (fileBytes.length > 50 * 1024 * 1024) {
+        return UploadGeneralFileResult(
+          success: false,
+          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع السحابي (50 ميغابايت).',
+        );
+      }
 
+      final tag = fileType == 'schedule'
+          ? '📅 جدول دراسي/امتحاني'
+          : fileType == 'banner'
+              ? '📢 إعلان وبوستر رسمي'
+              : '📁 ملف جامعي';
+      final fullCaption = caption != null && caption.trim().isNotEmpty
+          ? '$tag\n${caption.trim()}'
+          : tag;
+
+      final botToken = AppConstants.lecturesBotToken;
+      final channelId = AppConstants.lecturesChannelId;
+      final uri = Uri.parse('https://api.telegram.org/bot$botToken/sendDocument');
+
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['chat_id'] = channelId.toString();
+      request.fields['caption'] = fullCaption;
       request.files.add(
         http.MultipartFile.fromBytes(
-          'file',
+          'document',
           fileBytes,
           filename: file.name,
         ),
@@ -143,35 +187,59 @@ class TelegramUploaderService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        final msgId = data['telegram_message_id'];
-        final relativeUrl = data['file_url'] ?? '/api/file/$msgId';
-        final fullUrl = '${AppConstants.telegramStreamerBaseUrl}$relativeUrl';
+        if (data['ok'] == true && data['result'] != null) {
+          final result = data['result'];
+          final msgId = result['message_id'] as int?;
+          final doc = result['document'];
+          final fileId = doc?['file_id']?.toString();
+          final mimeType = doc?['mime_type']?.toString() ?? 'application/octet-stream';
 
-        return UploadGeneralFileResult(
-          success: true,
-          message: 'تم رفع الملف إلى سحابة تيليجرام بنجاح',
-          telegramMessageId: msgId,
-          fileUrl: fullUrl,
-          fileName: file.name,
-          fileSizeBytes: actualSize,
-          mimeType: data['mime_type'],
-        );
-      } else {
-        return UploadGeneralFileResult(
-          success: false,
-          message: 'فشل الرفع من سيرفر تيليجرام (${response.statusCode}): ${response.body}',
-        );
+          // جلب مسار التحميل المباشر
+          String? directUrl;
+          if (fileId != null) {
+            try {
+              final getFileUri = Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId');
+              final getFileRes = await http.get(getFileUri).timeout(const Duration(seconds: 15));
+              if (getFileRes.statusCode == 200) {
+                final getFileData = jsonDecode(utf8.decode(getFileRes.bodyBytes));
+                final filePath = getFileData['result']?['file_path'];
+                if (filePath != null) {
+                  directUrl = 'https://api.telegram.org/file/bot$botToken/$filePath';
+                }
+              }
+            } catch (e) {
+              debugPrint('[-] Error getting file path: $e');
+            }
+          }
+
+          directUrl ??= '${AppConstants.telegramStreamerBaseUrl}/api/file/$msgId';
+
+          return UploadGeneralFileResult(
+            success: true,
+            message: 'تم رفع الملف إلى سحابة تيليجرام بنجاح',
+            telegramMessageId: msgId,
+            fileUrl: directUrl,
+            fileName: file.name,
+            fileSizeBytes: fileBytes.length,
+            mimeType: mimeType,
+          );
+        }
       }
-    } catch (e) {
-      debugPrint('[-] Telegram general file upload error: $e');
+
       return UploadGeneralFileResult(
         success: false,
-        message: 'حدث خطأ في الاتصال بسيرفر تيليجرام: $e',
+        message: 'فشل الرفع من سحابة تيليجرام (${response.statusCode}): ${response.body}',
+      );
+    } catch (e) {
+      debugPrint('[-] Telegram cloud general file upload error: $e');
+      return UploadGeneralFileResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال بسحابة تيليجرام: $e',
       );
     }
   }
 
-  /// رفع ملف المحاضرة والميتا داتا إلى سيرفر تيليجرام وسوبابيز
+  /// رفع ملف المحاضرة والميتا داتا مباشرة إلى سحابة تيليجرام وقاعدة بيانات سوبابيز
   Future<UploadLectureResult> uploadLecture({
     required PlatformFile file,
     required String title,
@@ -187,31 +255,47 @@ class TelegramUploaderService {
     required String uploaderRole,
   }) async {
     try {
-      final uploadUrl = Uri.parse('${AppConstants.telegramStreamerBaseUrl}/api/upload-lecture');
-      final request = http.MultipartRequest('POST', uploadUrl);
+      final Uint8List fileBytes = await _getFileBytes(file);
+      if (fileBytes.isEmpty) {
+        return UploadLectureResult(
+          success: false,
+          message: 'تعذر قراءة بيانات ملف المحاضرة من المتصفح، يرجى إعادة اختيار الملف.',
+        );
+      }
 
-      request.fields['title'] = title.trim();
-      request.fields['subject_name'] = subjectName.trim();
-      request.fields['department'] = department;
-      request.fields['stage'] = stage;
-      request.fields['semester'] = semester.toString();
-      request.fields['lecture_type'] = lectureType;
+      if (fileBytes.length > 50 * 1024 * 1024) {
+        return UploadLectureResult(
+          success: false,
+          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى استخدام خيار رابط Google Drive للملفات الكبيرة جداً.',
+        );
+      }
+
+      // 1. صياغة التسمية والوصف لقناة تيليجرام
+      final captionLines = [
+        '📚 ${title.trim()}',
+        '📖 المقرر: ${subjectName.trim()}',
+        '🏛 القسم: $department | المرحلة: $stage',
+      ];
       if (professorName != null && professorName.trim().isNotEmpty) {
-        request.fields['professor_name'] = professorName.trim();
+        captionLines.add('👨‍🏫 الأستاذ: ${professorName.trim()}');
       }
       if (description != null && description.trim().isNotEmpty) {
-        request.fields['description'] = description.trim();
+        captionLines.add('📝 ملاحظات: ${description.trim()}');
       }
-      request.fields['uploader_id'] = uploaderId;
-      request.fields['uploader_name'] = uploaderName;
-      request.fields['uploader_role'] = uploaderRole;
+      captionLines.add('👤 نُشر بواسطة: $uploaderName ($uploaderRole)');
+      final caption = captionLines.join('\n');
 
-      final Uint8List fileBytes = await file.readAsBytes();
-      final int actualSize = fileBytes.length;
+      // 2. الرفع المباشر عبر Telegram Bot API
+      final botToken = AppConstants.lecturesBotToken;
+      final channelId = AppConstants.lecturesChannelId;
+      final uri = Uri.parse('https://api.telegram.org/bot$botToken/sendDocument');
 
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['chat_id'] = channelId.toString();
+      request.fields['caption'] = caption;
       request.files.add(
         http.MultipartFile.fromBytes(
-          'file',
+          'document',
           fileBytes,
           filename: file.name,
         ),
@@ -222,24 +306,82 @@ class TelegramUploaderService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return UploadLectureResult(
-          success: true,
-          message: 'تم رفع المحاضرة إلى سحابة الكلية بنجاح ومزامنتها للطلبة',
-          telegramMessageId: data['telegram_message_id'],
-          fileName: file.name,
-          fileSizeBytes: actualSize,
-        );
-      } else {
-        return UploadLectureResult(
-          success: false,
-          message: 'فشل الرفع من السيرفر (كود: ${response.statusCode}): ${response.body}',
-        );
+        if (data['ok'] == true && data['result'] != null) {
+          final result = data['result'];
+          final msgId = result['message_id'] as int?;
+          final doc = result['document'];
+          final fileId = doc?['file_id']?.toString();
+          final realMime = doc?['mime_type']?.toString() ?? 'application/octet-stream';
+
+          // 3. جلب مسار التحميل المباشر السحابي الدائم
+          String? directUrl;
+          if (fileId != null) {
+            try {
+              final getFileUri = Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId');
+              final getFileRes = await http.get(getFileUri).timeout(const Duration(seconds: 15));
+              if (getFileRes.statusCode == 200) {
+                final getFileData = jsonDecode(utf8.decode(getFileRes.bodyBytes));
+                final filePath = getFileData['result']?['file_path'];
+                if (filePath != null) {
+                  directUrl = 'https://api.telegram.org/file/bot$botToken/$filePath';
+                }
+              }
+            } catch (e) {
+              debugPrint('[-] Error getting lecture file path: $e');
+            }
+          }
+
+          // 4. حفظ بيانات المحاضرة سحابياً في جدول Supabase مباشرة
+          final lecturePayload = {
+            'title': title.trim(),
+            'subject_name': subjectName.trim(),
+            'department': department,
+            'stage': stage,
+            'semester': semester,
+            'type': lectureType,
+            'drive_url': directUrl ?? 'telegram',
+            'description': description?.trim(),
+            'professor_name': professorName?.trim(),
+            'uploader_id': uploaderId,
+            'uploader_name': uploaderName,
+            'uploader_role': uploaderRole,
+            'telegram_channel_id': channelId,
+            'telegram_message_id': msgId,
+            'telegram_file_id': fileId,
+            'file_name': file.name,
+            'file_size_bytes': fileBytes.length,
+            'mime_type': realMime,
+            'duration_seconds': 0,
+          };
+
+          final dbOk = await SupabaseService().createLecture(LectureModel.fromJson(lecturePayload));
+          if (!dbOk) {
+            try {
+              await SupabaseService().client.from('lectures').insert(lecturePayload);
+            } catch (dbErr) {
+              debugPrint('[-] Direct db insert error: $dbErr');
+            }
+          }
+
+          return UploadLectureResult(
+            success: true,
+            message: 'تم نشر ورفع المحاضرة إلى السحابة بنجاح ومزامنتها للطلبة',
+            telegramMessageId: msgId,
+            fileName: file.name,
+            fileSizeBytes: fileBytes.length,
+          );
+        }
       }
-    } catch (e) {
-      debugPrint('[-] Upload error: $e');
+
       return UploadLectureResult(
         success: false,
-        message: 'حدث خطأ في الاتصال بسيرفر المحاضرات: $e',
+        message: 'فشل الرفع من سحابة تيليجرام (${response.statusCode}): ${response.body}',
+      );
+    } catch (e) {
+      debugPrint('[-] Upload lecture cloud error: $e');
+      return UploadLectureResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال بالسحابة: $e',
       );
     }
   }

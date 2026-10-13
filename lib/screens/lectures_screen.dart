@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
+import '../services/telegram_uploader_service.dart';
 import 'dashboard_screen.dart';
 
 class LecturesScreen extends StatefulWidget {
@@ -109,9 +110,31 @@ class _LecturesScreenState extends State<LecturesScreen> {
     );
   }
 
-  /// فتح أو بث المحاضرة مباشرة عبر مشغل الفيديو
-  Future<void> _openMediaStream(String? url) async {
-    if (url == null || url.isEmpty) return;
+  /// فتح أو بث المحاضرة مباشرة عبر مشغل الفيديو أو السحابة
+  Future<void> _openMediaStream(dynamic target) async {
+    String? url;
+    if (target is LectureModel) {
+      url = target.streamUrl;
+      if (target.telegramFileId != null && target.telegramFileId!.isNotEmpty) {
+        final fresh = await TelegramUploaderService().resolveFileUrl(target.telegramFileId!);
+        if (fresh != null && fresh.isNotEmpty) url = fresh;
+      }
+      if (url == null || url.isEmpty) {
+        if (target.hasDriveUrl) url = target.cleanDriveViewUrl;
+      }
+    } else if (target is String) {
+      url = target;
+    }
+
+    if (url == null || url.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('رابط البث أو الملف غير متوفر')),
+        );
+      }
+      return;
+    }
+
     final uri = Uri.parse(url);
     try {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -129,9 +152,31 @@ class _LecturesScreenState extends State<LecturesScreen> {
     }
   }
 
-  /// تحميل المحاضرة مباشرة من سيرفر تيليجرام
-  Future<void> _openMediaDownload(String? url) async {
-    if (url == null || url.isEmpty) return;
+  /// تحميل المحاضرة مباشرة من سحابة تيليجرام
+  Future<void> _openMediaDownload(dynamic target) async {
+    String? url;
+    if (target is LectureModel) {
+      url = target.downloadUrl;
+      if (target.telegramFileId != null && target.telegramFileId!.isNotEmpty) {
+        final fresh = await TelegramUploaderService().resolveFileUrl(target.telegramFileId!);
+        if (fresh != null && fresh.isNotEmpty) url = fresh;
+      }
+      if (url == null || url.isEmpty) {
+        if (target.hasDriveUrl) url = target.cleanDriveViewUrl;
+      }
+    } else if (target is String) {
+      url = target;
+    }
+
+    if (url == null || url.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('رابط التحميل غير متوفر')),
+        );
+      }
+      return;
+    }
+
     final uri = Uri.parse(url);
     try {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -418,7 +463,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
                       'تشغيل مباشر (Stream)',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
-                    onPressed: () => _openMediaStream(lecture.streamUrl),
+                    onPressed: () => _openMediaStream(lecture),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -435,7 +480,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
                       'تحميل المحاضرة',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2DD4BF)),
                     ),
-                    onPressed: () => _openMediaDownload(lecture.downloadUrl),
+                    onPressed: () => _openMediaDownload(lecture),
                   ),
                 ),
               ],
