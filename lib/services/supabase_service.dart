@@ -54,13 +54,13 @@ class SupabaseService {
     }
   }
 
-  /// ── التحقق من كود المعرف الجامعي (قراءة فقط من سيرفر الحضور القديم) ───
+  /// ── التحقق من كود المعرف الجامعي حصراً (قراءة فقط من سيرفر الحضور القديم) ───
   Future<StudentModel?> verifyTelegramStudentCode(String inputCode) async {
     final cleanCode = inputCode.trim();
     if (cleanCode.isEmpty) return null;
 
     try {
-      // 1. البحث عبر المعرف الجامعي المباشر (e.g. ST-NUST-...) من سيرفر الحضور
+      // 1. البحث عبر المعرف الجامعي المباشر حصراً (e.g. ST-NUST-...) من سيرفر الحضور
       final resById = await _attendanceClient
           .from('students')
           .select('*')
@@ -71,26 +71,17 @@ class SupabaseService {
         return StudentModel.fromJson(resById);
       }
 
-      // 2. البحث عبر معرف التيليجرام chat_id إن كان الكود رقماً
-      final resByTelegram = await _attendanceClient
-          .from('students')
-          .select('*')
-          .eq('telegram_chat_id', cleanCode)
-          .maybeSingle();
+      // 2. البحث عبر معرف التيليجرام chat_id إن كان الكود رقماً عددياً
+      if (RegExp(r'^\d+$').hasMatch(cleanCode)) {
+        final resByTelegram = await _attendanceClient
+            .from('students')
+            .select('*')
+            .eq('telegram_chat_id', cleanCode)
+            .maybeSingle();
 
-      if (resByTelegram != null) {
-        return StudentModel.fromJson(resByTelegram);
-      }
-
-      // 3. البحث المرن بالاسم أو كود مختصر
-      final resByName = await _attendanceClient
-          .from('students')
-          .select('*')
-          .ilike('name', '%$cleanCode%')
-          .limit(1);
-
-      if (resByName.isNotEmpty) {
-        return StudentModel.fromJson(resByName.first);
+        if (resByTelegram != null) {
+          return StudentModel.fromJson(resByTelegram);
+        }
       }
 
       return null;

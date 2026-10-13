@@ -95,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      setState(() => _errorMessage = 'يرجى إدخال المعرف الجامعي أو اسم الطالب الثلاثي');
+      setState(() => _errorMessage = 'يرجى إدخال المعرف الجامعي أولاً');
       return;
     }
 
@@ -124,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'لم يتم العثور على قيد مطابق. تأكد من إدخال اسمك الثلاثي كاملاً أو المعرف بشكل دقيق.';
+        _errorMessage = 'لم يتم العثور على قيد مطابق. يرجى التأكد من كتابة المعرف الجامعي بدقة.';
       });
     }
   }
@@ -417,25 +417,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       controller: _codeController,
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'المعرف الجامعي أو اسم الطالب الثلاثي',
-                        hintText: 'مثال: ST-NUST-... أو اكتب اسمك الثلاثي',
-                        prefixIcon: const Icon(Icons.person_search_rounded, color: AppTheme.primary),
+                        labelText: 'المعرف الجامعي',
+                        hintText: 'مثال: ST-NUST-...',
+                        prefixIcon: const Icon(Icons.badge_rounded, color: AppTheme.primary),
                         filled: true,
                         fillColor: AppTheme.lightSurface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '💡 يمكنك التحقق مباشرة بكتابة اسمك الثلاثي، أو طلب المعرف من البوت',
-                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
-                      ),
-                    ),
                     const SizedBox(height: 14),
 
-                    // زر التحقق المباشر
+                    // زر التحقق
                     ElevatedButton(
                       onPressed: _isLoading ? null : _verifyCode,
                       style: ElevatedButton.styleFrom(
@@ -450,7 +442,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               width: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : Text('التحقق المباشر', style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold)),
+                          : Text('التحقق', style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 10),
 
@@ -466,7 +458,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       icon: const Icon(Icons.send_rounded, size: 16),
                       label: Text(
-                        'طلب المعرف من بوت تيليجرام (اختصار id) ⚡',
+                        'طلب المعرف من بوت تيليجرام (id) ⚡',
                         style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.bold),
                       ),
                     ),
