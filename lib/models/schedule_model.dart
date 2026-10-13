@@ -1,0 +1,127 @@
+/// نموذج بيانات الجدول الدراسي والامتحاني
+class ScheduleModel {
+  final String id;
+  final String title;
+  final String type; // 'lectures' (محاضرات أسبوعية) أو 'exams' (جدول امتحانات)
+  final String department;
+  final String stage;
+  final String? fileUrl; // رابط صورة الجدول أو ملف الـ PDF
+  final String? fileName;
+  final String? uploaderName;
+  final String? uploaderId;
+  final DateTime createdAt;
+  final List<ScheduleItemModel> items;
+
+  ScheduleModel({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.department,
+    required this.stage,
+    this.fileUrl,
+    this.fileName,
+    this.uploaderName,
+    this.uploaderId,
+    required this.createdAt,
+    this.items = const [],
+  });
+
+  bool get isExam => type == 'exams';
+  bool get hasFile => fileUrl != null && fileUrl!.trim().isNotEmpty;
+  bool get isImage {
+    if (!hasFile) return false;
+    final lower = fileUrl!.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.contains('image');
+  }
+
+  bool get isPdf {
+    if (!hasFile) return false;
+    final lower = fileUrl!.toLowerCase();
+    final nameLower = (fileName ?? '').toLowerCase();
+    return lower.endsWith('.pdf') || nameLower.endsWith('.pdf') || lower.contains('pdf');
+  }
+
+  factory ScheduleModel.fromJson(Map<String, dynamic> json) {
+    var rawItems = json['items'];
+    List<ScheduleItemModel> parsedItems = [];
+    if (rawItems is List) {
+      parsedItems = rawItems
+          .whereType<Map<String, dynamic>>()
+          .map((i) => ScheduleItemModel.fromJson(i))
+          .toList();
+    }
+
+    return ScheduleModel(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? 'جدول دراسي',
+      type: json['type'] ?? 'lectures',
+      department: json['department'] ?? 'ALL',
+      stage: json['stage'] ?? 'ALL',
+      fileUrl: json['file_url'],
+      fileName: json['file_name'],
+      uploaderName: json['uploader_name'],
+      uploaderId: json['uploader_id'],
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          : DateTime.now(),
+      items: parsedItems,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'type': type,
+      'department': department,
+      'stage': stage,
+      'file_url': fileUrl,
+      'file_name': fileName,
+      'uploader_name': uploaderName,
+      'uploader_id': uploaderId,
+      'created_at': createdAt.toIso8601String(),
+      'items': items.map((i) => i.toJson()).toList(),
+    };
+  }
+}
+
+/// بند أو حصة داخل الجدول الدراسي السريع
+class ScheduleItemModel {
+  final String day; // الأحد، الإثنين، إلخ
+  final String time; // 08:30 - 10:30
+  final String subjectName;
+  final String hall; // القاعة / المختبر
+  final String? professor;
+
+  ScheduleItemModel({
+    required this.day,
+    required this.time,
+    required this.subjectName,
+    required this.hall,
+    this.professor,
+  });
+
+  factory ScheduleItemModel.fromJson(Map<String, dynamic> json) {
+    return ScheduleItemModel(
+      day: json['day'] ?? '',
+      time: json['time'] ?? '',
+      subjectName: json['subject_name'] ?? '',
+      hall: json['hall'] ?? '',
+      professor: json['professor'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'day': day,
+      'time': time,
+      'subject_name': subjectName,
+      'hall': hall,
+      'professor': professor,
+    };
+  }
+}

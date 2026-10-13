@@ -1,0 +1,162 @@
+import '../core/constants/app_constants.dart';
+
+class LectureModel {
+  final String id;
+  final String title;
+  final String subjectName;
+  final String? subjectCode;
+  final String department;
+  final String stage;
+  final int semester; // 1 or 2
+  final String type; // 'theory' or 'practical'
+  final String driveUrl;
+  final String? description;
+  final String? professorName;
+  final String uploaderId;
+  final String uploaderName;
+  final String uploaderRole;
+  final int downloadCount;
+  final DateTime createdAt;
+
+  final int? telegramChannelId;
+  final int? telegramMessageId;
+  final String? fileName;
+  final int? fileSizeBytes;
+  final String? mimeType;
+  final int? durationSeconds;
+  final String? thumbnailUrl;
+
+  LectureModel({
+    required this.id,
+    required this.title,
+    required this.subjectName,
+    this.subjectCode,
+    required this.department,
+    required this.stage,
+    this.semester = 1,
+    this.type = 'theory',
+    required this.driveUrl,
+    this.description,
+    this.professorName,
+    required this.uploaderId,
+    required this.uploaderName,
+    this.uploaderRole = 'representative',
+    this.downloadCount = 0,
+    required this.createdAt,
+    this.telegramChannelId,
+    this.telegramMessageId,
+    this.fileName,
+    this.fileSizeBytes,
+    this.mimeType,
+    this.durationSeconds,
+    this.thumbnailUrl,
+  });
+
+  bool get isPractical => type == 'practical';
+  String get typeLabel => isPractical ? 'مختبر وعملي' : 'نظري';
+
+  /// هل تتوفر المحاضرة عبر سيرفر تيليجرام
+  bool get hasTelegramMedia => telegramMessageId != null;
+
+  /// هل تتوفر المحاضرة عبر رابط Google Drive
+  bool get hasDriveUrl => driveUrl.trim().isNotEmpty && driveUrl != 'telegram';
+
+  /// رابط البث المباشر للفيديو
+  String? get streamUrl {
+    if (!hasTelegramMedia) return null;
+    return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/stream';
+  }
+
+  /// رابط التحميل المباشر
+  String? get downloadUrl {
+    if (!hasTelegramMedia) return null;
+    return '${AppConstants.telegramStreamerBaseUrl}/api/lecture/$telegramMessageId/download';
+  }
+
+  /// حجم الملف بصيغة مقروءة (MB أو KB)
+  String get formattedFileSize {
+    if (fileSizeBytes == null || fileSizeBytes == 0) return '';
+    final bytes = fileSizeBytes!;
+    if (bytes >= 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } else if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+  }
+
+  /// استخراج معرّف ملف Google Drive وتوليد رابط معاينة مباشر إن أمكن
+  String get cleanDriveViewUrl {
+    final trimmed = driveUrl.trim();
+    if (trimmed.contains('drive.google.com/file/d/')) {
+      final regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)');
+      final match = regExp.firstMatch(trimmed);
+      if (match != null && match.groupCount >= 1) {
+        final fileId = match.group(1);
+        return 'https://drive.google.com/file/d/$fileId/view';
+      }
+    }
+    return trimmed;
+  }
+
+  factory LectureModel.fromJson(Map<String, dynamic> json) {
+    DateTime created = DateTime.now();
+    if (json['created_at'] != null) {
+      try {
+        created = DateTime.parse(json['created_at'].toString());
+      } catch (_) {}
+    }
+
+    return LectureModel(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      subjectName: json['subject_name']?.toString() ?? '',
+      subjectCode: json['subject_code']?.toString(),
+      department: json['department']?.toString() ?? '',
+      stage: json['stage']?.toString() ?? '',
+      semester: int.tryParse(json['semester']?.toString() ?? '1') ?? 1,
+      type: json['type']?.toString() ?? 'theory',
+      driveUrl: json['drive_url']?.toString() ?? '',
+      description: json['description']?.toString(),
+      professorName: json['professor_name']?.toString(),
+      uploaderId: json['uploader_id']?.toString() ?? '',
+      uploaderName: json['uploader_name']?.toString() ?? '',
+      uploaderRole: json['uploader_role']?.toString() ?? 'representative',
+      downloadCount: int.tryParse(json['download_count']?.toString() ?? '0') ?? 0,
+      createdAt: created,
+      telegramChannelId: int.tryParse(json['telegram_channel_id']?.toString() ?? ''),
+      telegramMessageId: int.tryParse(json['telegram_message_id']?.toString() ?? ''),
+      fileName: json['file_name']?.toString(),
+      fileSizeBytes: int.tryParse(json['file_size_bytes']?.toString() ?? ''),
+      mimeType: json['mime_type']?.toString(),
+      durationSeconds: int.tryParse(json['duration_seconds']?.toString() ?? ''),
+      thumbnailUrl: json['thumbnail_url']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'subject_name': subjectName,
+      'subject_code': subjectCode,
+      'department': department,
+      'stage': stage,
+      'semester': semester,
+      'type': type,
+      'drive_url': driveUrl,
+      'description': description,
+      'professor_name': professorName,
+      'uploader_id': uploaderId,
+      'uploader_name': uploaderName,
+      'uploader_role': uploaderRole,
+      'telegram_channel_id': telegramChannelId,
+      'telegram_message_id': telegramMessageId,
+      'file_name': fileName,
+      'file_size_bytes': fileSizeBytes,
+      'mime_type': mimeType,
+      'duration_seconds': durationSeconds,
+      'thumbnail_url': thumbnailUrl,
+    };
+  }
+}
