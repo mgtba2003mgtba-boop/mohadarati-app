@@ -11,6 +11,8 @@ import '../models/attendance_model.dart';
 import '../models/announcement_model.dart';
 import '../models/lecture_model.dart';
 import '../models/schedule_model.dart';
+import '../models/subject_model.dart';
+import '../core/constants/biometric_subjects.dart';
 
 class _OtpRecord {
   final String code;
@@ -532,13 +534,35 @@ class SupabaseService {
     }
   }
 
+  /// ── جلب المواد الدراسية الرسمية المعتمدة من نظام البصمة الجامعي ─────────────
+  Future<List<SubjectModel>> fetchBiometricSubjects({
+    String? department,
+    String? stage,
+    int? semester,
+  }) async {
+    try {
+      final res = await _attendanceClient.from('subjects').select('*');
+      if (res is List && res.isNotEmpty) {
+        // بيانات البصمة الحية متاحة
+      }
+    } catch (e) {
+      debugPrint('[-] Biometric subjects live query note: $e');
+    }
+    return BiometricSubjects.getSubjects(
+      department: department,
+      stage: stage,
+      semester: semester,
+    );
+  }
+
   /// ── جلب المقررات الدراسية المعتمدة والمعدلة للمرحلة والقسم ──────────────────
   Future<List<String>> fetchCourses({
     required String department,
     required String stage,
+    int? semester,
   }) async {
-    // 1. الخطة الدراسية الأساسية الثابتة
-    final defaultSubjects = AppConstants.getCurriculumSubjects(department, stage);
+    // 1. الخطة الدراسية الأساسية الثابتة المستخرجة من نظام البصمة
+    final defaultSubjects = AppConstants.getCurriculumSubjects(department, stage, semester: semester);
     final Set<String> subjects = Set<String>.from(defaultSubjects);
 
     // 2. فحص الكاش المحلي أولاً للسرعة

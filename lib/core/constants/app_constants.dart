@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'biometric_subjects.dart';
 
 /// ثوابت وإعدادات المنظومة الجامعية الموحدة
 class AppConstants {
@@ -204,8 +205,17 @@ class AppConstants {
     },
   };
 
-  /// استرجاع المقررات الدراسية الرسمية لقسم ومرحلة محددة
-  static List<String> getCurriculumSubjects(String department, String stage) {
+  /// استرجاع المقررات الدراسية الرسمية لقسم ومرحلة محددة مع إمكانية التحديد بالكورس
+  static List<String> getCurriculumSubjects(String department, String stage, {int? semester}) {
+    final bioNames = BiometricSubjects.getSubjectNames(
+      department: department,
+      stage: stage,
+      semester: semester,
+    );
+    if (bioNames.isNotEmpty) {
+      return bioNames;
+    }
+
     final deptData = curriculumMap[department];
     if (deptData != null) {
       final stageData = deptData[stage];

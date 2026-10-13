@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
+import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
@@ -131,6 +132,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _contentStageFilter = 'ALL';
   String _contentSearchQuery = '';
 
+  int _publishModeIndex = 0; // 0 = محاضرة, 1 = إعلان, 2 = بوستر
+  int _moderationSegmentIndex = 0; // 0 = المحتوى والمنشورات, 1 = الطلاب والممثلين
+
+  // ── مواد البصمة لقسم ومرحلة وكورس المحاضرة ──
+  String? _selectedBiometricSubject;
+  bool _isCustomLectureSubject = false;
+
+  // ── مواد البصمة للإعلان ──
+  String? _selectedAnnouncementSubject;
+
+  List<String> get _availableLectureSubjects {
+    return BiometricSubjects.getSubjectNames(
+      department: _selectedLectureDept,
+      stage: _selectedLectureStage,
+      semester: _selectedLectureSemester,
+    );
+  }
+
+  List<String> get _availableAnnouncementSubjects {
+    if (_selectedAnnounceDept == 'ALL' || _selectedAnnounceStage == 'ALL') {
+      return [];
+    }
+    return BiometricSubjects.getSubjectNames(
+      department: _selectedAnnounceDept,
+      stage: _selectedAnnounceStage,
+    );
+  }
+
+  void _syncLectureSubjectSelection() {
+    final available = _availableLectureSubjects;
+    if (available.isNotEmpty) {
+      if (_selectedBiometricSubject == null || !available.contains(_selectedBiometricSubject)) {
+        _selectedBiometricSubject = available.first;
+        _subjectNameController.text = available.first;
+        _isCustomLectureSubject = false;
+      }
+    } else {
+      _selectedBiometricSubject = null;
+      _isCustomLectureSubject = true;
+    }
+  }
+
   List<AppUserModel> get _representatives => _allUsers
       .where((u) => u.isRepresentative || u.canPublishLectures || u.canPublishAnnouncements)
       .toList();
@@ -146,12 +189,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _selectedAnnounceStage = _currentUser!.stage;
     }
 
-    final int tabsCount = _isMujtaba ? 5 : 2;
+    final int tabsCount = _isMujtaba ? 3 : 2;
+    int initialTab = 0;
+    if (_isMujtaba) {
+      if (widget.initialTabIndex == 1) {
+        initialTab = 1;
+        _publishModeIndex = 1; // نشر إعلان
+      } else if (widget.initialTabIndex >= 2) {
+        initialTab = 2; // إدارة المحتوى والطلاب
+      } else {
+        initialTab = 0; // إحصائيات الطلاب والنبض
+      }
+    } else {
+      initialTab = widget.initialTabIndex.clamp(0, 1);
+    }
+
     _tabController = TabController(
       length: tabsCount,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, tabsCount - 1),
+      initialIndex: initialTab,
     );
+
+    _syncLectureSubjectSelection();
 
     if (_isMujtaba) {
       _loadDashboardData();
@@ -642,11 +701,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: _isMujtaba
               ? const [
-                  Tab(icon: Icon(Icons.analytics_rounded), text: 'إحصائيات الطلاب والرادار'),
-                  Tab(icon: Icon(Icons.people_alt_rounded), text: 'الطلاب والممثلين'),
-                  Tab(icon: Icon(Icons.auto_stories_rounded), text: 'إدارة المحتوى والنشر'),
-                  Tab(icon: Icon(Icons.photo_library_rounded), text: 'بوسترات الواجهة'),
-                  Tab(icon: Icon(Icons.campaign_rounded), text: 'نشر مركزي'),
+                  Tab(icon: Icon(Icons.analytics_rounded), text: 'إحصائيات الطلاب والنبض'),
+                  Tab(icon: Icon(Icons.add_circle_outline_rounded), text: 'مركز النشر والمقررات'),
+                  Tab(icon: Icon(Icons.admin_panel_settings_rounded), text: 'إدارة المحتوى والطلاب'),
                 ]
               : const [
                   Tab(icon: Icon(Icons.upload_file_rounded), text: 'نشر المحاضرات'),
@@ -659,15 +716,178 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         children: _isMujtaba
             ? [
                 _buildActivityRadarTab(),
-                _buildRepsDirectoryTab(),
-                _buildContentManagementTab(),
-                _buildBannersPanel(),
-                _buildCentralPublishTab(),
+                _buildUnifiedPublishTab(),
+                _buildModerationAndDirectoryTab(),
               ]
             : [
                 _buildPublishLectureTab(),
                 _buildPublishAnnouncementTab(),
               ],
+      ),
+    );
+  }
+
+  // ── مركز النشر الموحد (محاضرات، إعلانات، بوسترات) للمشرف العام ──────────
+  Widget _buildUnifiedPublishTab() {
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppTheme.darkCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildPublishSegmentButton(
+                  index: 0,
+                  icon: Icons.upload_file_rounded,
+                  label: 'رفع محاضرة',
+                ),
+              ),
+              Expanded(
+                child: _buildPublishSegmentButton(
+                  index: 1,
+                  icon: Icons.campaign_rounded,
+                  label: 'نشر إعلان',
+                ),
+              ),
+              Expanded(
+                child: _buildPublishSegmentButton(
+                  index: 2,
+                  icon: Icons.photo_library_rounded,
+                  label: 'بوستر الواجهة',
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _publishModeIndex == 0
+              ? _buildPublishLectureTab()
+              : _publishModeIndex == 1
+                  ? _buildPublishAnnouncementTab()
+                  : _buildBannersPanel(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPublishSegmentButton({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _publishModeIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _publishModeIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.cairo(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── مركز إدارة المحتوى والطلاب الموحد (مع شريحة تبديل سريعة) ──────────
+  Widget _buildModerationAndDirectoryTab() {
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppTheme.darkCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildModerationSegmentButton(
+                  index: 0,
+                  icon: Icons.auto_stories_rounded,
+                  label: 'المحتوى والمنشورات',
+                ),
+              ),
+              Expanded(
+                child: _buildModerationSegmentButton(
+                  index: 1,
+                  icon: Icons.people_alt_rounded,
+                  label: 'الطلاب والممثلين',
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _moderationSegmentIndex == 0
+              ? _buildContentManagementTab()
+              : _buildRepsDirectoryTab(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModerationSegmentButton({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _moderationSegmentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _moderationSegmentIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.cairo(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -979,39 +1199,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(height: 14),
           ],
 
-          // ── الحقول المشتركة ──
-          TextField(
-            controller: _lectureTitleController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'عنوان المحاضرة (مثال: المحاضرة 1 - مقدمة في الدوائر)',
-              prefixIcon: Icon(Icons.title_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          TextField(
-            controller: _subjectNameController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'اسم المادة الدراسية (مثال: أجهزة طبية، شبكات، برمجيات)',
-              prefixIcon: Icon(Icons.book_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          TextField(
-            controller: _professorNameController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'اسم أستاذ المادة (اختياري)',
-              prefixIcon: Icon(Icons.person_outline_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
+          // ── 1. النطاق الأكاديمي (القسم والمرحلة والكورس) ──
           if (_currentUser?.isAdmin == true) ...[
-            // اختيار القسم
             DropdownButtonFormField<String>(
               value: _selectedLectureDept,
               dropdownColor: AppTheme.darkCard,
@@ -1023,11 +1212,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               items: AppConstants.departments
                   .map((d) => DropdownMenuItem(value: d, child: Text(d, style: GoogleFonts.cairo(color: AppTheme.textPrimary))))
                   .toList(),
-              onChanged: (val) => setState(() => _selectedLectureDept = val!),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedLectureDept = val;
+                    _syncLectureSubjectSelection();
+                  });
+                }
+              },
             ),
             const SizedBox(height: 14),
 
-            // اختيار المرحلة والكورس
             Row(
               children: [
                 Expanded(
@@ -1041,7 +1236,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     items: AppConstants.stages
                         .map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.cairo(color: AppTheme.textPrimary))))
                         .toList(),
-                    onChanged: (val) => setState(() => _selectedLectureStage = val!),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedLectureStage = val;
+                          _syncLectureSubjectSelection();
+                        });
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1057,13 +1259,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       DropdownMenuItem(value: 1, child: Text('الكورس 1')),
                       DropdownMenuItem(value: 2, child: Text('الكورس 2')),
                     ],
-                    onChanged: (val) => setState(() => _selectedLectureSemester = val!),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedLectureSemester = val;
+                          _syncLectureSubjectSelection();
+                        });
+                      }
+                    },
                   ),
                 ),
               ],
             ),
           ] else ...[
-            // نطاق النشر مقيد بشعبة ممثل الدفعة
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1099,12 +1307,107 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       DropdownMenuItem(value: 1, child: Text('الكورس 1')),
                       DropdownMenuItem(value: 2, child: Text('الكورس 2')),
                     ],
-                    onChanged: (val) => setState(() => _selectedLectureSemester = val!),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedLectureSemester = val;
+                          _syncLectureSubjectSelection();
+                        });
+                      }
+                    },
                   ),
                 ],
               ),
             ),
           ],
+          const SizedBox(height: 14),
+
+          // ── 2. المادة الدراسية الرسمية من نظام البصمة الجامعي ──
+          DropdownButtonFormField<String>(
+            value: _isCustomLectureSubject
+                ? '__CUSTOM__'
+                : (_availableLectureSubjects.contains(_selectedBiometricSubject)
+                    ? _selectedBiometricSubject
+                    : (_availableLectureSubjects.isNotEmpty ? _availableLectureSubjects.first : null)),
+            dropdownColor: AppTheme.darkCard,
+            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+            decoration: InputDecoration(
+              labelText: 'المادة الدراسية الرسمية (نظام البصمة - ${_availableLectureSubjects.length} مادة)',
+              prefixIcon: const Icon(Icons.school_rounded, color: AppTheme.accent),
+              helperText: 'مستخرجة مباشرة ومصنفة حسب القسم والمرحلة والكورس',
+              helperStyle: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+            ),
+            items: [
+              ..._availableLectureSubjects.map((s) => DropdownMenuItem(
+                value: s,
+                child: Text(
+                  s,
+                  style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              )),
+              DropdownMenuItem(
+                value: '__CUSTOM__',
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_note_rounded, size: 16, color: AppTheme.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'مادة أخرى / إدخال يدوي...',
+                      style: GoogleFonts.cairo(color: AppTheme.accent, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            onChanged: (val) {
+              if (val == '__CUSTOM__') {
+                setState(() {
+                  _isCustomLectureSubject = true;
+                  _selectedBiometricSubject = null;
+                  _subjectNameController.clear();
+                });
+              } else if (val != null) {
+                setState(() {
+                  _isCustomLectureSubject = false;
+                  _selectedBiometricSubject = val;
+                  _subjectNameController.text = val;
+                });
+              }
+            },
+          ),
+          if (_isCustomLectureSubject || _availableLectureSubjects.isEmpty) ...[
+            const SizedBox(height: 14),
+            TextField(
+              controller: _subjectNameController,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'أدخل اسم المادة يدوياً...',
+                prefixIcon: Icon(Icons.edit_note_rounded, color: AppTheme.accent),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+
+          // ── 3. عنوان المحاضرة وأستاذ المادة ──
+          TextField(
+            controller: _lectureTitleController,
+            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+            decoration: const InputDecoration(
+              labelText: 'عنوان المحاضرة (مثال: المحاضرة 1 - مقدمة عامة)',
+              prefixIcon: Icon(Icons.title_rounded, color: AppTheme.primaryLight),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: _professorNameController,
+            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+            decoration: const InputDecoration(
+              labelText: 'اسم أستاذ المادة (اختياري)',
+              prefixIcon: Icon(Icons.person_outline_rounded, color: AppTheme.primaryLight),
+            ),
+          ),
           const SizedBox(height: 14),
 
           // نوع المحاضرة: نظري أو عملي
@@ -1213,16 +1516,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 14),
 
-          TextField(
-            controller: _announcementSubjectController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'اسم المادة الدراسية (اختياري - لربط الإعلان بصفحة المادة)',
-              prefixIcon: Icon(Icons.menu_book_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
+          // ── 1. النطاق الأكاديمي للإعلان ──
           if (_currentUser?.isAdmin == true) ...[
             DropdownButtonFormField<String>(
               value: _selectedAnnounceDept,
@@ -1230,12 +1524,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               style: GoogleFonts.cairo(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
                 labelText: 'القسم الموجه له الإعلان',
+                prefixIcon: Icon(Icons.domain_rounded, color: AppTheme.primaryLight),
               ),
               items: [
                 const DropdownMenuItem(value: 'ALL', child: Text('كافة أقسام الكلية الموحدة')),
                 ...AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d))),
               ],
-              onChanged: (val) => setState(() => _selectedAnnounceDept = val!),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedAnnounceDept = val;
+                    _selectedAnnouncementSubject = null;
+                    _announcementSubjectController.text = 'عام';
+                  });
+                }
+              },
             ),
             const SizedBox(height: 14),
 
@@ -1250,7 +1553,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 const DropdownMenuItem(value: 'ALL', child: Text('كافة المراحل الدراسية')),
                 ...AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s))),
               ],
-              onChanged: (val) => setState(() => _selectedAnnounceStage = val!),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedAnnounceStage = val;
+                    _selectedAnnouncementSubject = null;
+                    _announcementSubjectController.text = 'عام';
+                  });
+                }
+              },
             ),
           ] else ...[
             Container(
@@ -1280,6 +1591,67 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+
+          // ── 2. المادة المرتبطة بالإعلان (نظام البصمة) ──
+          DropdownButtonFormField<String>(
+            value: _selectedAnnouncementSubject ?? '__GENERAL__',
+            dropdownColor: AppTheme.darkCard,
+            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+            decoration: InputDecoration(
+              labelText: 'المادة المرتبطة بالإعلان (نظام البصمة)',
+              prefixIcon: const Icon(Icons.school_rounded, color: AppTheme.primaryLight),
+              helperText: _availableAnnouncementSubjects.isNotEmpty
+                  ? 'متاح ${_availableAnnouncementSubjects.length} مادة معتمدة لهذا القسم والمرحلة'
+                  : 'حدد قسماً ومرحلة محددة لإظهار مواد البصمة',
+              helperStyle: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: '__GENERAL__',
+                child: Text('عام (بدون مادة محددة)', style: GoogleFonts.cairo(color: AppTheme.accent, fontWeight: FontWeight.bold)),
+              ),
+              ..._availableAnnouncementSubjects.map((s) => DropdownMenuItem(
+                value: s,
+                child: Text(s, style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13), overflow: TextOverflow.ellipsis),
+              )),
+              DropdownMenuItem(
+                value: '__CUSTOM__',
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_note_rounded, size: 16, color: AppTheme.accent),
+                    const SizedBox(width: 6),
+                    Text('مادة أخرى / إدخال يدوي...', style: GoogleFonts.cairo(color: AppTheme.accent, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+            onChanged: (val) {
+              setState(() {
+                if (val == '__GENERAL__' || val == null) {
+                  _selectedAnnouncementSubject = null;
+                  _announcementSubjectController.text = 'عام';
+                } else if (val == '__CUSTOM__') {
+                  _selectedAnnouncementSubject = '__CUSTOM__';
+                  _announcementSubjectController.clear();
+                } else {
+                  _selectedAnnouncementSubject = val;
+                  _announcementSubjectController.text = val;
+                }
+              });
+            },
+          ),
+          if (_selectedAnnouncementSubject == '__CUSTOM__') ...[
+            const SizedBox(height: 14),
+            TextField(
+              controller: _announcementSubjectController,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'أدخل اسم المادة يدوياً...',
+                prefixIcon: Icon(Icons.edit_note_rounded, color: AppTheme.accent),
               ),
             ),
           ],
@@ -1455,7 +1827,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        onPressed: () => _tabController.animateTo(1),
+                        onPressed: () {
+                          setState(() => _moderationSegmentIndex = 1);
+                          _tabController.animateTo(2);
+                        },
                         child: Text(
                           'عرض الطلاب',
                           style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
@@ -2722,41 +3097,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _loadDashboardData();
       }
     }
-  }
-
-  Widget _buildCentralPublishTab() {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Container(
-            color: AppTheme.darkCard,
-            child: TabBar(
-              labelColor: AppTheme.accent,
-              unselectedLabelColor: const Color(0xFF94A3B8),
-              indicatorColor: AppTheme.accent,
-              labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
-              tabs: const [
-                Tab(icon: Icon(Icons.campaign_rounded, size: 18), text: 'إعلان مركزي'),
-                Tab(icon: Icon(Icons.upload_file_rounded, size: 18), text: 'محاضرة مركزية'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildPublishAnnouncementTab(),
-                _buildPublishLectureTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserManagementTab() {
-    return _buildRepsDirectoryTab();
   }
 
   Future<void> _launchUrlExternal(String? urlString, {required String errorMsg}) async {

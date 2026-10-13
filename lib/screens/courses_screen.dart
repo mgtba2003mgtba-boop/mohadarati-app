@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
+import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/attendance_model.dart';
@@ -26,6 +27,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   List<String> _coursesList = [];
   OverallAttendanceSummary? _attendanceSummary;
   String _searchQuery = '';
+  int _selectedSemester = 0; // 0 = كافة الفصول, 1 = الكورس الأول, 2 = الكورس الثاني
 
   @override
   void initState() {
@@ -91,7 +93,23 @@ class _CoursesScreenState extends State<CoursesScreen> {
       }
     }
 
-    final list = names.toList();
+    List<String> list = names.toList();
+
+    // فلترة الكورس الدراسي (الفصل 1 أو الفصل 2) وفق تصنيف البصمة
+    if (_selectedSemester != 0 && _user != null) {
+      final semesterSubjects = BiometricSubjects.getSubjectNames(
+        department: _user!.department,
+        stage: _user!.stage,
+        semester: _selectedSemester,
+      );
+      if (semesterSubjects.isNotEmpty) {
+        list = list.where((name) {
+          return semesterSubjects.any((sub) =>
+              sub.contains(name) || name.contains(sub) || sub.toLowerCase() == name.toLowerCase());
+        }).toList();
+      }
+    }
+
     if (_searchQuery.isEmpty) return list;
     return list
         .where((name) => name.toLowerCase().contains(_searchQuery.toLowerCase().trim()))
@@ -442,6 +460,49 @@ class _CoursesScreenState extends State<CoursesScreen> {
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide.none,
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ChoiceChip(
+                                label: const Text('كافة المقررات'),
+                                selected: _selectedSemester == 0,
+                                onSelected: (_) => setState(() => _selectedSemester = 0),
+                                selectedColor: AppTheme.primary,
+                                labelStyle: GoogleFonts.cairo(
+                                  color: _selectedSemester == 0 ? Colors.white : AppTheme.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text('الكورس الأول 📘'),
+                                selected: _selectedSemester == 1,
+                                onSelected: (_) => setState(() => _selectedSemester = 1),
+                                selectedColor: AppTheme.primary,
+                                labelStyle: GoogleFonts.cairo(
+                                  color: _selectedSemester == 1 ? Colors.white : AppTheme.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text('الكورس الثاني 📙'),
+                                selected: _selectedSemester == 2,
+                                onSelected: (_) => setState(() => _selectedSemester = 2),
+                                selectedColor: AppTheme.primary,
+                                labelStyle: GoogleFonts.cairo(
+                                  color: _selectedSemester == 2 ? Colors.white : AppTheme.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 10),

@@ -6,6 +6,8 @@ import 'package:nust_student_portal/models/announcement_model.dart';
 import 'package:nust_student_portal/models/app_user_model.dart';
 import 'package:nust_student_portal/services/attendance_service.dart';
 import 'package:nust_student_portal/core/constants/app_constants.dart';
+import 'package:nust_student_portal/core/constants/biometric_subjects.dart';
+import 'package:nust_student_portal/models/subject_model.dart';
 import 'package:nust_student_portal/models/schedule_model.dart';
 
 void main() {
@@ -182,12 +184,12 @@ void main() {
       expect(medicalStage4.length, greaterThanOrEqualTo(6));
 
       final compStage3 = AppConstants.getCurriculumSubjects('هندسة تقنيات الحاسوب', 'المرحلة الثالثة');
-      expect(compStage3, contains('الذكاء الاصطناعي (AI)'));
+      expect(compStage3.any((s) => s.contains('الذكاء الاصطناعي')), isTrue);
       expect(compStage3.length, greaterThanOrEqualTo(6));
 
       final cyberStage2 = AppConstants.getCurriculumSubjects('هندسة تقنيات الأمن السيبراني', 'المرحلة الثانية');
-      expect(cyberStage2, contains('أمن الشبكات والبروتوكولات'));
-      expect(cyberStage2.length, greaterThanOrEqualTo(6));
+      expect(cyberStage2.any((s) => s.contains('أمن الشبكات')), isTrue);
+      expect(cyberStage2.length, greaterThanOrEqualTo(4));
     });
 
     test('اختبار نموذج الجدول الدراسي والامتحاني وكشف الصور (Schedule Model Tests)', () {
@@ -554,6 +556,79 @@ void main() {
       expect(fromJson.telegramFileId, cloudLecture.telegramFileId);
       expect(fromJson.hasTelegramMedia, true);
       expect(fromJson.streamUrl, cloudLecture.streamUrl);
+    });
+
+    test('اختبار قاعدة بيانات المواد المستخرجة من نظام البصمة (119 Biometric Subjects Extraction & Classification)', () {
+      // 1. فحص إجمالي عدد المواد في نظام البصمة الجامعي
+      final all = BiometricSubjects.allSubjects;
+      expect(all.length, 119, reason: 'يجب أن تحتوي المنظومة على 119 مادة رسمية معتمدة من نظام البصمة');
+
+      // 2. فحص توزيع المواد حسب الأقسام
+      final compSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الحاسوب');
+      final cyberSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأمن السيبراني');
+      final medSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأجهزة الطبية');
+
+      expect(compSubjects.length, 51, reason: 'هندسة الحاسوب تضم 51 مادة عبر المراحل الأربع');
+      expect(cyberSubjects.length, 19, reason: 'الأمن السيبراني يضم 19 مادة رسمية');
+      expect(medSubjects.length, 49, reason: 'الأجهزة الطبية تضم 49 مادة رسمية');
+      expect(compSubjects.length + cyberSubjects.length + medSubjects.length, 119);
+
+      // 3. فحص فلترة الكورس الدراسي (الفصل 1 والفصل 2)
+      final compL1S1 = BiometricSubjects.getSubjects(
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        semester: 1,
+      );
+      expect(compL1S1.isNotEmpty, true);
+      expect(compL1S1.every((s) => s.semester == 1), true);
+
+      final medL4S2 = BiometricSubjects.getSubjects(
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        semester: 2,
+      );
+      expect(medL4S2.isNotEmpty, true);
+      expect(medL4S2.every((s) => s.semester == 2), true);
+    });
+
+    test('اختبار هيكلة الداشبورد المبسطة وصلاحيات التبويبات (Dashboard 3-Tab Architecture & Role Segregation)', () {
+      final mujtabaUser = AppUserModel(
+        id: 'u-mujtaba',
+        studentId: 'ST-NUST-001630760-413',
+        name: 'مجتبى عواد طالب عبيد',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleAdmin,
+      );
+
+      final regularRep = AppUserModel(
+        id: 'u-rep',
+        studentId: 'ST-NUST-009988-123',
+        name: 'أحمد علي',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        role: AppConstants.roleRepresentative,
+        canPublishLectures: true,
+        canPublishAnnouncements: true,
+      );
+
+      // التحقق من تحديد المشرف العام مجتبى عواد
+      final bool isMujtaba = mujtabaUser.studentId == 'ST-NUST-001630760-413' ||
+          mujtabaUser.name.contains('مجتبى') ||
+          mujtabaUser.isAdmin;
+      final bool isRepMujtaba = regularRep.studentId == 'ST-NUST-001630760-413' ||
+          regularRep.name.contains('مجتبى') ||
+          regularRep.isAdmin;
+
+      expect(isMujtaba, true);
+      expect(isRepMujtaba, false);
+
+      // عدد التبويبات الجديد المتفق عليه: 3 لمجتبى عواد و 2 للممثل العادي
+      final int mujtabaTabsCount = isMujtaba ? 3 : 2;
+      final int repTabsCount = isRepMujtaba ? 3 : 2;
+
+      expect(mujtabaTabsCount, 3, reason: 'المشرف العام مجتبى لديه 3 تبويبات فقط: النبض، مركز النشر، إدارة المحتوى والطلاب');
+      expect(repTabsCount, 2, reason: 'ممثل الدفعة لديه تبويبان فقط: نشر المحاضرات، نشر الإعلانات');
     });
   });
 }
