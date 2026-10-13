@@ -255,6 +255,55 @@ class TelegramUploaderService {
     }
   }
 
+  /// حذف رسالة أو منشور من قناة تيليجرام المرتبطة
+  Future<bool> deleteMessageFromTelegram({
+    required int messageId,
+    int? channelId,
+  }) async {
+    try {
+      final botToken = AppConstants.lecturesBotToken;
+      final targetChannel = channelId ?? AppConstants.lecturesChannelId;
+
+      // 1. المحاولة عبر POST request
+      final uri = Uri.parse('https://api.telegram.org/bot$botToken/deleteMessage');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat_id': targetChannel,
+          'message_id': messageId,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['ok'] == true) {
+          debugPrint('[+] Deleted message $messageId from Telegram channel $targetChannel');
+          return true;
+        }
+      }
+
+      // 2. المحاولة البديلة عبر GET مع معلمات الاستعلام
+      final getUri = Uri.parse(
+        'https://api.telegram.org/bot$botToken/deleteMessage?chat_id=$targetChannel&message_id=$messageId',
+      );
+      final getRes = await http.get(getUri).timeout(const Duration(seconds: 10));
+      if (getRes.statusCode == 200) {
+        final getData = jsonDecode(utf8.decode(getRes.bodyBytes));
+        if (getData['ok'] == true) {
+          debugPrint('[+] Deleted message $messageId from Telegram via GET fallback');
+          return true;
+        }
+      }
+
+      debugPrint('[-] Note: Telegram deleteMessage responded with: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('[-] Note: Error attempting to delete message from Telegram: $e');
+      return false;
+    }
+  }
+
   /// رفع ملف المحاضرة والميتا داتا مباشرة إلى سحابة تيليجرام وقاعدة بيانات سوبابيز
   Future<UploadLectureResult> uploadLecture({
     required PlatformFile file,

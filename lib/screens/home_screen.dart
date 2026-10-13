@@ -357,8 +357,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   : _defaultBannerImages[0];
 
               final title = announcement?.title ?? 'الكلية التقنية الهندسية';
-              final content = announcement?.content ?? 'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)';
-              final isPureBanner = announcement?.content == 'إعلان وبوستر رسمي في الواجهة الرئيسية';
+              final content = (announcement?.displayContent.isNotEmpty == true)
+                  ? announcement!.displayContent
+                  : 'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)';
+              final isPureBanner = announcement != null &&
+                  (announcement.displayContent.isEmpty ||
+                      announcement.displayContent == 'إعلان وبوستر رسمي في الواجهة الرئيسية');
 
               return GestureDetector(
                 onTap: () {
@@ -479,7 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
       subtitle: 'الناشر: ${announcement.authorName} • ${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
-      contentText: announcement.content,
+      contentText: announcement.displayContent,
       accentColor: AppTheme.primary,
       actions: [
         ElevatedButton(

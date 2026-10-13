@@ -13,6 +13,7 @@ import '../models/lecture_model.dart';
 import '../models/schedule_model.dart';
 import '../models/subject_model.dart';
 import '../core/constants/biometric_subjects.dart';
+import 'telegram_uploader_service.dart';
 
 class _OtpRecord {
   final String code;
@@ -397,8 +398,43 @@ class SupabaseService {
     }
   }
 
+  /// ── حذف إعلان / بوستر / جدول (مع حذف الرسالة من قناة تيليجرام بالتزامن) ───
   Future<bool> deleteAnnouncement(String id) async {
     try {
+      // 1. استعلام مسبق لحذف المنشور المقابل من قناة تيليجرام إن وجد
+      try {
+        final row = await client
+            .from('announcements')
+            .select('content, image_url')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (row != null) {
+          int? msgId;
+          final contentStr = row['content']?.toString() ?? '';
+          final match = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(contentStr);
+          if (match != null) {
+            msgId = int.tryParse(match.group(1) ?? '');
+          }
+
+          // محاولة بديلة: إذا كان رابط الصورة يحمل معرف الرسالة
+          if (msgId == null) {
+            final imageUrl = row['image_url']?.toString() ?? '';
+            final urlMatch = RegExp(r'/api/file/(\d+)').firstMatch(imageUrl);
+            if (urlMatch != null) {
+              msgId = int.tryParse(urlMatch.group(1) ?? '');
+            }
+          }
+
+          if (msgId != null && msgId > 0) {
+            await TelegramUploaderService().deleteMessageFromTelegram(messageId: msgId);
+          }
+        }
+      } catch (tgErr) {
+        debugPrint('[-] Note on deleting announcement message from Telegram: $tgErr');
+      }
+
+      // 2. حذف السجل من قاعدة بيانات Supabase
       await client.from('announcements').delete().eq('id', id);
       return true;
     } catch (e) {
@@ -428,6 +464,10 @@ class SupabaseService {
         final cat = item['category']?.toString() ?? '';
         final title = item['title']?.toString() ?? '';
         final isExam = cat == 'exam' || title.contains('امتحان');
+        final content = item['content']?.toString() ?? '';
+        final tgMatch = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(content);
+        final tgMsgId = tgMatch != null ? int.tryParse(tgMatch.group(1) ?? '') : null;
+
         return ScheduleModel(
           id: item['id']?.toString() ?? '',
           title: item['title'] ?? 'جدول دراسي',
@@ -438,6 +478,7 @@ class SupabaseService {
           fileName: item['title'],
           uploaderName: item['author_name'] ?? 'إدارة الكلية',
           uploaderId: item['author_id'],
+          telegramMessageId: tgMsgId,
           createdAt: item['created_at'] != null
               ? DateTime.tryParse(item['created_at']) ?? DateTime.now()
               : DateTime.now(),
@@ -456,12 +497,13 @@ class SupabaseService {
     }
   }
 
-  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام عن الإعلانات) ─────────────
+  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام عن الإعلانات وتوثيق رسالة تيليجرام) ─────────────
   Future<bool> createSchedule(ScheduleModel schedule) async {
     try {
+      final tgTag = schedule.telegramMessageId != null ? ' [TG_MSG_ID:${schedule.telegramMessageId}]' : '';
       final payload = {
         'title': schedule.title,
-        'content': '[SCHEDULE_TIMETABLE] جدول دراسي',
+        'content': '[SCHEDULE_TIMETABLE]$tgTag جدول دراسي',
         'category': schedule.isExam ? 'exam' : 'academic',
         'department': schedule.department,
         'stage': schedule.stage,
@@ -523,9 +565,32 @@ class SupabaseService {
     }
   }
 
-  /// ── حذف محاضرة ──────────────────────────────────────────────────────────
+  /// ── حذف محاضرة (مع حذف الرسالة من قناة تيليجرام بالتزامن) ────────────────
   Future<bool> deleteLecture(String id) async {
     try {
+      // 1. استعلام مسبق لجلب معرف رسالة تيليجرام والقناة
+      try {
+        final row = await client
+            .from('lectures')
+            .select('telegram_message_id, telegram_channel_id')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (row != null && row['telegram_message_id'] != null) {
+          final msgId = int.tryParse(row['telegram_message_id'].toString());
+          final chId = int.tryParse(row['telegram_channel_id']?.toString() ?? '');
+          if (msgId != null && msgId > 0) {
+            await TelegramUploaderService().deleteMessageFromTelegram(
+              messageId: msgId,
+              channelId: chId,
+            );
+          }
+        }
+      } catch (tgErr) {
+        debugPrint('[-] Note on deleting lecture message from Telegram: $tgErr');
+      }
+
+      // 2. حذف السجل من قاعدة بيانات Supabase
       await client.from('lectures').delete().eq('id', id);
       return true;
     } catch (e) {

@@ -9,6 +9,7 @@ class ScheduleModel {
   final String? fileName;
   final String? uploaderName;
   final String? uploaderId;
+  final int? telegramMessageId;
   final DateTime createdAt;
   final List<ScheduleItemModel> items;
 
@@ -22,6 +23,7 @@ class ScheduleModel {
     this.fileName,
     this.uploaderName,
     this.uploaderId,
+    this.telegramMessageId,
     required this.createdAt,
     this.items = const [],
   });
@@ -55,16 +57,21 @@ class ScheduleModel {
           .toList();
     }
 
+    final rawContent = json['content']?.toString() ?? '';
+    final tgMatch = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(rawContent);
+    final parsedTgId = tgMatch != null ? int.tryParse(tgMatch.group(1) ?? '') : null;
+
     return ScheduleModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? 'جدول دراسي',
       type: json['type'] ?? 'lectures',
       department: json['department'] ?? 'ALL',
       stage: json['stage'] ?? 'ALL',
-      fileUrl: json['file_url'],
+      fileUrl: json['file_url'] ?? json['image_url'],
       fileName: json['file_name'],
-      uploaderName: json['uploader_name'],
-      uploaderId: json['uploader_id'],
+      uploaderName: json['uploader_name'] ?? json['author_name'],
+      uploaderId: json['uploader_id'] ?? json['author_id'],
+      telegramMessageId: parsedTgId ?? int.tryParse(json['telegram_message_id']?.toString() ?? ''),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
@@ -83,6 +90,7 @@ class ScheduleModel {
       'file_name': fileName,
       'uploader_name': uploaderName,
       'uploader_id': uploaderId,
+      'telegram_message_id': telegramMessageId,
       'created_at': createdAt.toIso8601String(),
       'items': items.map((i) => i.toJson()).toList(),
     };

@@ -364,6 +364,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       if (title.isEmpty) return;
 
                       String? finalFileUrl = urlController.text.trim().isNotEmpty ? urlController.text.trim() : null;
+                      int? telegramMsgId;
 
                       if (selectedFile != null) {
                         setDlgState(() => isUploading = true);
@@ -386,6 +387,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           return;
                         }
                         finalFileUrl = uploadRes.fileUrl;
+                        telegramMsgId = uploadRes.telegramMessageId;
                       }
 
                       final schedule = ScheduleModel(
@@ -398,6 +400,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         fileName: selectedFile?.name ?? title,
                         uploaderName: _user?.name ?? 'المشرف',
                         uploaderId: _user?.studentId,
+                        telegramMessageId: telegramMsgId,
                         createdAt: DateTime.now(),
                       );
 

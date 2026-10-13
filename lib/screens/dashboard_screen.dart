@@ -289,7 +289,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           actorId: a.authorId,
           actorRole: a.authorRole,
           createdAt: a.createdAt,
-          content: a.content,
+          content: a.displayContent,
         ));
       }
 
@@ -3661,12 +3661,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return;
     }
 
+    final baseContent = _bannerContentController.text.trim().isNotEmpty
+        ? _bannerContentController.text.trim()
+        : 'إعلان وبوستر رسمي في الواجهة الرئيسية';
+    final tgTag = res.telegramMessageId != null ? ' [TG_MSG_ID:${res.telegramMessageId}]' : '';
+
     final newBanner = AnnouncementModel(
       id: '',
       title: title,
-      content: _bannerContentController.text.trim().isNotEmpty
-          ? _bannerContentController.text.trim()
-          : 'إعلان وبوستر رسمي في الواجهة الرئيسية',
+      content: '$baseContent$tgTag',
       authorId: _currentUser?.studentId ?? 'ST-NUST-001630760-413',
       authorName: _currentUser?.name ?? 'مجتبى عواد',
       authorRole: 'admin',

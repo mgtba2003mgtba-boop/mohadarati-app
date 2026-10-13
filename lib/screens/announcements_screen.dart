@@ -244,7 +244,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             const SizedBox(height: 6),
 
             Text(
-              announcement.content,
+              announcement.displayContent,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
@@ -283,7 +283,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       subtitle: 'الناشر: ${announcement.authorName} • ${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: announcement.imageUrl,
-      contentText: announcement.content,
+      contentText: announcement.displayContent,
       accentColor: AppTheme.primary,
       actions: [
         ElevatedButton(

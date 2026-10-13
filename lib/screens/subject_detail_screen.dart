@@ -679,7 +679,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               title: item.title,
               subtitle: 'الناشر: ${item.authorName} • ${item.createdAt.year}/${item.createdAt.month.toString().padLeft(2, '0')}/${item.createdAt.day.toString().padLeft(2, '0')}',
               icon: Icons.campaign_rounded,
-              contentText: item.content,
+              contentText: item.displayContent,
               accentColor: AppTheme.primary,
               actions: [
                 ElevatedButton(
@@ -728,7 +728,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  item.content,
+                  item.displayContent,
                   style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

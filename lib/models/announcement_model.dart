@@ -29,6 +29,24 @@ class AnnouncementModel {
     required this.createdAt,
   });
 
+  /// معرف رسالة تيليجرام المرتبطة بالمنشور إن وجد
+  int? get telegramMessageId {
+    final match = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(content);
+    if (match != null) {
+      return int.tryParse(match.group(1) ?? '');
+    }
+    return null;
+  }
+
+  /// المحتوى النظيف للعرض بدون وسوم تيليجرام والنظام الداخلية
+  String get displayContent {
+    return content
+        .replaceAll(RegExp(r'\[TG_MSG_ID:\d+\]'), '')
+        .replaceAll('[SCHEDULE_TIMETABLE]', '')
+        .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')
+        .trim();
+  }
+
   factory AnnouncementModel.fromJson(Map<String, dynamic> json) {
     DateTime created = DateTime.now();
     if (json['created_at'] != null) {

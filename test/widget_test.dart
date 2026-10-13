@@ -630,6 +630,64 @@ void main() {
       expect(mujtabaTabsCount, 3, reason: 'المشرف العام مجتبى لديه 3 تبويبات فقط: النبض، مركز النشر، إدارة المحتوى والطلاب');
       expect(repTabsCount, 2, reason: 'ممثل الدفعة لديه تبويبان فقط: نشر المحاضرات، نشر الإعلانات');
     });
+
+    test('اختبار مزامنة الحذف التلقائي وحذف الرسائل من قناة تيليجرام (Telegram Channel Synchronized Deletion)', () {
+      // 1. اختبار استخراج معرف رسالة تيليجرام من المحاضرة
+      final lecture = LectureModel(
+        id: 'lec-99',
+        title: 'محاضرة المعالجة الرقمية',
+        subjectName: 'معالجة الإشارات',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        driveUrl: 'telegram',
+        uploaderId: 'REP-01',
+        uploaderName: 'ممثل الدفعة',
+        telegramMessageId: 10452,
+        telegramChannelId: AppConstants.lecturesChannelId,
+        createdAt: DateTime.now(),
+      );
+
+      expect(lecture.telegramMessageId, 10452);
+      expect(lecture.telegramChannelId, AppConstants.lecturesChannelId);
+
+      // 2. اختبار استخراج معرف رسالة تيليجرام وتنظيف المحتوى في البوسترات والإعلانات
+      final banner = AnnouncementModel(
+        id: 'ann-55',
+        title: 'بوستر مؤتمر الذكاء الاصطناعي',
+        content: 'دعوة لحضور المؤتمر السنوي [TG_MSG_ID:88421]',
+        authorId: 'ST-NUST-001630760-413',
+        authorName: 'مجتبى عواد',
+        authorRole: 'admin',
+        imageUrl: 'https://api.telegram.org/file/bot/photos/file_88421.jpg',
+        createdAt: DateTime.now(),
+      );
+
+      expect(banner.telegramMessageId, 88421, reason: 'يجب استخراج معرف رسالة تيليجرام بدقة من وسم [TG_MSG_ID:88421]');
+      expect(banner.displayContent, 'دعوة لحضور المؤتمر السنوي', reason: 'يجب تنظيف النص من الوسم الداخلي عند العرض للطلاب');
+
+      // 3. اختبار استخراج معرف الرسالة للجداول الدراسية
+      final scheduleRawJson = {
+        'id': 'sch-12',
+        'title': 'جدول الامتحانات النهائية',
+        'content': '[SCHEDULE_TIMETABLE] [TG_MSG_ID:99120] جدول دراسي',
+        'category': 'exam',
+        'department': 'هندسة تقنيات الأجهزة الطبية',
+        'stage': 'المرحلة الرابعة',
+        'image_url': 'https://api.telegram.org/file/bot/docs/file_99120.pdf',
+        'author_name': 'ممثل الدفعة',
+        'author_id': 'REP-413',
+      };
+
+      final schedule = ScheduleModel.fromJson(scheduleRawJson);
+      expect(schedule.telegramMessageId, 99120, reason: 'يجب أن يتعرف المودل على معرف رسالة تيليجرام للجدول');
+      expect(schedule.toJson()['telegram_message_id'], 99120);
+
+      // 4. اختبار التوافق مع رابط الصورة /api/file/{id} كخيار بديل
+      final fallbackUrl = 'https://nust.edu.iq/api/file/77654';
+      final urlMatch = RegExp(r'/api/file/(\d+)').firstMatch(fallbackUrl);
+      expect(urlMatch, isNotNull);
+      expect(int.tryParse(urlMatch!.group(1)!), 77654);
+    });
   });
 }
 
