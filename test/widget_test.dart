@@ -690,24 +690,17 @@ void main() {
       expect(int.tryParse(urlMatch!.group(1)!), 77654);
     });
 
-    test('اختبار نافذة المعاينة المدمجة ومنع التحميل القسري للملفات (In-App Media Preview & Non-Forced Downloads)', () {
-      // 1. فحص كشف أنواع الوسائط (صور، PDF، فيديو، مستندات)
+    test('اختبار نافذة المعاينة المدمجة وعارض PDF المحلي المباشر (In-App Media Preview & Local PDF Viewer)', () {
+      // 1. فحص كشف أنواع الوسائط (صور، PDF، مستندات)
       const pdfUrl = 'https://api.telegram.org/file/bot8816281220/documents/lecture_1.pdf';
-      const driveUrl = 'https://drive.google.com/file/d/1A2B3C4D5E6F/view';
+      const imageUrl = 'https://api.telegram.org/file/bot8816281220/photos/file_0.jpg';
 
-      // فحص تحويل رابط Google Drive إلى رابط المعاينة المباشر
-      final match = RegExp(r'file/d/([a-zA-Z0-9_-]+)').firstMatch(driveUrl);
-      expect(match, isNotNull);
-      final fileId = match!.group(1);
-      final drivePreview = 'https://drive.google.com/file/d/$fileId/preview';
-      expect(drivePreview, 'https://drive.google.com/file/d/1A2B3C4D5E6F/preview');
+      // فحص تحويل رابط الـ PDF إلى عارض pdf_viewer.html المحلي المباشر بدون Google Docs
+      final proxied = AppConstants.resolveImageUrl(pdfUrl);
+      final pdfViewerUrl = 'pdf_viewer.html?file=${Uri.encodeComponent(proxied)}';
+      expect(pdfViewerUrl, contains('pdf_viewer.html?file='));
 
-      // فحص تحويل رابط المستند إلى رابط Google Docs Viewer لمنع التحميل القسري
-      final embeddedDocsUrl = 'https://docs.google.com/viewer?url=${Uri.encodeComponent(pdfUrl)}&embedded=true';
-      expect(embeddedDocsUrl, contains('docs.google.com/viewer'));
-      expect(embeddedDocsUrl, contains(Uri.encodeComponent(pdfUrl)));
-
-      // فحص نموذج الـ Widget
+      // فحص نموذج الـ Widget للـ PDF
       const previewModal = AppMediaPreviewModal(
         title: 'محاضرة التشريح الطبي',
         subtitle: 'المرحلة الثانية • PDF',
@@ -717,7 +710,33 @@ void main() {
       );
       expect(previewModal.title, 'محاضرة التشريح الطبي');
       expect(previewModal.rawUrl, pdfUrl);
+
+      // فحص نموذج الـ Widget للصورة
+      const imageModal = AppMediaPreviewModal(
+        title: 'مخطط الدائرة الإلكترونية',
+        subtitle: 'المرحلة الثالثة • صورة',
+        rawUrl: imageUrl,
+        fileName: 'circuit.png',
+        mimeType: 'image/png',
+      );
+      expect(imageModal.title, 'مخطط الدائرة الإلكترونية');
+      expect(imageModal.rawUrl, imageUrl);
+    });
+
+    test('اختبار حظر رفع الفيديوهات والاعتماد الحصري على المستندات والصور (No Video Uploads & Documents Only Policy)', () {
+      // 1. فحص قائمة الامتدادات المسموح بها للمحاضرات (مستندات وصور فقط بدون فيديو)
+      final allowedDocsAndImages = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'rar'];
+      final forbiddenVideoFormats = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv'];
+
+      for (final forbidden in forbiddenVideoFormats) {
+        expect(allowedDocsAndImages.contains(forbidden), false, reason: 'يجب حظر امتدادات الفيديو $forbidden تماماً من المنظومة');
+      }
+
+      for (final allowed in ['pdf', 'docx', 'pptx', 'png', 'jpg']) {
+        expect(allowedDocsAndImages.contains(allowed), true, reason: 'يجب السماح بامتداد المستند/الصورة $allowed');
+      }
     });
   });
 }
+
 

@@ -49,12 +49,12 @@ class TelegramUploaderService {
   factory TelegramUploaderService() => _instance;
   TelegramUploaderService._internal();
 
-  /// اختيار ملف محاضرة من ذاكرة الجهاز (فيديو MP4/MKV أو مستند PDF/Office)
+  /// اختيار ملف محاضرة من ذاكرة الجهاز (مستند PDF/Office أو صورة توضيحية)
   Future<PlatformFile?> pickLectureFile() async {
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['mp4', 'mkv', 'avi', 'mov', 'pdf', 'docx', 'pptx', 'zip', 'rar'],
+        allowedExtensions: ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'rar'],
       );
 
       if (files.isNotEmpty) {

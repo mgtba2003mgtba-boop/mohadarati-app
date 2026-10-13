@@ -370,88 +370,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final targetDept = _currentUser?.isAdmin == true ? _selectedLectureDept : (_currentUser?.department ?? _selectedLectureDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedLectureStage : (_currentUser?.stage ?? _selectedLectureStage);
 
-    if (_uploadDirectFile) {
-      if (_selectedFile == null) {
-        _showSnackbar('يرجى اختيار ملف المحاضرة أولاً', isError: true);
-        return;
-      }
+    if (_selectedFile == null) {
+      _showSnackbar('يرجى اختيار ملف المحاضرة أولاً (PDF / مستند / صورة)', isError: true);
+      return;
+    }
 
-      setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-      final result = await TelegramUploaderService().uploadLecture(
-        file: _selectedFile!,
-        title: title,
-        subjectName: subject,
-        department: targetDept,
-        stage: targetStage,
-        semester: _selectedLectureSemester,
-        lectureType: _selectedLectureType,
-        professorName: _professorNameController.text.trim().isNotEmpty ? _professorNameController.text.trim() : null,
-        description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
-        uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
-        uploaderName: _currentUser?.name ?? 'ممثل الدفعة',
-        uploaderRole: _currentUser?.role ?? 'representative',
-      );
+    final result = await TelegramUploaderService().uploadLecture(
+      file: _selectedFile!,
+      title: title,
+      subjectName: subject,
+      department: targetDept,
+      stage: targetStage,
+      semester: _selectedLectureSemester,
+      lectureType: _selectedLectureType,
+      professorName: _professorNameController.text.trim().isNotEmpty ? _professorNameController.text.trim() : null,
+      description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
+      uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
+      uploaderName: _currentUser?.name ?? 'ممثل الدفعة',
+      uploaderRole: _currentUser?.role ?? 'representative',
+    );
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-      if (result.success) {
-        setState(() => _selectedFile = null);
-        _lectureTitleController.clear();
-        _subjectNameController.clear();
-        _driveUrlController.clear();
-        _professorNameController.clear();
-        _lectureDescController.clear();
-        _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
-      } else {
-        _showSnackbar(result.message, isError: true);
-      }
+    if (result.success) {
+      setState(() => _selectedFile = null);
+      _lectureTitleController.clear();
+      _subjectNameController.clear();
+      _driveUrlController.clear();
+      _professorNameController.clear();
+      _lectureDescController.clear();
+      _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
     } else {
-      final driveUrl = _driveUrlController.text.trim();
-      if (driveUrl.isEmpty) {
-        _showSnackbar('يرجى لصق رابط Google Drive للمحاضرة', isError: true);
-        return;
-      }
-      if (!driveUrl.contains('drive.google.com') && !driveUrl.startsWith('http')) {
-        _showSnackbar('تأكد من إدخال رابط Google Drive صحيح يبدأ بـ https://', isError: true);
-        return;
-      }
-
-      setState(() => _isLoading = true);
-
-      final newLecture = LectureModel(
-        id: '',
-        title: title,
-        subjectName: subject,
-        department: targetDept,
-        stage: targetStage,
-        semester: _selectedLectureSemester,
-        type: _selectedLectureType,
-        driveUrl: driveUrl,
-        description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
-        professorName: _professorNameController.text.trim().isNotEmpty ? _professorNameController.text.trim() : null,
-        uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
-        uploaderName: _currentUser?.name ?? 'ممثل الدفعة',
-        uploaderRole: _currentUser?.role ?? 'representative',
-        createdAt: DateTime.now(),
-      );
-
-      final success = await SupabaseService().createLecture(newLecture);
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      if (success) {
-        _lectureTitleController.clear();
-        _subjectNameController.clear();
-        _driveUrlController.clear();
-        _professorNameController.clear();
-        _lectureDescController.clear();
-        _showSnackbar('تم نشر المحاضرة بنجاح');
-      } else {
-        _showSnackbar('حدث خطأ أثناء حفظ المحاضرة بسيرفر Supabase', isError: true);
-      }
+      _showSnackbar(result.message, isError: true);
     }
   }
 
@@ -609,7 +562,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
                     // مفاتيح الصلاحيات المخصصة
                     SwitchListTile(
-                      title: Text('صلاحية نشر المحاضرات (Google Drive)', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
+                      title: Text('صلاحية نشر ومشاركة المحاضرات', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
                       value: canLectures,
                       activeThumbColor: AppTheme.primaryLight,
                       contentPadding: EdgeInsets.zero,
@@ -893,11 +846,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // ── تبويب 1: نشر المحاضرات (رفع مباشر من الجهاز أو Google Drive) ─
+  // ── تبويب 1: نشر المحاضرات (رفع مباشر من الجهاز إلى سحابة تيليجرام) ─
   Widget _buildPublishLectureTab() {
-    final isVideo = _selectedFile != null &&
-        ['mp4', 'mkv', 'avi', 'mov'].contains(_selectedFile!.extension?.toLowerCase());
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -937,7 +887,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'يمكنك رفع ملفات الفيديو والمستندات مباشرة من جهازك، وسيتم تخزينها وبثها للطلبة فوراً داخل التطبيق دون أي تحويل لخارج المنظومة.',
+                        'يمكنك رفع ملفات ومستندات المحاضرات (PDF، صور، عروض تقديمية) مباشرة من جهازك، وسيتم تخزينها وبثها للطلبة فوراً داخل التطبيق دون أي تحويل لخارج المنظومة.',
                         style: GoogleFonts.cairo(
                           fontSize: 11,
                           color: const Color(0xFFCBD5E1),
@@ -950,255 +900,148 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // ── شريط اختيار طريقة النشر: رفع ملف مباشر vs رابط خارجي ──
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppTheme.darkCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _uploadDirectFile = true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _uploadDirectFile ? AppTheme.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.upload_file_rounded,
-                            size: 18,
-                            color: _uploadDirectFile ? Colors.white : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'رفع ملف من الجهاز',
-                            style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _uploadDirectFile ? Colors.white : AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _uploadDirectFile = false),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: !_uploadDirectFile ? AppTheme.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_to_drive_rounded,
-                            size: 18,
-                            color: !_uploadDirectFile ? Colors.white : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'رابط Google Drive',
-                            style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: !_uploadDirectFile ? Colors.white : AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 18),
 
-          // ── مساحة اختيار أو عرض الملف المختار (في حال الرفع المباشر) ──
-          if (_uploadDirectFile) ...[
-            if (_selectedFile == null)
-              InkWell(
-                onTap: _isPickingFile ? null : _pickLectureFile,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.darkCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppTheme.primaryLight.withValues(alpha: 0.4),
-                      style: BorderStyle.solid,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: _isPickingFile
-                            ? const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryLight),
-                              )
-                            : const Icon(Icons.cloud_upload_outlined, color: AppTheme.primaryLight, size: 36),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'اضغط هنا لاختيار ملف المحاضرة من جهازك',
-                        style: GoogleFonts.cairo(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'يدعم ملفات الفيديو (MP4, MKV) والمستندات (PDF, Word, PowerPoint) بحجم يصل حتى 2GB',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      ElevatedButton.icon(
-                        onPressed: _isPickingFile ? null : _pickLectureFile,
-                        icon: const Icon(Icons.folder_open_rounded, size: 18),
-                        label: const Text('تصفح الملفات'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(16),
+          // ── مساحة اختيار أو عرض الملف المختار ──
+          if (_selectedFile == null)
+            InkWell(
+              onTap: _isPickingFile ? null : _pickLectureFile,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
                 decoration: BoxDecoration(
                   color: AppTheme.darkCard,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.5), width: 1.5),
+                  border: Border.all(
+                    color: AppTheme.primaryLight.withValues(alpha: 0.4),
+                    style: BorderStyle.solid,
+                    width: 1.5,
+                  ),
                 ),
-                child: Row(
+                child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isVideo
-                            ? AppTheme.accent.withValues(alpha: 0.2)
-                            : AppTheme.primary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppTheme.primary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        isVideo ? Icons.video_file_rounded : Icons.description_rounded,
-                        color: isVideo ? AppTheme.accent : AppTheme.primaryLight,
-                        size: 32,
+                      child: _isPickingFile
+                          ? const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryLight),
+                            )
+                          : const Icon(Icons.cloud_upload_outlined, color: AppTheme.primaryLight, size: 36),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'اضغط هنا لاختيار ملف المحاضرة من جهازك',
+                      style: GoogleFonts.cairo(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedFile!.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.cairo(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.success.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'الحجم: ${_formatFileSize(_selectedFileSize)}',
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.success,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isVideo ? 'فيديو تدفق مباشر' : 'مستند دراسي',
-                                style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
-                              ),
-                            ],
-                          ),
-                        ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'يدعم ملفات المستندات (PDF, Word, PowerPoint) والصور التوضيحية',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.cairo(
+                        fontSize: 11,
+                        color: const Color(0xFF94A3B8),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, color: AppTheme.danger),
-                      tooltip: 'إلغاء الملف',
-                      onPressed: () => setState(() => _selectedFile = null),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      onPressed: _isPickingFile ? null : _pickLectureFile,
+                      icon: const Icon(Icons.folder_open_rounded, size: 18),
+                      label: const Text('تصفح الملفات'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ],
                 ),
               ),
-            const SizedBox(height: 18),
-          ],
-
-          // ── حقل رابط Google Drive (فقط عند اختيار الوضع الخارجي) ──
-          if (!_uploadDirectFile) ...[
-            TextField(
-              controller: _driveUrlController,
-              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-              decoration: InputDecoration(
-                labelText: 'رابط Google Drive للمحاضرة',
-                hintText: 'https://drive.google.com/file/d/.../view',
-                prefixIcon: const Icon(Icons.add_to_drive_rounded, color: AppTheme.accent),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.open_in_new_rounded, color: AppTheme.primaryLight),
-                  tooltip: 'تجربة الرابط',
-                  onPressed: () async {
-                    final url = _driveUrlController.text.trim();
-                    if (url.isNotEmpty && await canLaunchUrl(Uri.parse(url))) {
-                      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                    } else {
-                      _showSnackbar('الرابط غير صالح للتجربة', isError: true);
-                    }
-                  },
-                ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.darkCard,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.success.withValues(alpha: 0.5), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.description_rounded,
+                      color: AppTheme.primaryLight,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _selectedFile!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.success.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'الحجم: ${_formatFileSize(_selectedFileSize)}',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.success,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'مستند / ملف دراسي',
+                              style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppTheme.danger),
+                    tooltip: 'إلغاء الملف',
+                    onPressed: () => setState(() => _selectedFile = null),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-          ],
+          const SizedBox(height: 18),
 
           // ── 1. النطاق الأكاديمي (القسم والمرحلة والكورس) ──
           if (_currentUser?.isAdmin == true) ...[

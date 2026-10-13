@@ -115,13 +115,16 @@ class _LecturesScreenState extends State<LecturesScreen> {
   Future<void> _openMediaStream(dynamic target) async {
     String? url;
     if (target is LectureModel) {
-      url = target.streamUrl;
       if (target.telegramFileId != null && target.telegramFileId!.isNotEmpty) {
         final fresh = await TelegramUploaderService().resolveFileUrl(target.telegramFileId!);
         if (fresh != null && fresh.isNotEmpty) url = fresh;
       }
       if (url == null || url.isEmpty) {
-        if (target.hasDriveUrl) url = target.cleanDriveViewUrl;
+        if (target.driveUrl.startsWith('http')) {
+          url = target.driveUrl;
+        } else {
+          url = target.streamUrl;
+        }
       }
     } else if (target is String) {
       url = target;
@@ -446,7 +449,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                // زر البث المباشر للفيديو
+                // زر المعاينة المباشرة
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -454,9 +457,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 18, color: Colors.white),
+                    icon: const Icon(Icons.visibility_rounded, size: 18, color: Colors.white),
                     label: Text(
-                      'تشغيل مباشر (Stream)',
+                      'معاينة المحاضرة',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                     onPressed: () => _openMediaStream(lecture),
@@ -484,7 +487,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
           ],
           const SizedBox(height: 12),
 
-          // معلومات الناشر وزر التحميل من Google Drive إن توفر
+          // معلومات الناشر
           Row(
             children: [
               Expanded(
@@ -495,26 +498,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (lecture.driveUrl.isNotEmpty) ...[
-                IconButton(
-                  icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF94A3B8)),
-                  tooltip: 'نسخ رابط Drive',
-                  onPressed: () => _copyDriveLink(lecture.driveUrl),
-                ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E3A8A),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.add_to_drive_rounded, size: 16, color: Colors.white),
-                  label: Text(
-                    'فتح Google Drive',
-                    style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () => _openGoogleDrive(lecture.driveUrl),
-                ),
-              ],
             ],
           ),
         ],

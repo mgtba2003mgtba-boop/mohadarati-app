@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0">
+  <title>معاينة المستند الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #0F172A;
+      color: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background-color: #1E293B;
+      border-bottom: 1px solid #334155;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      background-color: #334155;
+      color: #F8FAFC;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .btn:hover:not(:disabled) {
+      background-color: #475569;
+      border-color: #64748B;
+    }
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background-color: #0284C7;
+      border-color: #0284C7;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background-color: #0369A1;
+      border-color: #0369A1;
+    }
+    .page-indicator {
+      font-size: 13px;
+      font-weight: 600;
+      color: #CBD5E1;
+      padding: 4px 10px;
+      background-color: #0F172A;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      direction: ltr;
+      display: inline-block;
+    }
+    #viewer-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      padding: 20px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+    .pdf-page-wrapper {
+      background-color: #FFFFFF;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    #loading-state {
+      position: absolute;
+      inset: 0;
+      background-color: #0F172A;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 20;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #334155;
+      border-top-color: #38BDF8;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #error-state {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background-color: #0F172A;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      text-align: center;
+      z-index: 25;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="toolbar-group">
+      <button id="prev-btn" class="btn" title="الصفحة السابقة">السابقة</button>
+      <span class="page-indicator" id="page-num">1 / 1</span>
+      <button id="next-btn" class="btn" title="الصفحة التالية">التالية</button>
+    </div>
+
+    <div class="toolbar-group">
+      <button id="zoom-out-btn" class="btn" title="تصغير">-</button>
+      <span class="page-indicator" id="zoom-level">100%</span>
+      <button id="zoom-in-btn" class="btn" title="تكبير">+</button>
+      <button id="fit-width-btn" class="btn btn-primary" title="ملاءمة العرض">ملاءمة الشاشة</button>
+    </div>
+  </header>
+
+  <div id="viewer-container">
+    <!-- Pages rendered here -->
+  </div>
+
+  <div id="loading-state">
+    <div class="spinner"></div>
+    <div style="font-size: 15px; font-weight: 600; color: #94A3B8;">جاري فتح ومعاينة صفحات المستند...</div>
+  </div>
+
+  <div id="error-state">
+    <div style="font-size: 48px;">📄</div>
+    <h3 style="color: #F8FAFC; font-size: 16px;">تعذر فتح ملف المستند</h3>
+    <p style="color: #94A3B8; font-size: 13px; max-width: 380px;" id="error-msg">
+      يرجى التحقق من توفر الملف أو المحاولة مرة أخرى.
+    </p>
+    <button class="btn btn-primary" onclick="location.reload()">إعادة المحاولة</button>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const rawFileParam = urlParams.get('file');
+
+    const container = document.getElementById('viewer-container');
+    const loadingState = document.getElementById('loading-state');
+    const errorState = document.getElementById('error-state');
+    const errorMsg = document.getElementById('error-msg');
+    const pageNumSpan = document.getElementById('page-num');
+    const zoomLevelSpan = document.getElementById('zoom-level');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const fitWidthBtn = document.getElementById('fit-width-btn');
+
+    let pdfDoc = null;
+    let totalPages = 0;
+    let currentPage = 1;
+    let scale = 1.2;
+    let rendering = false;
+    let pageCanvases = [];
+
+    if (!rawFileParam) {
+      showError('لم يتم تحديد رابط الملف المطلوب للمعاينة.');
+    } else {
+      loadDocument(decodeURIComponent(rawFileParam));
+    }
+
+    async function loadDocument(fileUrl) {
+      try {
+        const loadingTask = pdfjsLib.getDocument({
+          url: fileUrl,
+          cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+          cMapPacked: true,
+        });
+
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+        loadingState.style.display = 'none';
+
+        calculateInitialScale();
+        await renderAllPages();
+        setupScrollObserver();
+      } catch (err) {
+        console.error('PDF Load Error:', err);
+        showError('تعذر جلب ملف الـ PDF عبر خادم المعاينة: ' + (err.message || 'خطأ غير معروف'));
+      }
+    }
+
+    function calculateInitialScale() {
+      const containerWidth = container.clientWidth - 40;
+      if (containerWidth < 600) {
+        scale = Math.max(0.7, containerWidth / 600);
+      } else {
+        scale = 1.15;
+      }
+      zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
+    }
+
+    async function renderAllPages() {
+      container.innerHTML = '';
+      pageCanvases = [];
+
+      for (let i = 1; i <= totalPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
+        const cssViewport = page.getViewport({ scale: scale });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pdf-page-wrapper';
+        wrapper.id = 'page-wrapper-' + i;
+        wrapper.style.width = cssViewport.width + 'px';
+        wrapper.style.height = cssViewport.height + 'px';
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = cssViewport.width + 'px';
+        canvas.style.height = cssViewport.height + 'px';
+
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+        wrapper.appendChild(canvas);
+        container.appendChild(wrapper);
+        pageCanvases.push({ pageNum: i, element: wrapper });
+      }
+
+      updatePageIndicator(currentPage);
+    }
+
+    function setupScrollObserver() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const pageId = entry.target.id;
+            const num = parseInt(pageId.replace('page-wrapper-', ''));
+            if (!isNaN(num)) {
+              currentPage = num;
+              updatePageIndicator(currentPage);
+            }
+          }
+        });
+      }, { root: container, threshold: 0.5 });
+
+      pageCanvases.forEach(p => observer.observe(p.element));
+    }
+
+    function updatePageIndicator(page) {
+      pageNumSpan.textContent = `${page} / ${totalPages}`;
+      prevBtn.disabled = (page <= 1);
+      nextBtn.disabled = (page >= totalPages);
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        scrollToPage(currentPage);
+      }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentPage < totalPages) {
+        currentPage++;
+        scrollToPage(currentPage);
+      }
+    });
+
+    function scrollToPage(num) {
+      const el = document.getElementById('page-wrapper-' + num);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    zoomInBtn.addEventListener('click', async () => {
+      if (scale < 3.0) {
+        scale += 0.2;
+        zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
+        await renderAllPages();
+        scrollToPage(currentPage);
+      }
+    });
+
+    zoomOutBtn.addEventListener('click', async () => {
+      if (scale > 0.5) {
+        scale -= 0.2;
+        zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
+        await renderAllPages();
+        scrollToPage(currentPage);
+      }
+    });
+
+    fitWidthBtn.addEventListener('click', async () => {
+      const containerWidth = container.clientWidth - 40;
+      if (pdfDoc && totalPages > 0) {
+        const page1 = await pdfDoc.getPage(1);
+        const unscaledViewport = page1.getViewport({ scale: 1.0 });
+        scale = containerWidth / unscaledViewport.width;
+        zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
+        await renderAllPages();
+        scrollToPage(currentPage);
+      }
+    });
+
+    function showError(msg) {
+      loadingState.style.display = 'none';
+      errorState.style.display = 'flex';
+      errorMsg.textContent = msg;
+    }
+  </script>
+</body>
+</html>

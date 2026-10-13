@@ -158,7 +158,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   Future<void> _launchLectureMedia(LectureModel lecture, {required bool isDownload}) async {
-    String? targetUrl = isDownload ? lecture.downloadUrl : lecture.streamUrl;
+    String? targetUrl;
 
     if (lecture.telegramFileId != null && lecture.telegramFileId!.isNotEmpty) {
       final fresh = await TelegramUploaderService().resolveFileUrl(lecture.telegramFileId!);
@@ -168,8 +168,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
 
     if (targetUrl == null || targetUrl.isEmpty) {
-      if (lecture.hasDriveUrl) {
-        targetUrl = lecture.cleanDriveViewUrl;
+      if (lecture.driveUrl.startsWith('http')) {
+        targetUrl = lecture.driveUrl;
+      } else {
+        targetUrl = isDownload ? lecture.downloadUrl : lecture.streamUrl;
       }
     }
 
@@ -589,7 +591,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 18, color: Colors.white),
+                    icon: const Icon(Icons.visibility_rounded, size: 18, color: Colors.white),
                     label: Text(
                       'معاينة',
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
@@ -612,33 +614,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     ),
                     onPressed: () => _launchLectureMedia(lecture, isDownload: true),
                   ),
-                ),
-              ],
-            ),
-          ],
-
-          // في حال وجود رابط Google Drive
-          if (lecture.hasDriveUrl) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.add_to_drive_rounded, size: 18, color: AppTheme.accent),
-                    label: Text('فتح الملف', style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary)),
-                    onPressed: () => _launchUrlExternal(lecture.driveUrl, errorMsg: 'تعذر فتح الرابط'),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.accent),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.copy_rounded, size: 18, color: AppTheme.primary),
-                  tooltip: 'نسخ رابط Drive',
-                  onPressed: () => _copyToClipboard(lecture.driveUrl, 'تم نسخ رابط Drive'),
                 ),
               ],
             ),
@@ -986,10 +961,8 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   // حقول المحاضرة
   final _titleController = TextEditingController();
   final _profController = TextEditingController();
-  final _driveUrlController = TextEditingController();
   final _descController = TextEditingController();
   String _lectureType = 'theory'; // 'theory', 'practical'
-  bool _uploadDirectFile = true;
   PlatformFile? _selectedFile;
   int _selectedFileSize = 0;
   bool _isPickingFile = false;
@@ -1002,7 +975,6 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   void dispose() {
     _titleController.dispose();
     _profController.dispose();
-    _driveUrlController.dispose();
     _descController.dispose();
     _announceTitleController.dispose();
     _announceContentController.dispose();
@@ -1049,57 +1021,31 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
       return;
     }
 
-    if (_uploadDirectFile && _selectedFile == null) {
-      _showSnack('يرجى اختيار ملف المحاضرة', isError: true);
-      return;
-    }
-
-    if (!_uploadDirectFile && _driveUrlController.text.trim().isEmpty) {
-      _showSnack('يرجى إدخال رابط Google Drive', isError: true);
+    if (_selectedFile == null) {
+      _showSnack('يرجى اختيار ملف المحاضرة (PDF / مستند / صورة)', isError: true);
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      if (_uploadDirectFile && _selectedFile != null) {
-        final res = await TelegramUploaderService().uploadLecture(
-          file: _selectedFile!,
-          title: title,
-          subjectName: widget.subjectName,
-          department: widget.department,
-          stage: widget.stage,
-          semester: 1,
-          lectureType: _lectureType,
-          professorName: _profController.text.trim().isEmpty ? null : _profController.text.trim(),
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-          uploaderName: widget.currentUser?.name ?? 'ممثل المادة',
-          uploaderRole: widget.currentUser?.role ?? 'representative',
-        );
+      final res = await TelegramUploaderService().uploadLecture(
+        file: _selectedFile!,
+        title: title,
+        subjectName: widget.subjectName,
+        department: widget.department,
+        stage: widget.stage,
+        semester: 1,
+        lectureType: _lectureType,
+        professorName: _profController.text.trim().isEmpty ? null : _profController.text.trim(),
+        description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+        uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+        uploaderName: widget.currentUser?.name ?? 'ممثل المادة',
+        uploaderRole: widget.currentUser?.role ?? 'representative',
+      );
 
-        if (!res.success) {
-          throw Exception(res.message);
-        }
-      } else {
-        final newLecture = LectureModel(
-          id: '',
-          title: title,
-          subjectName: widget.subjectName,
-          department: widget.department,
-          stage: widget.stage,
-          semester: 1,
-          type: _lectureType,
-          driveUrl: _driveUrlController.text.trim(),
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-          professorName: _profController.text.trim().isEmpty ? null : _profController.text.trim(),
-          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-          uploaderName: widget.currentUser?.name ?? 'ممثل المادة',
-          uploaderRole: widget.currentUser?.role ?? 'representative',
-          createdAt: DateTime.now(),
-        );
-        final ok = await SupabaseService().createLecture(newLecture);
-        if (!ok) throw Exception('تعذر حفظ المحاضرة');
+      if (!res.success) {
+        throw Exception(res.message);
       }
 
       if (mounted) {
@@ -1378,109 +1324,62 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               ),
               const SizedBox(height: 12),
 
-              // اختيار طريقة الرفع
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Text('رفع مباشر من الجهاز'),
-                      selected: _uploadDirectFile,
-                      onSelected: (s) => setState(() => _uploadDirectFile = true),
-                      selectedColor: AppTheme.primary,
-                      labelStyle: GoogleFonts.cairo(
-                        color: _uploadDirectFile ? Colors.white : AppTheme.textPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              // مساحة اختيار ملف المحاضرة (مستند PDF أو صورة أو عرض تقديمي)
+              if (_selectedFile == null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Text('رابط Google Drive'),
-                      selected: !_uploadDirectFile,
-                      onSelected: (s) => setState(() => _uploadDirectFile = false),
-                      selectedColor: AppTheme.accent,
-                      labelStyle: GoogleFonts.cairo(
-                        color: !_uploadDirectFile ? Colors.white : AppTheme.textPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  icon: _isPickingFile
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                  label: Text(
+                    'اختر ملف المحاضرة (PDF / مستند / صورة)',
+                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              if (_uploadDirectFile) ...[
-                if (_selectedFile == null)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppTheme.primary, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: _isPickingFile
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
-                    label: Text(
-                      'اختر ملف المحاضرة (PDF / فيديو)',
-                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
-                    onPressed: _isPickingFile ? null : _pickFile,
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primarySubtle,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _selectedFile!.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                _formatFileSize(_selectedFileSize),
-                                style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                          ),
+                  onPressed: _isPickingFile ? null : _pickFile,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primarySubtle,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFile!.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              _formatFileSize(_selectedFileSize),
+                              style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
-                          onPressed: () => setState(() {
-                            _selectedFile = null;
-                            _selectedFileSize = 0;
-                          }),
-                        ),
-                      ],
-                    ),
-                  ),
-              ] else ...[
-                TextField(
-                  controller: _driveUrlController,
-                  style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'رابط Google Drive',
-                    hintText: 'https://drive.google.com/...',
-                    labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.link_rounded, size: 20),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
+                        onPressed: () => setState(() {
+                          _selectedFile = null;
+                          _selectedFileSize = 0;
+                        }),
+                      ),
+                    ],
                   ),
                 ),
-              ],
               const SizedBox(height: 16),
 
               ElevatedButton.icon(
