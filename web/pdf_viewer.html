@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>معاينة المستند الأكاديمي</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,49 +23,50 @@
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
+      user-select: none;
     }
     header {
       background-color: #1E293B;
       border-bottom: 1px solid #334155;
-      padding: 10px 16px;
+      padding: 8px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
       z-index: 10;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     .toolbar-group {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .btn {
       background-color: #334155;
       color: #F8FAFC;
       border: 1px solid #475569;
       border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 13px;
-      font-weight: 600;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 4px;
       transition: all 0.2s ease;
-      user-select: none;
+      white-space: nowrap;
     }
     .btn:hover:not(:disabled) {
       background-color: #475569;
       border-color: #64748B;
     }
     .btn:active:not(:disabled) {
-      transform: scale(0.97);
+      transform: scale(0.96);
     }
     .btn:disabled {
-      opacity: 0.4;
+      opacity: 0.35;
       cursor: not-allowed;
     }
     .btn-primary {
@@ -76,39 +77,51 @@
       background-color: #0369A1;
       border-color: #0369A1;
     }
+    .btn-mode {
+      background-color: #1E293B;
+      border-color: #38BDF8;
+      color: #38BDF8;
+    }
     .page-indicator {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
       color: #CBD5E1;
-      padding: 4px 10px;
+      padding: 4px 8px;
       background-color: #0F172A;
       border-radius: 6px;
       border: 1px solid #334155;
       direction: ltr;
       display: inline-block;
+      min-width: 54px;
+      text-align: center;
     }
     #viewer-container {
       flex: 1;
       overflow-y: auto;
       overflow-x: auto;
-      padding: 20px 10px;
+      padding: 16px 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 16px;
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
+    /* منع ضغط الصفحات نهائياً وضمان أبعادها الأصلية الحقيقية */
     .pdf-page-wrapper {
       background-color: #FFFFFF;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-      border-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+      border-radius: 6px;
       overflow: hidden;
       position: relative;
+      flex-shrink: 0 !important;
+      margin: 0 auto;
+      transition: transform 0.15s ease;
     }
     canvas {
       display: block;
-      width: 100%;
-      height: auto;
+      width: 100% !important;
+      height: 100% !important;
     }
     #loading-state {
       position: absolute;
@@ -122,12 +135,12 @@
       z-index: 20;
     }
     .spinner {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       border: 4px solid #334155;
       border-top-color: #38BDF8;
       border-radius: 50%;
-      animation: spin 0.9s linear infinite;
+      animation: spin 0.8s linear infinite;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
@@ -140,7 +153,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
       padding: 24px;
       text-align: center;
       z-index: 25;
@@ -150,9 +163,10 @@
 <body>
   <header>
     <div class="toolbar-group">
-      <button id="prev-btn" class="btn" title="الصفحة السابقة">السابقة</button>
+      <button id="prev-btn" class="btn" title="الصفحة السابقة">◀ السابقة</button>
       <span class="page-indicator" id="page-num">1 / 1</span>
-      <button id="next-btn" class="btn" title="الصفحة التالية">التالية</button>
+      <button id="next-btn" class="btn" title="الصفحة التالية">التالية ▶</button>
+      <button id="view-mode-btn" class="btn btn-mode" title="تبديل طريقة العرض">صفحة واحدة</button>
     </div>
 
     <div class="toolbar-group">
@@ -169,13 +183,13 @@
 
   <div id="loading-state">
     <div class="spinner"></div>
-    <div style="font-size: 15px; font-weight: 600; color: #94A3B8;">جاري فتح ومعاينة صفحات المستند...</div>
+    <div style="font-size: 14px; font-weight: 700; color: #94A3B8;">جاري فتح ومعاينة صفحات المستند...</div>
   </div>
 
   <div id="error-state">
-    <div style="font-size: 48px;">📄</div>
-    <h3 style="color: #F8FAFC; font-size: 16px;">تعذر فتح ملف المستند</h3>
-    <p style="color: #94A3B8; font-size: 13px; max-width: 380px;" id="error-msg">
+    <div style="font-size: 44px;">📄</div>
+    <h3 style="color: #F8FAFC; font-size: 15px;">تعذر فتح ملف المستند</h3>
+    <p style="color: #94A3B8; font-size: 12px; max-width: 360px;" id="error-msg">
       يرجى التحقق من توفر الملف أو المحاولة مرة أخرى.
     </p>
     <button class="btn btn-primary" onclick="location.reload()">إعادة المحاولة</button>
@@ -198,13 +212,15 @@
     const zoomInBtn = document.getElementById('zoom-in-btn');
     const zoomOutBtn = document.getElementById('zoom-out-btn');
     const fitWidthBtn = document.getElementById('fit-width-btn');
+    const viewModeBtn = document.getElementById('view-mode-btn');
 
     let pdfDoc = null;
     let totalPages = 0;
     let currentPage = 1;
-    let scale = 1.2;
-    let rendering = false;
+    let scale = 1.0;
+    let isSinglePageMode = true; // الوضع الافتراضي الذكي: صفحة بصفحة (سلايد بسلايد) بدقة كاملة
     let pageCanvases = [];
+    let isRendering = false;
 
     if (!rawFileParam) {
       showError('لم يتم تحديد رابط الملف المطلوب للمعاينة.');
@@ -224,55 +240,83 @@
         totalPages = pdfDoc.numPages;
         loadingState.style.display = 'none';
 
-        calculateInitialScale();
-        await renderAllPages();
-        setupScrollObserver();
+        const page1 = await pdfDoc.getPage(1);
+        calculateInitialScale(page1);
+
+        await renderViews();
+        setupGestures();
       } catch (err) {
         console.error('PDF Load Error:', err);
         showError('تعذر جلب ملف الـ PDF عبر خادم المعاينة: ' + (err.message || 'خطأ غير معروف'));
       }
     }
 
-    function calculateInitialScale() {
-      const containerWidth = container.clientWidth - 40;
-      if (containerWidth < 600) {
-        scale = Math.max(0.7, containerWidth / 600);
-      } else {
-        scale = 1.15;
-      }
+    function calculateInitialScale(firstPage) {
+      const containerWidth = container.clientWidth || window.innerWidth;
+      const targetWidth = Math.max(300, containerWidth - 24);
+      const unscaledViewport = firstPage.getViewport({ scale: 1.0 });
+
+      // ضبط المقياس ليملأ عرض شاشة الهاتف أو الحاسوب تماماً
+      scale = targetWidth / unscaledViewport.width;
       zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
     }
 
-    async function renderAllPages() {
+    async function renderViews() {
+      if (isRendering) return;
+      isRendering = true;
+
       container.innerHTML = '';
       pageCanvases = [];
 
-      for (let i = 1; i <= totalPages; i++) {
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
-        const cssViewport = page.getViewport({ scale: scale });
+      if (isSinglePageMode) {
+        // ── وضع الصفحة الواحدة (سلايد بسلايد): عرض الصفحة الحالية فقط بملء الشاشة وبدون أي ضغط ──
+        viewModeBtn.textContent = '📄 صفحة واحدة';
+        viewModeBtn.title = 'انقر للتبديل إلى وضع التمرير المستمر لكافة الصفحات';
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'pdf-page-wrapper';
-        wrapper.id = 'page-wrapper-' + i;
-        wrapper.style.width = cssViewport.width + 'px';
-        wrapper.style.height = cssViewport.height + 'px';
+        await renderSinglePage(currentPage);
+      } else {
+        // ── وضع التمرير المستمر: رص كافة الصفحات عمودياً مع الحفاظ الصارم على أبعاد كل صفحة ──
+        viewModeBtn.textContent = '📜 تمرير مستمر';
+        viewModeBtn.title = 'انقر للتبديل إلى وضع الصفحة الواحدة';
 
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.style.width = cssViewport.width + 'px';
-        canvas.style.height = cssViewport.height + 'px';
-
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-        wrapper.appendChild(canvas);
-        container.appendChild(wrapper);
-        pageCanvases.push({ pageNum: i, element: wrapper });
+        for (let i = 1; i <= totalPages; i++) {
+          await renderSinglePage(i);
+        }
+        setupScrollObserver();
       }
 
-      updatePageIndicator(currentPage);
+      updateControls();
+      isRendering = false;
+    }
+
+    async function renderSinglePage(pageNum) {
+      const page = await pdfDoc.getPage(pageNum);
+      const dpr = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale: scale * dpr });
+      const cssViewport = page.getViewport({ scale: scale });
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pdf-page-wrapper';
+      wrapper.id = 'page-wrapper-' + pageNum;
+      wrapper.style.width = Math.round(cssViewport.width) + 'px';
+      wrapper.style.height = Math.round(cssViewport.height) + 'px';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+      wrapper.appendChild(canvas);
+      container.appendChild(wrapper);
+      pageCanvases.push({ pageNum: pageNum, element: wrapper });
+    }
+
+    function updateControls() {
+      pageNumSpan.textContent = `${currentPage} / ${totalPages}`;
+      prevBtn.disabled = (currentPage <= 1);
+      nextBtn.disabled = (currentPage >= totalPages);
     }
 
     function setupScrollObserver() {
@@ -283,7 +327,7 @@
             const num = parseInt(pageId.replace('page-wrapper-', ''));
             if (!isNaN(num)) {
               currentPage = num;
-              updatePageIndicator(currentPage);
+              updateControls();
             }
           }
         });
@@ -292,23 +336,25 @@
       pageCanvases.forEach(p => observer.observe(p.element));
     }
 
-    function updatePageIndicator(page) {
-      pageNumSpan.textContent = `${page} / ${totalPages}`;
-      prevBtn.disabled = (page <= 1);
-      nextBtn.disabled = (page >= totalPages);
-    }
-
-    prevBtn.addEventListener('click', () => {
+    prevBtn.addEventListener('click', async () => {
       if (currentPage > 1) {
         currentPage--;
-        scrollToPage(currentPage);
+        if (isSinglePageMode) {
+          await renderViews();
+        } else {
+          scrollToPage(currentPage);
+        }
       }
     });
 
-    nextBtn.addEventListener('click', () => {
+    nextBtn.addEventListener('click', async () => {
       if (currentPage < totalPages) {
         currentPage++;
-        scrollToPage(currentPage);
+        if (isSinglePageMode) {
+          await renderViews();
+        } else {
+          scrollToPage(currentPage);
+        }
       }
     });
 
@@ -317,35 +363,77 @@
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    viewModeBtn.addEventListener('click', async () => {
+      isSinglePageMode = !isSinglePageMode;
+      await renderViews();
+      if (!isSinglePageMode) {
+        scrollToPage(currentPage);
+      }
+    });
+
     zoomInBtn.addEventListener('click', async () => {
-      if (scale < 3.0) {
+      if (scale < 3.5) {
         scale += 0.2;
         zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
-        await renderAllPages();
-        scrollToPage(currentPage);
+        await renderViews();
       }
     });
 
     zoomOutBtn.addEventListener('click', async () => {
-      if (scale > 0.5) {
+      if (scale > 0.4) {
         scale -= 0.2;
         zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
-        await renderAllPages();
-        scrollToPage(currentPage);
+        await renderViews();
       }
     });
 
     fitWidthBtn.addEventListener('click', async () => {
-      const containerWidth = container.clientWidth - 40;
       if (pdfDoc && totalPages > 0) {
-        const page1 = await pdfDoc.getPage(1);
-        const unscaledViewport = page1.getViewport({ scale: 1.0 });
-        scale = containerWidth / unscaledViewport.width;
-        zoomLevelSpan.textContent = Math.round(scale * 100) + '%';
-        await renderAllPages();
-        scrollToPage(currentPage);
+        const page = await pdfDoc.getPage(currentPage);
+        calculateInitialScale(page);
+        await renderViews();
       }
     });
+
+    // دعم إيماءات السحب واللمس للهواتف الذكية (Swipe Left/Right)
+    function setupGestures() {
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      container.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+
+      container.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+      }, { passive: true });
+
+      function handleSwipe() {
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > 60) {
+          // في اتجاه RTL: السحب لليسار يعني التالي
+          if (diff > 0 && currentPage < totalPages) {
+            currentPage++;
+            if (isSinglePageMode) renderViews();
+          } else if (diff < 0 && currentPage > 1) {
+            currentPage--;
+            if (isSinglePageMode) renderViews();
+          }
+        }
+      }
+
+      // دعم أزرار الكيبورد للأسهم
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' && currentPage > 1) {
+          currentPage--;
+          if (isSinglePageMode) renderViews();
+        } else if (e.key === 'ArrowLeft' && currentPage < totalPages) {
+          currentPage++;
+          if (isSinglePageMode) renderViews();
+        }
+      });
+    }
 
     function showError(msg) {
       loadingState.style.display = 'none';

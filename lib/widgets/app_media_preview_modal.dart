@@ -294,61 +294,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
 
   /// عارض المستندات والـ PDF المدمج دون أي تحميل قسري
   Widget _buildDocumentViewer(String embedUrl) {
-    return Stack(
-      children: [
-        // عارض الـ IFrame المدمج داخل التطبيق
-        Positioned.fill(
-          child: buildWebIFrame(
-            url: embedUrl,
-            title: widget.title,
-          ),
-        ),
-
-        // شريط إرشادي سفلي خفيف
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B).withValues(alpha: 0.95),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3)),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _isPdf ? Icons.picture_as_pdf_rounded : Icons.description_rounded,
-                  color: AppTheme.accent,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _isPdf
-                        ? 'معاينة المستند نشطة • مرر للاطلاع على كافة الصفحات'
-                        : 'معاينة المستند المدمجة',
-                    style: GoogleFonts.cairo(color: const Color(0xFFCBD5E1), fontSize: 11),
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: () => _launchExternal(_embeddedPreviewUrl),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  icon: const Icon(Icons.fullscreen_rounded, size: 16),
-                  label: Text('ملء الشاشة', style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return SizedBox.expand(
+      child: buildWebIFrame(
+        url: embedUrl,
+        title: widget.title,
+      ),
     );
   }
 
