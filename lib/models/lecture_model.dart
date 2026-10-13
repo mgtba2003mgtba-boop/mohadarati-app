@@ -7,6 +7,7 @@ class LectureModel {
   final String? subjectCode;
   final String department;
   final String stage;
+  final String section; // 'ALL', 'A', 'B', 'C', etc.
   final int semester; // 1 or 2
   final String type; // 'theory' or 'practical'
   final String driveUrl;
@@ -34,6 +35,7 @@ class LectureModel {
     this.subjectCode,
     required this.department,
     required this.stage,
+    this.section = 'ALL',
     this.semester = 1,
     this.type = 'theory',
     required this.driveUrl,
@@ -56,6 +58,14 @@ class LectureModel {
 
   bool get isPractical => type == 'practical';
   String get typeLabel => isPractical ? 'مختبر وعملي' : 'نظري';
+
+  /// الوصف النظيف للعرض بدون وسوم النظام الداخلية
+  String get displayDescription {
+    if (description == null) return '';
+    return description!
+        .replaceAll(RegExp(r'\[SECTION:[^\]]+\]'), '')
+        .trim();
+  }
 
   /// هل تتوفر المحاضرة عبر سحابة تيليجرام
   bool get hasTelegramMedia =>
@@ -128,6 +138,13 @@ class LectureModel {
       } catch (_) {}
     }
 
+    final rawDesc = json['description']?.toString() ?? '';
+    String sec = json['section']?.toString() ?? '';
+    if (sec.isEmpty || sec == 'null') {
+      final match = RegExp(r'\[SECTION:([A-Za-z0-9_]+)\]').firstMatch(rawDesc);
+      sec = match?.group(1) ?? 'ALL';
+    }
+
     return LectureModel(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
@@ -135,10 +152,11 @@ class LectureModel {
       subjectCode: json['subject_code']?.toString(),
       department: json['department']?.toString() ?? '',
       stage: json['stage']?.toString() ?? '',
+      section: sec,
       semester: int.tryParse(json['semester']?.toString() ?? '1') ?? 1,
       type: json['type']?.toString() ?? 'theory',
       driveUrl: json['drive_url']?.toString() ?? '',
-      description: json['description']?.toString(),
+      description: rawDesc.isEmpty ? null : rawDesc,
       professorName: json['professor_name']?.toString(),
       uploaderId: json['uploader_id']?.toString() ?? '',
       uploaderName: json['uploader_name']?.toString() ?? '',
@@ -157,6 +175,11 @@ class LectureModel {
   }
 
   Map<String, dynamic> toJson() {
+    String descWithSection = (description ?? '').trim();
+    if (!descWithSection.contains('[SECTION:')) {
+      descWithSection = '$descWithSection [SECTION:$section]'.trim();
+    }
+
     return {
       'title': title,
       'subject_name': subjectName,
@@ -166,8 +189,7 @@ class LectureModel {
       'semester': semester,
       'type': type,
       'drive_url': driveUrl,
-      'description': description,
-      'professor_name': professorName,
+      'description': descWithSection,
       'uploader_id': uploaderId,
       'uploader_name': uploaderName,
       'uploader_role': uploaderRole,

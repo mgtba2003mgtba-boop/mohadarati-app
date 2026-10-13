@@ -91,15 +91,18 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_user != null) {
       try {
         // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار بنسبة 70%
+        final userSection = _user!.isAdmin ? null : _user!.section;
         final results = await Future.wait([
           service.fetchAnnouncements(
             department: _user!.department,
             stage: _user!.stage,
+            section: userSection,
           ),
           service.fetchStudentAttendance(_user!.studentId),
           service.fetchLectures(
             department: _user!.department,
             stage: _user!.stage,
+            section: userSection,
           ),
           service.fetchCourses(
             department: _user!.department,
@@ -743,7 +746,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${lec.subjectName} • ${lec.typeLabel}',
+                              '${lec.subjectName} • ${lec.typeLabel} • ${lec.section == 'ALL' ? '🌐 عام' : '🏷️ شعبة ${lec.section}'}',
                               style: GoogleFonts.cairo(
                                 fontSize: 11,
                                 color: AppTheme.textSecondary,

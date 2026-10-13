@@ -36,11 +36,12 @@ class AppUserModel {
   });
 
   bool get isAdmin => role == AppConstants.roleAdmin;
-  bool get isProfessor => role == AppConstants.roleProfessor;
+  @deprecated
+  bool get isProfessor => false;
   bool get isRepresentative => role == AppConstants.roleRepresentative;
   bool get isStudent => role == AppConstants.roleStudent;
 
-  bool get canManageLectures => isAdmin || isProfessor || (isRepresentative && canPublishLectures);
+  bool get canManageLectures => isAdmin || (isRepresentative && canPublishLectures);
   bool get canManageAnnouncements => isAdmin || (isRepresentative && canPublishAnnouncements);
   bool get canPromoteUsers => isAdmin;
   bool get canManageCourses => isAdmin || isRepresentative || canManageLectures;

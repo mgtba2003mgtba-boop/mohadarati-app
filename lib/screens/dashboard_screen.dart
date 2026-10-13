@@ -7,6 +7,7 @@ import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../models/announcement_model.dart';
+import '../models/student_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_network_image.dart';
@@ -64,11 +65,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // ── متحكمات استمارة نشر المحاضرة ──────────────────────────────
   final _lectureTitleController = TextEditingController();
   final _subjectNameController = TextEditingController();
-  final _professorNameController = TextEditingController();
   final _driveUrlController = TextEditingController();
   final _lectureDescController = TextEditingController();
   String _selectedLectureDept = AppConstants.departments.first;
   String _selectedLectureStage = AppConstants.stages.first;
+  String _selectedLectureSection = 'ALL';
   int _selectedLectureSemester = 1;
   String _selectedLectureType = 'theory'; // 'theory' | 'practical'
 
@@ -84,8 +85,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final _announcementSubjectController = TextEditingController();
   String _selectedAnnounceDept = 'ALL';
   String _selectedAnnounceStage = 'ALL';
+  String _selectedAnnounceSection = 'ALL';
   String _selectedAnnounceCategory = 'academic';
   bool _isAnnouncePinned = false;
+
+  // ── إدارة شعب نظام البصمة وتكليف الممثلين ─────────────────────
+  String _selectedRepDept = AppConstants.departments.first;
+  String _selectedRepStage = AppConstants.stages.first;
+  String _selectedRepSection = 'A';
+  List<String> _availableBiometricSections = ['A', 'B', 'C', 'D'];
+  bool _isLoadingSections = false;
 
     // ── متحكمات بنل البوسترات المصورة (خاص بمجتبى عواد) ──────────────
   final _bannerTitleController = TextEditingController();
@@ -216,6 +225,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (_isMujtaba) {
       _loadDashboardData();
       _loadBanners();
+      _loadBiometricSections();
+    }
+  }
+
+  Future<void> _loadBiometricSections() async {
+    setState(() => _isLoadingSections = true);
+    final list = await SupabaseService().fetchBiometricSections(
+      department: _selectedRepDept,
+      stage: _selectedRepStage,
+    );
+    if (mounted) {
+      setState(() {
+        _availableBiometricSections = list;
+        if (!_availableBiometricSections.contains(_selectedRepSection)) {
+          _selectedRepSection = _availableBiometricSections.isNotEmpty ? _availableBiometricSections.first : 'A';
+        }
+        _isLoadingSections = false;
+      });
     }
   }
 
@@ -224,7 +251,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _tabController.dispose();
     _lectureTitleController.dispose();
     _subjectNameController.dispose();
-    _professorNameController.dispose();
     _driveUrlController.dispose();
     _lectureDescController.dispose();
     _announcementTitleController.dispose();
@@ -369,6 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     final targetDept = _currentUser?.isAdmin == true ? _selectedLectureDept : (_currentUser?.department ?? _selectedLectureDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedLectureStage : (_currentUser?.stage ?? _selectedLectureStage);
+    final targetSection = _currentUser?.isAdmin == true ? _selectedLectureSection : (_currentUser?.section ?? 'ALL');
 
     if (_selectedFile == null) {
       _showSnackbar('يرجى اختيار ملف المحاضرة أولاً (PDF / مستند / صورة)', isError: true);
@@ -383,12 +410,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       subjectName: subject,
       department: targetDept,
       stage: targetStage,
+      section: targetSection,
       semester: _selectedLectureSemester,
       lectureType: _selectedLectureType,
-      professorName: _professorNameController.text.trim().isNotEmpty ? _professorNameController.text.trim() : null,
       description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
       uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
-      uploaderName: _currentUser?.name ?? 'ممثل الدفعة',
+      uploaderName: _currentUser?.name ?? 'ممثل الشعبة',
       uploaderRole: _currentUser?.role ?? 'representative',
     );
 
@@ -400,7 +427,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _lectureTitleController.clear();
       _subjectNameController.clear();
       _driveUrlController.clear();
-      _professorNameController.clear();
       _lectureDescController.clear();
       _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
     } else {
@@ -425,6 +451,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     final targetDept = _currentUser?.isAdmin == true ? _selectedAnnounceDept : (_currentUser?.department ?? _selectedAnnounceDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedAnnounceStage : (_currentUser?.stage ?? _selectedAnnounceStage);
+    final targetSection = _currentUser?.isAdmin == true ? _selectedAnnounceSection : (_currentUser?.section ?? 'ALL');
 
     setState(() => _isLoading = true);
 
@@ -437,6 +464,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       authorRole: _currentUser?.role ?? 'admin',
       department: targetDept,
       stage: targetStage,
+      section: targetSection,
       category: _selectedAnnounceCategory,
       subjectName: subject.isNotEmpty ? subject : null,
       isPinned: _isAnnouncePinned,
@@ -507,8 +535,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       },
                     ),
                     _buildRoleRadio(
-                      title: 'ممثل الدفعة (Representative)',
-                      subtitle: 'صلاحيات نشر المحاضرات والإعلانات',
+                      title: 'ممثل الشعبة ⭐ (Representative)',
+                      subtitle: 'صلاحيات نشر المحاضرات والتبليغات لشعبته فقط',
                       roleValue: AppConstants.roleRepresentative,
                       groupValue: selectedRole,
                       onChanged: (val) {
@@ -516,18 +544,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           selectedRole = val!;
                           canLectures = true;
                           canAnnouncements = true;
-                        });
-                      },
-                    ),
-                    _buildRoleRadio(
-                      title: 'أستاذ مادة (Professor)',
-                      subtitle: 'صلاحيات نشر وتعديل المحاضرات',
-                      roleValue: AppConstants.roleProfessor,
-                      groupValue: selectedRole,
-                      onChanged: (val) {
-                        setDialogState(() {
-                          selectedRole = val!;
-                          canLectures = true;
                         });
                       },
                     ),
@@ -1244,14 +1260,52 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 14),
 
-          TextField(
-            controller: _professorNameController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'اسم أستاذ المادة (اختياري)',
-              prefixIcon: Icon(Icons.person_outline_rounded, color: AppTheme.primaryLight),
+          // ── الشعبة المستهدفة لنشر المحاضرة ──
+          if (_currentUser?.isAdmin == true) ...[
+            DropdownButtonFormField<String>(
+              value: _selectedLectureSection,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'الشعبة المستهدفة لنشر المحاضرة',
+                prefixIcon: Icon(Icons.groups_rounded, color: AppTheme.primaryLight),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedLectureSection = val);
+              },
             ),
-          ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_rounded, size: 20, color: AppTheme.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'نطاق النشر مقفل تلقائياً لطلاب: شعبة (${_currentUser?.section ?? "A"})',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           // نوع المحاضرة: نظري أو عملي
@@ -1407,6 +1461,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 }
               },
             ),
+            const SizedBox(height: 14),
+
+            DropdownButtonFormField<String>(
+              value: _selectedAnnounceSection,
+              dropdownColor: AppTheme.darkCard,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'الشعبة المستهدفة لنشر التبليغ',
+                prefixIcon: Icon(Icons.groups_rounded, color: AppTheme.primaryLight),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedAnnounceSection = val);
+              },
+            ),
           ] else ...[
             Container(
               padding: const EdgeInsets.all(14),
@@ -1424,11 +1499,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'نطاق الإعلان موجه لطلبة صفك حصراً',
+                          'نطاق الإعلان موجه لطلبة شعبتك حصراً',
                           style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
                         ),
                         Text(
-                          '${_currentUser?.department ?? _selectedAnnounceDept} • ${_currentUser?.stage ?? _selectedAnnounceStage}',
+                          '${_currentUser?.department ?? _selectedAnnounceDept} • ${_currentUser?.stage ?? _selectedAnnounceStage} • شعبة (${_currentUser?.section ?? "A"})',
                           style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                         ),
                       ],
@@ -2305,7 +2380,273 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // رأس التبويب وزر تكليف ممثل
+          // ══════════════════════════════════════════════════════════════
+          // بطاقة إدارة وتكليف ممثلي الشُعب (نظام البصمة المعتمد)
+          // ══════════════════════════════════════════════════════════════
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primary.withValues(alpha: 0.15),
+                  AppTheme.darkCard,
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.fingerprint_rounded, color: AppTheme.accent, size: 24),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'إدارة وتكليف ممثلي الشُعب (نظام البصمة)',
+                            style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                          ),
+                          Text(
+                            'اختر القسم والمرحلة والشعبة لتعيين الممثل المعتمد من قاعدة بيانات البصمة',
+                            style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // 1. اختيار القسم والمرحلة
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedRepDept,
+                        dropdownColor: AppTheme.darkCard,
+                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'القسم الأكاديمي',
+                          labelStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        items: AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedRepDept = val);
+                            _loadBiometricSections();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedRepStage,
+                        dropdownColor: AppTheme.darkCard,
+                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'المرحلة',
+                          labelStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        items: AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedRepStage = val);
+                            _loadBiometricSections();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // 2. أزرار الشعب الأفقية المستخرجة من البصمة
+                Text(
+                  'شُعب المرحلة المعتمدة بالبصمة:',
+                  style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFCBD5E1)),
+                ),
+                const SizedBox(height: 6),
+                _isLoadingSections
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accent))),
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _availableBiometricSections.map((sec) {
+                            final isSel = _selectedRepSection == sec;
+                            final repCount = _allUsers.where((u) =>
+                              u.isRepresentative &&
+                              u.department == _selectedRepDept &&
+                              u.stage == _selectedRepStage &&
+                              u.section == sec
+                            ).length;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(
+                                  'شعبة ($sec) ${repCount > 0 ? "★ ($repCount)" : ""}',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSel ? Colors.black : (repCount > 0 ? AppTheme.accent : const Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                                selected: isSel,
+                                selectedColor: AppTheme.accent,
+                                backgroundColor: AppTheme.darkCard,
+                                side: BorderSide(color: isSel ? AppTheme.accent : AppTheme.darkBorder),
+                                onSelected: (s) {
+                                  if (s) setState(() => _selectedRepSection = sec);
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                const Divider(color: AppTheme.darkBorder, height: 24),
+
+                // 3. ممثلو الشعبة الحالية والزر المباشر للتكليف
+                Builder(
+                  builder: (context) {
+                    final currentReps = _allUsers.where((u) =>
+                      u.isRepresentative &&
+                      u.department == _selectedRepDept &&
+                      u.stage == _selectedRepStage &&
+                      u.section == _selectedRepSection
+                    ).toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'ممثلو شعبة ($_selectedRepSection):',
+                              style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                            ),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.accent,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.black, size: 16),
+                              label: Text(
+                                'تكليف ممثل للشعبة ⭐',
+                                style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                              ),
+                              onPressed: () => _showAssignBiometricRepDialog(
+                                department: _selectedRepDept,
+                                stage: _selectedRepStage,
+                                section: _selectedRepSection,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        if (currentReps.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppTheme.darkBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, color: Color(0xFF94A3B8), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'لا يوجد ممثل مكلف حالياً لشعبة ($_selectedRepSection). انقر على "تكليف ممثل للشعبة" لاختيار طالب من نظام البصمة.',
+                                    style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            children: currentReps.map((rep) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.darkCard,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppTheme.accent.withValues(alpha: 0.2),
+                                      backgroundImage: rep.photoUrl != null && rep.photoUrl!.isNotEmpty ? NetworkImage(rep.photoUrl!) : null,
+                                      child: rep.photoUrl == null || rep.photoUrl!.isEmpty
+                                          ? const Icon(Icons.person, color: AppTheme.accent, size: 18)
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            rep.name,
+                                            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                          ),
+                                          Text(
+                                            '${rep.studentId} • ممثل شعبة ${rep.section ?? _selectedRepSection}',
+                                            style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_note_rounded, color: AppTheme.accent, size: 18),
+                                      tooltip: 'تعديل الصلاحيات',
+                                      onPressed: () => _showPromoteDialog(rep),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.person_remove_rounded, color: AppTheme.danger, size: 18),
+                                      tooltip: 'سحب التكليف',
+                                      onPressed: () => _confirmDemoteRep(rep),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // رأس دليل الطلاب المسجلين
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2313,7 +2654,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'سجل الطلاب وممثلي الشعب',
+                    'دليل الطلاب والمسجلين في التطبيق',
                     style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
                   Text(
@@ -2321,19 +2662,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent),
                   ),
                 ],
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.person_add_rounded, color: Colors.black, size: 18),
-                label: Text(
-                  'تكليف ممثل جديد',
-                  style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-                onPressed: _showAssignNewRepDialog,
               ),
             ],
           ),
@@ -2717,203 +3045,251 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  void _showAssignNewRepDialog() {
-    String? selectedStudentId;
-    String selectedDept = AppConstants.departments.first;
-    String selectedStage = AppConstants.stages.first;
-    final sectionController = TextEditingController(text: 'A');
+  void _showAssignBiometricRepDialog({
+    required String department,
+    required String stage,
+    required String section,
+  }) {
+    String searchQuery = '';
     bool canLectures = true;
     bool canAnnouncements = true;
-    String searchFilter = '';
+    bool isLoadingStudents = true;
+    List<StudentModel> biometricStudents = [];
+    StudentModel? selectedStudent;
 
     showDialog(
       context: context,
-      builder: (ctx) {
+      barrierDismissible: false,
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final availableStudents = _allUsers.where((u) {
-              if (selectedStudentId == u.studentId) return true;
-              final q = searchFilter.trim().toLowerCase();
+          builder: (ctx, setDialogState) {
+            if (isLoadingStudents && biometricStudents.isEmpty) {
+              SupabaseService()
+                  .fetchBiometricStudentsBySection(
+                    department: department,
+                    stage: stage,
+                    section: section,
+                  )
+                  .then((list) {
+                setDialogState(() {
+                  biometricStudents = list;
+                  isLoadingStudents = false;
+                });
+              });
+            }
+
+            final filteredStudents = biometricStudents.where((s) {
+              final q = searchQuery.trim().toLowerCase();
               if (q.isEmpty) return true;
-              return u.name.toLowerCase().contains(q) || u.studentId.toLowerCase().contains(q);
+              return s.name.toLowerCase().contains(q) || s.id.toLowerCase().contains(q);
             }).toList();
 
             return AlertDialog(
               backgroundColor: AppTheme.darkCard,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(
-                'تكليف ممثل جديد لشعبة',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
-              ),
-              content: SizedBox(
-                width: 400,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text('اختر الطالب المراد تكليفه:', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
-                      const SizedBox(height: 6),
-                      TextField(
-                        style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
-                        decoration: InputDecoration(
-                          hintText: 'ابحث بالاسم أو الرقم الجامعي...',
-                          hintStyle: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B)),
-                          prefixIcon: const Icon(Icons.search, size: 18, color: AppTheme.accent),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          filled: true,
-                          fillColor: Colors.black.withValues(alpha: 0.2),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      const Icon(Icons.stars_rounded, color: AppTheme.accent, size: 24),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'تكليف ممثل لشعبة ($section)',
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
                         ),
-                        onChanged: (val) => setDialogState(() => searchFilter = val),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            dropdownColor: AppTheme.darkCard,
-                            hint: Text('اختر الطالب من القائمة', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8))),
-                            value: selectedStudentId,
-                            items: availableStudents.map((st) {
-                              return DropdownMenuItem<String>(
-                                value: st.studentId,
-                                child: Text('${st.name} (${st.studentId})', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                final st = _allUsers.firstWhere((u) => u.studentId == val);
-                                setDialogState(() {
-                                  selectedStudentId = val;
-                                  selectedDept = st.department.isNotEmpty ? st.department : selectedDept;
-                                  selectedStage = st.stage.isNotEmpty ? st.stage : selectedStage;
-                                  if (st.section != null && st.section!.isNotEmpty) {
-                                    sectionController.text = st.section!;
-                                  }
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      Text('القسم الأكاديمي:', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
-                      const SizedBox(height: 4),
-                      DropdownButtonFormField<String>(
-                        dropdownColor: AppTheme.darkCard,
-                        value: selectedDept,
-                        style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
-                        items: AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                        onChanged: (val) => setDialogState(() => selectedDept = val!),
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('المرحلة:', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
-                                const SizedBox(height: 4),
-                                DropdownButtonFormField<String>(
-                                  dropdownColor: AppTheme.darkCard,
-                                  value: selectedStage,
-                                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
-                                  items: AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                                  onChanged: (val) => setDialogState(() => selectedStage = val!),
-                                  decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('الشعبة (A, B, C...):', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: sectionController,
-                                  style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
-                                  decoration: InputDecoration(
-                                    hintText: 'A / B / C',
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('صلاحية نشر المحاضرات', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
-                        value: canLectures,
-                        activeColor: AppTheme.primaryLight,
-                        onChanged: (v) => setDialogState(() => canLectures = v),
-                      ),
-                      SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('صلاحية نشر التبليغات', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
-                        value: canAnnouncements,
-                        activeColor: AppTheme.accent,
-                        onChanged: (v) => setDialogState(() => canAnnouncements = v),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$department • $stage • قائمة نظام البصمة المعتمدة',
+                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primaryLight),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: 'ابحث عن اسم الطالب أو الرقم الجامعي...',
+                        hintStyle: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B)),
+                        prefixIcon: const Icon(Icons.search, size: 18, color: AppTheme.accent),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        filled: true,
+                        fillColor: Colors.black.withValues(alpha: 0.2),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onChanged: (val) => setDialogState(() => searchQuery = val),
+                    ),
+                    const SizedBox(height: 10),
+
+                    if (isLoadingStudents)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(color: AppTheme.accent),
+                        ),
+                      )
+                    else if (biometricStudents.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'لم يتم العثور على طلاب مسجلين في شعبة ($section) في نظام البصمة لهذا القسم والمرحلة.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        height: 220,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.darkBorder),
+                        ),
+                        child: filteredStudents.isEmpty
+                            ? Center(
+                                child: Text('لا توجد نتائج مطابقة للبحث',
+                                    style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8))),
+                              )
+                            : ListView.separated(
+                                itemCount: filteredStudents.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.darkBorder),
+                                itemBuilder: (ctx, i) {
+                                  final st = filteredStudents[i];
+                                  final isSelected = selectedStudent?.id == st.id;
+                                  final isAlreadyRep = _allUsers.any((u) => u.studentId == st.id && u.isRepresentative);
+
+                                  return ListTile(
+                                    dense: true,
+                                    selected: isSelected,
+                                    selectedTileColor: AppTheme.accent.withValues(alpha: 0.15),
+                                    leading: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: isSelected
+                                          ? AppTheme.accent
+                                          : AppTheme.primaryLight.withValues(alpha: 0.2),
+                                      child: Text(
+                                        st.name.isNotEmpty ? st.name.characters.first : 'ط',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? Colors.black : Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            st.name,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 12,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected ? AppTheme.accent : AppTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isAlreadyRep)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'ممثل حالي ⭐',
+                                              style: GoogleFonts.cairo(fontSize: 9, color: Colors.amber, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      'الرقم الجامعي: ${st.id}',
+                                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                                    ),
+                                    trailing: Radio<String>(
+                                      value: st.id,
+                                      groupValue: selectedStudent?.id,
+                                      activeColor: AppTheme.accent,
+                                      onChanged: (_) {
+                                        setDialogState(() => selectedStudent = st);
+                                      },
+                                    ),
+                                    onTap: () {
+                                      setDialogState(() => selectedStudent = st);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    const SizedBox(height: 12),
+
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('صلاحية نشر المحاضرات لشعبته', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
+                      value: canLectures,
+                      activeColor: AppTheme.primaryLight,
+                      onChanged: (v) => setDialogState(() => canLectures = v),
+                    ),
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('صلاحية نشر التبليغات لشعبته', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
+                      value: canAnnouncements,
+                      activeColor: AppTheme.accent,
+                      onChanged: (v) => setDialogState(() => canAnnouncements = v),
+                    ),
+                  ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(ctx),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: Text('إلغاء', style: GoogleFonts.cairo(color: const Color(0xFF94A3B8))),
                 ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent),
-                  onPressed: () async {
-                    if (selectedStudentId == null) {
-                      _showSnackbar('يرجى اختيار طالب أولاً', isError: true);
-                      return;
-                    }
-                    Navigator.pop(ctx);
-                    final ok = await SupabaseService().updateUserRole(
-                      studentId: selectedStudentId!,
-                      role: AppConstants.roleRepresentative,
-                      canPublishLectures: canLectures,
-                      canPublishAnnouncements: canAnnouncements,
-                      section: sectionController.text.trim().toUpperCase(),
-                      stage: selectedStage,
-                      department: selectedDept,
-                    );
-                    if (ok) {
-                      _showSnackbar('تم تكليف ممثل الشعبة بنجاح');
-                      _loadDashboardData();
-                    } else {
-                      _showSnackbar('فشل تكليف الممثل', isError: true);
-                    }
-                  },
-                  child: Text('تكليف رسمي', style: GoogleFonts.cairo(color: Colors.black, fontWeight: FontWeight.bold)),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.verified_user_rounded, color: Colors.black, size: 18),
+                  label: Text('تكليف وتثبيت الممثل ⭐',
+                      style: GoogleFonts.cairo(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                  onPressed: selectedStudent == null
+                      ? null
+                      : () async {
+                          final targetStudent = selectedStudent!;
+                          Navigator.pop(dialogCtx);
+                          _showSnackbar('جارٍ تكليف ${targetStudent.name} ممثلاً لشعبة ($section)...');
+                          final ok = await SupabaseService().assignSectionRepresentative(
+                            student: targetStudent,
+                            section: section,
+                            canLectures: canLectures,
+                            canAnnouncements: canAnnouncements,
+                          );
+                          if (ok) {
+                            _showSnackbar('تم تكليف ${targetStudent.name} ممثلاً لشعبة ($section) بنجاح ⭐');
+                            await _loadDashboardData();
+                          } else {
+                            _showSnackbar('حدث خطأ أثناء حفظ التكليف', isError: true);
+                          }
+                        },
                 ),
               ],
             );
@@ -2941,15 +3317,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
     );
     if (confirm == true) {
-      final ok = await SupabaseService().updateUserRole(
-        studentId: rep.studentId,
-        role: AppConstants.roleStudent,
-        canPublishLectures: false,
-        canPublishAnnouncements: false,
-      );
+      final ok = await SupabaseService().revokeRepresentative(rep.studentId);
       if (ok) {
         _showSnackbar('تم سحب التكليف بنجاح');
         _loadDashboardData();
+      } else {
+        _showSnackbar('حدث خطأ أثناء سحب التكليف', isError: true);
       }
     }
   }

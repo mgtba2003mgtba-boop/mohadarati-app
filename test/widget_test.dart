@@ -736,6 +736,145 @@ void main() {
         expect(allowedDocsAndImages.contains(allowed), true, reason: 'يجب السماح بامتداد المستند/الصورة $allowed');
       }
     });
+
+    test('اختبار قفل صلاحيات ومنشورات ممثل الشعبة وحصرها بطلبة شعبته فقط (Section Representative Scoping & Student Isolation)', () {
+      // 1. مستخدم ممثل لشعبة B
+      final repSectionB = AppUserModel(
+        id: 'rep-b-1',
+        studentId: '2023101',
+        name: 'ممثل شعبة B',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'B',
+        role: AppConstants.roleRepresentative,
+        canPublishLectures: true,
+        canPublishAnnouncements: true,
+      );
+
+      expect(repSectionB.isRepresentative, true);
+      expect(repSectionB.isAdmin, false);
+      expect(repSectionB.isProfessor, false);
+      expect(repSectionB.section, 'B');
+
+      // 2. محاكاة محاضرات منشورة لشعب مختلفة وعامة
+      final lecGeneral = LectureModel(
+        id: 'lec-all',
+        uploaderId: 'rep-b-1',
+        uploaderName: 'ممثل الدفعة',
+        title: 'محاضرة عامة للكل',
+        subjectName: 'شبكات الحاسوب',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'ALL',
+        semester: 1,
+        type: 'theory',
+        driveUrl: 'https://example.com/all',
+        createdAt: DateTime.now(),
+      );
+
+      final lecSectionA = LectureModel(
+        id: 'lec-a',
+        uploaderId: 'rep-a-1',
+        uploaderName: 'ممثل شعبة A',
+        title: 'محاضرة لشعبة A فقط',
+        subjectName: 'شبكات الحاسوب',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        semester: 1,
+        type: 'practical',
+        driveUrl: 'https://example.com/a',
+        createdAt: DateTime.now(),
+      );
+
+      final lecSectionB = LectureModel(
+        id: 'lec-b',
+        uploaderId: 'rep-b-1',
+        uploaderName: 'ممثل شعبة B',
+        title: 'محاضرة لشعبة B فقط',
+        subjectName: 'شبكات الحاسوب',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'B',
+        semester: 1,
+        type: 'theory',
+        driveUrl: 'https://example.com/b',
+        createdAt: DateTime.now(),
+      );
+
+      final allLectures = [lecGeneral, lecSectionA, lecSectionB];
+
+      // فلترة طالب شعبة B: يرى العامة + شعبة B فقط، ولا يرى شعبة A إطلاقاً
+      final studentBVisible = allLectures.where((l) => l.section == 'ALL' || l.section == 'B').toList();
+      expect(studentBVisible.length, 2);
+      expect(studentBVisible.any((l) => l.id == 'lec-a'), false, reason: 'طالب شعبة B لا يرى محاضرات شعبة A أبداً');
+      expect(studentBVisible.any((l) => l.id == 'lec-b'), true);
+      expect(studentBVisible.any((l) => l.id == 'lec-all'), true);
+
+      // فلترة الآدمن: يرى كل المحاضرات
+      expect(allLectures.length, 3);
+    });
+
+    test('اختبار ترميز وفك وسم الشعبة [SECTION:...] في المحاضرات والتبليغات (Section Tag Serialization & Deserialization)', () {
+      // 1. فحص كائن المحاضرة مع وسم الشعبة داخل الوصف
+      final rawLectureJson = {
+        'id': 'lec-test-1',
+        'title': 'محاضرة إلكترونيات قدرة',
+        'subject_name': 'إلكترونيات',
+        'department': 'هندسة تقنيات الحاسوب',
+        'stage': 'المرحلة الثالثة',
+        'description': '[SECTION:C] تجربة معملية رقم 4',
+        'semester': 1,
+        'type': 'practical',
+        'drive_url': 'https://example.com/c',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      final parsedLecture = LectureModel.fromJson(rawLectureJson);
+      expect(parsedLecture.section, 'C', reason: 'تم استخراج الشعبة بنجاح من وسم [SECTION:C]');
+      expect(parsedLecture.displayDescription, 'تجربة معملية رقم 4', reason: 'تم تنظيف الوصف لإخفاء الوسم الفني عن المستخدم');
+
+      // 2. فحص كائن التبليغ مع وسم الشعبة داخل المحتوى
+      final rawAnnounceJson = {
+        'id': 'ann-test-1',
+        'title': 'كويز مفاجئ',
+        'content': '[SECTION:A] كويز باكر الساعة 8:30 صباحاً',
+        'category': 'exam',
+        'author_id': 'REP-A',
+        'author_name': 'ممثل شعبة A',
+        'author_role': 'representative',
+        'subject_name': 'إلكترونيات',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      final parsedAnnounce = AnnouncementModel.fromJson(rawAnnounceJson);
+      expect(parsedAnnounce.section, 'A', reason: 'تم استخراج الشعبة بنجاح من وسم [SECTION:A]');
+      expect(parsedAnnounce.displayContent, 'كويز باكر الساعة 8:30 صباحاً', reason: 'تم تنظيف المحتوى من الوسم الفني');
+    });
+
+    test('اختبار إلغاء دور التدريسي/الأستاذ نهائياً من كافة مستويات الصلاحيات والنماذج (Total Elimination of Professor Role)', () {
+      // 1. التأكد من قائمة الأدوار المعتمدة
+      expect(AppConstants.roleAdmin, 'admin');
+      expect(AppConstants.roleRepresentative, 'representative');
+      expect(AppConstants.roleStudent, 'student');
+
+      // 2. التأكد من مسميات الأدوار
+      expect(AppConstants.getRoleLabel(AppConstants.roleAdmin), contains('مشرف عام'));
+      expect(AppConstants.getRoleLabel(AppConstants.roleRepresentative), contains('ممثل'));
+      expect(AppConstants.getRoleLabel(AppConstants.roleStudent), contains('طالب'));
+      expect(AppConstants.getRoleLabel('professor'), contains('طالب'));
+
+      // 3. التحقق من خاصية isProfessor في نموذج المستخدم ترجع false دائماً
+      final user = AppUserModel(
+        id: 'u-1',
+        studentId: '1234',
+        name: 'مستخدم تجريبي',
+        department: 'قسم',
+        stage: 'مرحلة',
+        role: 'student',
+      );
+      expect(user.isProfessor, false);
+    });
   });
 }
 

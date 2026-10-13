@@ -86,21 +86,24 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     try {
       final dept = widget.department ?? _user?.department;
       final stage = widget.stage ?? _user?.stage;
+      final userSection = _user?.isAdmin == true ? null : _user?.section;
 
-      // 1. جلب محاضرات المادة
+      // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين)
       final allLectures = await service.fetchLectures(
         department: dept,
         stage: stage,
+        section: userSection,
       );
       _subjectLectures = allLectures.where((l) {
         return l.subjectName.trim().toLowerCase() ==
             widget.subjectName.trim().toLowerCase();
       }).toList();
 
-      // 2. جلب تبليغات المادة
+      // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين)
       final allAnnouncements = await service.fetchAnnouncements(
         department: dept,
         stage: stage,
+        section: userSection,
       );
       _subjectAnnouncements = allAnnouncements.where((a) {
         if (a.subjectName != null && a.subjectName!.isNotEmpty) {
@@ -136,8 +139,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           _lectureTypeFilter == 'ALL' || l.type == _lectureTypeFilter;
       final matchesSearch = _searchQuery.isEmpty ||
           l.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (l.professorName != null &&
-              l.professorName!.toLowerCase().contains(_searchQuery.toLowerCase()));
+          l.uploaderName.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesType && matchesSearch;
     }).toList();
   }
@@ -538,18 +540,36 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
 
-          if (lecture.professorName != null && lecture.professorName!.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              'أستاذ المادة: ${lecture.professorName}',
-              style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
-            ),
-          ],
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (lecture.section == 'ALL' ? AppTheme.accent : const Color(0xFF6366F1)).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  lecture.section == 'ALL' ? '🌐 عام لجميع الشعب' : '🏷️ شعبة ${lecture.section}',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: lecture.section == 'ALL' ? AppTheme.accent : const Color(0xFF818CF8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'نشر: ${lecture.uploaderName}',
+                style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
+              ),
+            ],
+          ),
 
-          if (lecture.description != null && lecture.description!.isNotEmpty) ...[
+          if (lecture.displayDescription.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              lecture.description!,
+              lecture.displayDescription,
               style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary, height: 1.4),
             ),
           ],
@@ -956,13 +976,18 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   void initState() {
     super.initState();
     _isLectureMode = widget.initialMode != 'announcement';
+    if (widget.currentUser?.isAdmin == true) {
+      _targetSection = 'ALL';
+    } else {
+      _targetSection = widget.currentUser?.section ?? 'ALL';
+    }
   }
 
   // حقول المحاضرة
   final _titleController = TextEditingController();
-  final _profController = TextEditingController();
   final _descController = TextEditingController();
   String _lectureType = 'theory'; // 'theory', 'practical'
+  String _targetSection = 'ALL';
   PlatformFile? _selectedFile;
   int _selectedFileSize = 0;
   bool _isPickingFile = false;
@@ -974,7 +999,6 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   @override
   void dispose() {
     _titleController.dispose();
-    _profController.dispose();
     _descController.dispose();
     _announceTitleController.dispose();
     _announceContentController.dispose();
@@ -1035,12 +1059,12 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         subjectName: widget.subjectName,
         department: widget.department,
         stage: widget.stage,
+        section: _targetSection,
         semester: 1,
         lectureType: _lectureType,
-        professorName: _profController.text.trim().isEmpty ? null : _profController.text.trim(),
         description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
         uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-        uploaderName: widget.currentUser?.name ?? 'ممثل المادة',
+        uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
         uploaderRole: widget.currentUser?.role ?? 'representative',
       );
 
@@ -1080,10 +1104,11 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         title: title,
         content: content,
         authorId: widget.currentUser?.studentId ?? 'ADMIN',
-        authorName: widget.currentUser?.name ?? 'ممثل المادة',
+        authorName: widget.currentUser?.name ?? 'ممثل الشعبة',
         authorRole: widget.currentUser?.role ?? 'representative',
         department: widget.department,
         stage: widget.stage,
+        section: _targetSection,
         category: 'academic',
         subjectName: widget.subjectName,
         createdAt: DateTime.now(),
@@ -1312,16 +1337,56 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               ),
               const SizedBox(height: 12),
 
-              TextField(
-                controller: _profController,
-                style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'اسم الأستاذ / التدريسي (اختياري)',
-                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.person_rounded, size: 20),
+              // الشعبة المستهدفة للنشر
+              if (widget.currentUser?.isAdmin == true) ...[
+                DropdownButtonFormField<String>(
+                  value: _targetSection,
+                  dropdownColor: AppTheme.darkCard,
+                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'الشعبة المستهدفة',
+                    labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _targetSection = val);
+                  },
                 ),
-              ),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_rounded, size: 18, color: AppTheme.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'نطاق النشر مقفل تلقائياً لطلاب: شعبة ($_targetSection)',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
 
               // مساحة اختيار ملف المحاضرة (مستند PDF أو صورة أو عرض تقديمي)

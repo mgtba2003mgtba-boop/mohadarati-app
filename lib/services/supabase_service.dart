@@ -339,10 +339,11 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب الإعلانات الأكاديمية والتبليغات ───────────────────────────────────
+  /// ── جلب الإعلانات الأكاديمية والتبليغات (مع فلترة الشعبة) ─────────────────
   Future<List<AnnouncementModel>> fetchAnnouncements({
     String? department,
     String? stage,
+    String? section,
   }) async {
     try {
       var query = client.from('announcements').select('*');
@@ -352,7 +353,7 @@ class SupabaseService {
           .order('is_pinned', ascending: false)
           .order('created_at', ascending: false);
 
-      final list = (res as List)
+      var list = (res as List)
           .map((item) => AnnouncementModel.fromJson(item))
           .where((a) {
             // استبعاد الجداول الدراسية والمقررات لكي تظهر حصراً في خاناتها المخصصة
@@ -364,9 +365,19 @@ class SupabaseService {
           })
           .toList();
 
-      if (department != null && department != 'ALL') {
-        return list.where((a) =>
+      if (department != null && department.isNotEmpty && department != 'ALL') {
+        list = list.where((a) =>
             a.department == 'ALL' || a.department == department).toList();
+      }
+
+      if (stage != null && stage.isNotEmpty && stage != 'ALL') {
+        list = list.where((a) =>
+            a.stage == 'ALL' || a.stage == stage).toList();
+      }
+
+      // فلترة الشعبة: المنشورات العامة (ALL) وتلك المخصصة لشعبة الطالب
+      if (section != null && section.isNotEmpty && section != 'ALL') {
+        list = list.where((a) => a.section == 'ALL' || a.section == section).toList();
       }
 
       return list;
@@ -526,10 +537,11 @@ class SupabaseService {
     return deleteAnnouncement(id);
   }
 
-  /// ── جلب المحاضرات مع روابط Google Drive ──────────────────────────────────
+  /// ── جلب المحاضرات مع روابط Google Drive (وفلترة الشعبة) ─────────────────
   Future<List<LectureModel>> fetchLectures({
     String? department,
     String? stage,
+    String? section,
     int? semester,
   }) async {
     try {
@@ -547,7 +559,14 @@ class SupabaseService {
 
       final res = await query.order('created_at', ascending: false);
 
-      return (res as List).map((item) => LectureModel.fromJson(item)).toList();
+      var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
+
+      // فلترة الشعبة: المنشورات العامة (ALL) وتلك الموجهة لشعبة الطالب
+      if (section != null && section.isNotEmpty && section != 'ALL') {
+        list = list.where((l) => l.section == 'ALL' || l.section == section).toList();
+      }
+
+      return list;
     } catch (e) {
       debugPrint('[-] Error fetching lectures: $e');
       return [];
@@ -595,6 +614,126 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('[-] Error deleting lecture: $e');
+      return false;
+    }
+  }
+
+  /// ── جلب الشعب الأكاديمية الفعلية من نظام البصمة الجامعي ────────────────────
+  Future<List<String>> fetchBiometricSections({
+    required String department,
+    required String stage,
+  }) async {
+    try {
+      final res = await _attendanceClient
+          .from('students')
+          .select('section')
+          .eq('department', department)
+          .eq('stage', stage);
+
+      if (res is List && res.isNotEmpty) {
+        final Set<String> found = {};
+        for (final item in res) {
+          final sec = item['section']?.toString().trim().toUpperCase();
+          if (sec != null && sec.isNotEmpty && sec != 'NULL') {
+            found.add(sec);
+          }
+        }
+        if (found.isNotEmpty) {
+          final list = found.toList()..sort();
+          return list;
+        }
+      }
+    } catch (e) {
+      debugPrint('[-] Biometric sections query note: $e');
+    }
+    return ['A', 'B', 'C', 'D'];
+  }
+
+  /// ── جلب قائمة طلاب شعبة معينة من نظام البصمة للتكليف والترقية ─────────────
+  Future<List<StudentModel>> fetchBiometricStudentsBySection({
+    required String department,
+    required String stage,
+    required String section,
+    String? query,
+    int limit = 60,
+  }) async {
+    try {
+      var q = _attendanceClient
+          .from('students')
+          .select('*')
+          .eq('department', department)
+          .eq('stage', stage)
+          .eq('section', section);
+
+      final cleanQuery = query?.trim() ?? '';
+      if (cleanQuery.isNotEmpty) {
+        q = q.or('name.ilike.%$cleanQuery%,id.ilike.%$cleanQuery%');
+      }
+
+      final res = await q.order('name', ascending: true).limit(limit);
+      if (res is List) {
+        return res.map((item) => StudentModel.fromJson(item)).toList();
+      }
+    } catch (e) {
+      debugPrint('[-] Error fetching biometric students for section: $e');
+    }
+    return [];
+  }
+
+  /// ── تكليف طالب كممثل لشعبة معينة وتحديث صلاحياته فوراً ───────────────────
+  Future<bool> assignSectionRepresentative({
+    required StudentModel student,
+    required String section,
+    bool canLectures = true,
+    bool canAnnouncements = true,
+  }) async {
+    try {
+      final existing = await getAppUserByStudentId(student.id);
+      if (existing != null) {
+        await client.from('app_users').update({
+          'role': AppConstants.roleRepresentative,
+          'department': student.department,
+          'stage': student.stage,
+          'section': section,
+          'can_publish_lectures': canLectures,
+          'can_publish_announcements': canAnnouncements,
+          'is_approved': true,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('student_id', student.id);
+      } else {
+        await client.from('app_users').insert({
+          'student_id': student.id,
+          'name': student.name,
+          'department': student.department,
+          'stage': student.stage,
+          'section': section,
+          'role': AppConstants.roleRepresentative,
+          'can_publish_lectures': canLectures,
+          'can_publish_announcements': canAnnouncements,
+          'is_approved': true,
+          'photo_url': student.photoUrl,
+          'pin_code': '1234',
+        });
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error assigning section representative: $e');
+      return false;
+    }
+  }
+
+  /// ── سحب التكليف من ممثل وإعادته إلى رتبة طالب ──────────────────────────
+  Future<bool> revokeRepresentative(String studentId) async {
+    try {
+      await client.from('app_users').update({
+        'role': AppConstants.roleStudent,
+        'can_publish_lectures': false,
+        'can_publish_announcements': false,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('student_id', studentId);
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error revoking representative: $e');
       return false;
     }
   }

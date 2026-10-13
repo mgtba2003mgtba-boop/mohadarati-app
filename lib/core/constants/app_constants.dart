@@ -245,20 +245,19 @@ class AppConstants {
   // ── الأدوار والصلاحيات ────────────────────────────────────────────
   static const String roleStudent = 'student';
   static const String roleRepresentative = 'representative';
+  @deprecated
   static const String roleProfessor = 'professor';
   static const String roleAdmin = 'admin';
 
   static String getRoleLabel(String role) {
     switch (role) {
       case roleAdmin:
-        return 'مشرف عام / إدارة الكلية';
-      case roleProfessor:
-        return 'أستاذ مادة';
+        return 'مشرف عام 🛡️';
       case roleRepresentative:
-        return 'ممثل الدفعة / المرحلة';
+        return 'ممثل الشعبة ⭐';
       case roleStudent:
       default:
-        return 'طالب';
+        return 'طالب 🎓';
     }
   }
 

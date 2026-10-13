@@ -311,6 +311,7 @@ class TelegramUploaderService {
     required String subjectName,
     required String department,
     required String stage,
+    String section = 'ALL',
     required int semester,
     required String lectureType,
     String? professorName,
@@ -341,8 +342,8 @@ class TelegramUploaderService {
         '📖 المقرر: ${subjectName.trim()}',
         '🏛 القسم: $department | المرحلة: $stage',
       ];
-      if (professorName != null && professorName.trim().isNotEmpty) {
-        captionLines.add('👨‍🏫 الأستاذ: ${professorName.trim()}');
+      if (section != 'ALL') {
+        captionLines.add('🏷️ شعبة: $section');
       }
       if (description != null && description.trim().isNotEmpty) {
         captionLines.add('📝 ملاحظات: ${description.trim()}');
@@ -415,11 +416,12 @@ class TelegramUploaderService {
             'subject_name': subjectName.trim(),
             'department': department,
             'stage': stage,
+            'section': section,
             'semester': semester,
             'type': lectureType,
             'drive_url': directUrl ?? 'telegram',
-            'description': description?.trim(),
-            'professor_name': professorName?.trim(),
+            'description': '${description?.trim() ?? ''} [SECTION:$section]'.trim(),
+            'professor_name': null,
             'uploader_id': uploaderId,
             'uploader_name': uploaderName,
             'uploader_role': uploaderRole,

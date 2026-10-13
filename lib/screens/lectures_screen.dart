@@ -53,6 +53,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
     final list = await service.fetchLectures(
       department: _selectedDept == 'ALL' ? null : _selectedDept,
       stage: _selectedStage == 'ALL' ? null : _selectedStage,
+      section: _user?.isAdmin == true ? null : _user?.section,
       semester: _selectedSemester,
     );
 
@@ -70,7 +71,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
       final matchesSearch = _searchQuery.isEmpty ||
           l.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           l.subjectName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (l.professorName != null && l.professorName!.toLowerCase().contains(_searchQuery.toLowerCase()));
+          l.section.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesType && matchesSearch;
     }).toList();
   }
@@ -368,26 +369,48 @@ class _LecturesScreenState extends State<LecturesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // الرأس: اسم المادة ونوعها (نظري/عملي)
+          // الرأس: اسم المادة ونوعها والشعبة المستهدفة
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: lecture.isPractical
-                      ? AppTheme.accent.withValues(alpha: 0.15)
-                      : AppTheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  lecture.typeLabel,
-                  style: GoogleFonts.cairo(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: lecture.isPractical ? AppTheme.accent : AppTheme.primaryLight,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: lecture.isPractical
+                          ? AppTheme.accent.withValues(alpha: 0.15)
+                          : AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      lecture.typeLabel,
+                      style: GoogleFonts.cairo(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: lecture.isPractical ? AppTheme.accent : AppTheme.primaryLight,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: lecture.section == 'ALL'
+                          ? const Color(0xFF3B82F6).withValues(alpha: 0.15)
+                          : AppTheme.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      lecture.section == 'ALL' ? '🌐 عام' : '🏷️ شعبة ${lecture.section}',
+                      style: GoogleFonts.cairo(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: lecture.section == 'ALL' ? const Color(0xFF60A5FA) : AppTheme.accent,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               Text(
                 '${lecture.createdAt.year}/${lecture.createdAt.month}/${lecture.createdAt.day}',
@@ -404,16 +427,16 @@ class _LecturesScreenState extends State<LecturesScreen> {
           ),
           const SizedBox(height: 2),
 
-          // اسم المادة والأستاذ
+          // اسم المادة ونطاق الشعبة
           Text(
-            'المادة: ${lecture.subjectName} ${lecture.professorName != null ? '• أ. ${lecture.professorName}' : ''}',
+            'المادة: ${lecture.subjectName} • ${lecture.section == 'ALL' ? 'عام لكافة الشعب' : 'خاص بطلبة شعبة ${lecture.section}'}',
             style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8)),
           ),
 
-          if (lecture.description != null && lecture.description!.isNotEmpty) ...[
+          if (lecture.displayDescription != null && lecture.displayDescription!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              lecture.description!,
+              lecture.displayDescription!,
               style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
             ),
           ],
