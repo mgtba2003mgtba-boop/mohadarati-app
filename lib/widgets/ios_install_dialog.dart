@@ -139,15 +139,15 @@ class _IosInstallDialogState extends State<IosInstallDialog> {
                       Expanded(
                         child: _buildTabButton(
                           index: 0,
-                          title: 'الملف التعريفي (مستحسن)',
-                          icon: Icons.verified_rounded,
+                          title: 'تثبيت سريع (بدون إعدادات)',
+                          icon: Icons.bolt_rounded,
                         ),
                       ),
                       Expanded(
                         child: _buildTabButton(
                           index: 1,
-                          title: 'طريقة سفاري السريعة',
-                          icon: Icons.ios_share_rounded,
+                          title: 'ملف التعريف (.mobileconfig)',
+                          icon: Icons.verified_rounded,
                         ),
                       ),
                     ],
@@ -159,7 +159,7 @@ class _IosInstallDialogState extends State<IosInstallDialog> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: _activeTab == 0 ? _buildMobileConfigSection() : _buildSafariPwaSection(),
+                  child: _activeTab == 0 ? _buildSafariPwaSection() : _buildMobileConfigSection(),
                 ),
               ),
 
@@ -358,7 +358,7 @@ class _IosInstallDialogState extends State<IosInstallDialog> {
     );
   }
 
-  /// الخيار الثاني: إضافة إلى الصفحة الرئيسية عبر سفاري
+  /// الخيار الرئيسي: إضافة إلى الصفحة الرئيسية عبر سفاري (تثبيت فوري بدون إعدادات)
   Widget _buildSafariPwaSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -366,28 +366,28 @@ class _IosInstallDialogState extends State<IosInstallDialog> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.accentSubtle,
+            color: AppTheme.primarySubtle,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.accent.withValues(alpha: 0.15)),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.accent.withValues(alpha: 0.12),
+                  color: AppTheme.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.info_outline_rounded, color: AppTheme.accent, size: 22),
+                child: const Icon(Icons.bolt_rounded, color: AppTheme.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'طريقة سريعة ومباشرة مدمجة في نظام iOS لا تتطلب تنزيل أي ملفات تعريف.',
+                  'أبسط طريقة رسمية لتثبيت التطبيق على الآيفون بنقرتين وبدون الدخول إلى الإعدادات أو طلب رمز القفل.',
                   style: GoogleFonts.cairo(
                     fontSize: 12,
                     height: 1.4,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.primaryDark,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -395,30 +395,50 @@ class _IosInstallDialogState extends State<IosInstallDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
         _buildStepCard(
           stepNumber: '1',
-          title: 'فتح المنصة في متصفح Safari',
-          description: 'تأكد من فتح رابط الموقع داخل متصفح سفاري الرسمي لجهازك الآيفون.',
-          icon: Icons.public_rounded,
-        ),
-        const SizedBox(height: 10),
-
-        _buildStepCard(
-          stepNumber: '2',
-          title: 'الضغط على زر المشاركة (Share)',
-          description: 'اضغط على أيقونة المشاركة (مربع بسهم للأعلى ⎋) الموجودة في الشريط السفلي لمتصفح سفاري.',
+          title: 'الضغط على زر المشاركة (Share ⎋)',
+          description: 'اضغط على زر المشاركة (مربع بسهم للأعلى ⎋) في الشريط السفلي لمتصفح سفاري.',
           icon: Icons.ios_share_rounded,
         ),
         const SizedBox(height: 10),
 
         _buildStepCard(
-          stepNumber: '3',
-          title: 'اختيار "إضافة إلى الصفحة الرئيسية"',
+          stepNumber: '2',
+          title: 'اختيار "إضافة إلى الصفحة الرئيسية" ➕',
           description: 'مرر القائمة لأسفل واختر "إضافة إلى الصفحة الرئيسية" (Add to Home Screen) ثم اضغط "إضافة" (Add).',
           icon: Icons.add_box_rounded,
           isFinal: true,
+        ),
+        const SizedBox(height: 16),
+
+        // مؤشر توجيهي للشريط السفلي
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.lightBorder),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.arrow_downward_rounded, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'زر المشاركة ⎋ موجود في شريط سفاري أسفل الشاشة',
+                  style: GoogleFonts.cairo(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
