@@ -7,6 +7,7 @@ import '../models/student_model.dart';
 import '../services/supabase_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_loading_overlay.dart';
+import '../widgets/ios_install_dialog.dart';
 import 'home_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -410,6 +411,36 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: AppTheme.lightBorder, height: 1),
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: () => IosInstallDialog.show(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primarySubtle,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.18)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.apple, color: AppTheme.textPrimary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'تثبيت التطبيق على الآيفون 📱 (بدون متصفح)',
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

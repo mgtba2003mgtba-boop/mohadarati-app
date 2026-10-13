@@ -7,6 +7,7 @@ import '../models/app_user_model.dart';
 import '../services/supabase_service.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_screen.dart';
+import '../widgets/ios_install_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -295,6 +296,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
                     onTap: _openTelegramBot,
+                  ),
+                  const Divider(color: AppTheme.lightBorder, height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.apple, color: Colors.black, size: 20),
+                    ),
+                    title: Text(
+                      'تثبيت التطبيق على الآيفون 📱',
+                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      'تشغيل بملء الشاشة كتطبيق رسمي بدون متصفح',
+                      style: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 11),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                    onTap: () => IosInstallDialog.show(context),
                   ),
                 ],
               ),

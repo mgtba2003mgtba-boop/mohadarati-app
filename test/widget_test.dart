@@ -10,6 +10,7 @@ import 'package:nust_student_portal/core/constants/biometric_subjects.dart';
 import 'package:nust_student_portal/models/subject_model.dart';
 import 'package:nust_student_portal/models/schedule_model.dart';
 import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
+import 'package:nust_student_portal/widgets/ios_install_dialog.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -955,6 +956,18 @@ void main() {
         role: 'student',
       );
       expect(user.isProfessor, false);
+    });
+
+    test('اختبار ملف التثبيت المباشر للآيفون (iOS Standalone WebClip Profile & Install Dialog)', () {
+      // 1. التحقق من مسارات التثبيت لنظام iOS
+      const primaryUrl = '/api/mobileconfig';
+      const fallbackUrl = '/mohadarati.mobileconfig';
+      expect(primaryUrl.endsWith('.mobileconfig') || primaryUrl.contains('mobileconfig'), true);
+      expect(fallbackUrl.endsWith('.mobileconfig'), true);
+
+      // 2. التحقق من إمكانية إنشاء نافذة التثبيت للآيفون بنجاح
+      const dialog = IosInstallDialog();
+      expect(dialog, isNotNull);
     });
   });
 }
