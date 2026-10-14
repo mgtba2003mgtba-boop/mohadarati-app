@@ -5,6 +5,7 @@ class ScheduleModel {
   final String type; // 'lectures' (محاضرات أسبوعية) أو 'exams' (جدول امتحانات)
   final String department;
   final String stage;
+  final String section; // 'ALL', 'A', 'B', 'C', etc.
   final String? fileUrl; // رابط صورة الجدول أو ملف الـ PDF
   final String? fileName;
   final String? uploaderName;
@@ -19,6 +20,7 @@ class ScheduleModel {
     required this.type,
     required this.department,
     required this.stage,
+    this.section = 'ALL',
     this.fileUrl,
     this.fileName,
     this.uploaderName,
@@ -30,6 +32,8 @@ class ScheduleModel {
 
   bool get isExam => type == 'exams';
   bool get hasFile => fileUrl != null && fileUrl!.trim().isNotEmpty;
+  bool get isUnified => section == 'ALL' || section.trim().isEmpty;
+  String get sectionLabel => isUnified ? 'موحد لكل الشُعب' : 'شعبة $section';
   String get formattedDate => '${createdAt.year}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.day.toString().padLeft(2, '0')}';
   bool get isImage {
     if (!hasFile) return false;
@@ -62,12 +66,19 @@ class ScheduleModel {
     final tgMatch = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(rawContent);
     final parsedTgId = tgMatch != null ? int.tryParse(tgMatch.group(1) ?? '') : null;
 
+    String sec = json['section']?.toString() ?? '';
+    if (sec.isEmpty || sec == 'null') {
+      final secMatch = RegExp(r'\[SECTION:([A-Za-z0-9_]+)\]').firstMatch(rawContent);
+      sec = secMatch?.group(1) ?? 'ALL';
+    }
+
     return ScheduleModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? 'جدول دراسي',
       type: json['type'] ?? 'lectures',
       department: json['department'] ?? 'ALL',
       stage: json['stage'] ?? 'ALL',
+      section: sec,
       fileUrl: json['file_url'] ?? json['image_url'],
       fileName: json['file_name'],
       uploaderName: json['uploader_name'] ?? json['author_name'],
@@ -87,6 +98,7 @@ class ScheduleModel {
       'type': type,
       'department': department,
       'stage': stage,
+      'section': section,
       'file_url': fileUrl,
       'file_name': fileName,
       'uploader_name': uploaderName,

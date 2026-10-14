@@ -445,10 +445,11 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب الجداول الدراسية والامتحانية (منعزلة عن الإعلانات) ──────────────
+  /// ── جلب الجداول الدراسية والامتحانية (منعزلة عن الإعلانات ومفلترة حسب الشعبة) ──────────────
   Future<List<ScheduleModel>> fetchSchedules({
     required String department,
     required String stage,
+    String? section,
     String? type,
   }) async {
     try {
@@ -470,12 +471,16 @@ class SupabaseService {
         final tgMatch = RegExp(r'\[TG_MSG_ID:(\d+)\]').firstMatch(content);
         final tgMsgId = tgMatch != null ? int.tryParse(tgMatch.group(1) ?? '') : null;
 
+        final secMatch = RegExp(r'\[SECTION:([A-Za-z0-9_]+)\]').firstMatch(content);
+        final itemSection = item['section']?.toString() ?? secMatch?.group(1) ?? 'ALL';
+
         return ScheduleModel(
           id: item['id']?.toString() ?? '',
           title: item['title'] ?? 'جدول دراسي',
           type: isExam ? 'exams' : 'lectures',
           department: item['department'] ?? 'ALL',
           stage: item['stage'] ?? 'ALL',
+          section: itemSection,
           fileUrl: item['image_url'],
           fileName: item['title'],
           uploaderName: item['author_name'] ?? 'إدارة الكلية',
@@ -491,7 +496,12 @@ class SupabaseService {
         final matchDept = s.department == 'ALL' || s.department == department;
         final matchStage = s.stage == 'ALL' || s.stage == stage;
         final matchType = type == null || s.type == type;
-        return matchDept && matchStage && matchType;
+        final matchSection = section == null ||
+            section.isEmpty ||
+            section == 'ALL' ||
+            s.section == 'ALL' ||
+            s.section == section;
+        return matchDept && matchStage && matchType && matchSection;
       }).toList();
     } catch (e) {
       debugPrint('[-] Error fetching schedules: $e');
@@ -499,18 +509,19 @@ class SupabaseService {
     }
   }
 
-  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام عن الإعلانات وتوثيق رسالة تيليجرام) ─────────────
+  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام عن الإعلانات وتوثيق الشعبة المستهدفة) ─────────────
   Future<bool> createSchedule(ScheduleModel schedule) async {
     try {
       final tgTag = schedule.telegramMessageId != null ? ' [TG_MSG_ID:${schedule.telegramMessageId}]' : '';
       final payload = {
         'title': schedule.title,
-        'content': '[SCHEDULE_TIMETABLE]$tgTag جدول دراسي',
+        'content': '[SCHEDULE_TIMETABLE]$tgTag [SECTION:${schedule.section}] جدول دراسي',
         'category': schedule.isExam ? 'exam' : 'academic',
         'department': schedule.department,
         'stage': schedule.stage,
+        'section': schedule.section,
         'image_url': schedule.fileUrl,
-        'author_name': schedule.uploaderName ?? 'ممثل الدفعة',
+        'author_name': schedule.uploaderName ?? 'ممثل الشعبة',
         'author_id': schedule.uploaderId ?? 'REP',
         'author_role': 'representative',
         'is_pinned': true,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
@@ -7,8 +6,6 @@ import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/schedule_model.dart';
 import '../services/supabase_service.dart';
-import '../widgets/study_book_animation.dart';
-import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
 import 'package:file_picker/file_picker.dart';
@@ -50,6 +47,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       _schedules = await service.fetchSchedules(
         department: _user!.department,
         stage: _user!.stage,
+        section: _user!.section,
       );
     }
 
@@ -168,6 +166,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     int selectedFileSize = 0;
     bool isPicking = false;
     bool isUploading = false;
+    final isAdmin = _user?.isAdmin == true;
+    String targetSection = isAdmin ? 'ALL' : (_user?.section ?? 'A');
 
     showDialog(
       context: context,
@@ -239,6 +239,63 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+
+                // الشعبة المستهدفة: اختيار للمشرف، قفل تلقائي للممثل
+                if (isAdmin) ...[
+                  Text(
+                    'الشعبة المستهدفة:',
+                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: targetSection,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppTheme.lightSurface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ALL', child: Text('عام (لكل الشُعب - موحد)')),
+                      DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                      DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                      DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                      DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setDlgState(() => targetSection = val);
+                    },
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.18)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lock_rounded, size: 16, color: AppTheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'الشعبة المستهدفة: شعبة ${_user?.section ?? "A"} (قفل تلقائي)',
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
 
                 // زر اختيار الملف من الجهاز للرفع المباشر إلى سيرفر تيليجرام
@@ -397,6 +454,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         type: type,
                         department: _user?.department ?? 'ALL',
                         stage: _user?.stage ?? 'ALL',
+                        section: targetSection,
                         fileUrl: finalFileUrl,
                         fileName: selectedFile?.name ?? title,
                         uploaderName: _user?.name ?? 'المشرف',
@@ -700,6 +758,26 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                             ),
                           ),
                           const SizedBox(width: 6),
+                          // شارة الشعبة
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: schedule.isUnified ? const Color(0xFFF1F5F9) : const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: schedule.isUnified ? const Color(0xFFCBD5E1) : const Color(0xFF93C5FD),
+                              ),
+                            ),
+                            child: Text(
+                              schedule.sectionLabel,
+                              style: GoogleFonts.cairo(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: schedule.isUnified ? const Color(0xFF475569) : const Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           // شارة نوع الجدول الرسمية
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),

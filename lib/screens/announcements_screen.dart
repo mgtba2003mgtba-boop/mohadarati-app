@@ -6,7 +6,6 @@ import '../models/app_user_model.dart';
 import '../models/announcement_model.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
-import '../widgets/app_icon_badge.dart';
 import 'dashboard_screen.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -37,6 +36,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     _announcements = await service.fetchAnnouncements(
       department: _user?.department,
       stage: _user?.stage,
+      section: _user?.section,
     );
 
     if (mounted) {
@@ -228,6 +228,21 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                     style: GoogleFonts.cairo(fontSize: 10, color: categoryColor, fontWeight: FontWeight.bold),
                   ),
                 ),
+                if (announcement.section != 'ALL') ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF93C5FD), width: 0.8),
+                    ),
+                    child: Text(
+                      'شعبة ${announcement.section}',
+                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
