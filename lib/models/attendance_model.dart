@@ -34,6 +34,15 @@ class AttendanceRecordModel {
       timestamp: ts,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'student_id': studentId,
+    'student_name': studentName,
+    'date': date,
+    'subject_name': subjectName,
+    'timestamp': timestamp?.toIso8601String(),
+  };
 }
 
 enum AcademicWarningLevel {

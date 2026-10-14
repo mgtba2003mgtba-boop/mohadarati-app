@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     // إذا كانت البيانات محملة مسبقاً، لا نظهر شاشة بيضاء لضمان استمرارية العرض السريع
     if (_announcements.isEmpty && _lectures.isEmpty) {
       setState(() => _isLoading = true);
@@ -98,13 +98,15 @@ class _HomeScreenState extends State<HomeScreen> {
             department: _user!.department,
             stage: _user!.stage,
             section: userSection,
+            forceRefresh: forceRefresh,
           ),
-          service.fetchStudentAttendance(_user!.studentId),
+          service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh),
           service.fetchLectures(
             department: _user!.department,
             stage: _user!.stage,
             section: userSection,
             semester: 1,
+            forceRefresh: forceRefresh,
           ),
           service.fetchCourses(
             department: _user!.department,
@@ -215,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () => _loadData(forceRefresh: true),
         color: AppTheme.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

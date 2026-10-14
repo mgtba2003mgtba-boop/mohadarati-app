@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
@@ -24,6 +25,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   String _selectedDept = 'ALL';
   String _selectedStage = 'ALL';
+  String _selectedSection = 'ALL';
   int _selectedSemester = 1;
   String _selectedType = 'ALL'; // 'ALL', 'theory', 'practical'
   String _searchQuery = '';
@@ -39,22 +41,26 @@ class _LecturesScreenState extends State<LecturesScreen> {
     _user = service.currentUser;
 
     if (_user != null) {
-      _selectedDept = _user!.department;
-      _selectedStage = _user!.stage;
+      _selectedDept = _user!.isAdmin ? 'ALL' : _user!.department;
+      _selectedStage = _user!.isAdmin ? 'ALL' : _user!.stage;
+      _selectedSection = _user!.isAdmin ? 'ALL' : _user!.section;
     }
 
     _loadLectures();
   }
 
-  Future<void> _loadLectures() async {
+  Future<void> _loadLectures({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
 
     final service = SupabaseService();
     final list = await service.fetchLectures(
       department: _selectedDept == 'ALL' ? null : _selectedDept,
       stage: _selectedStage == 'ALL' ? null : _selectedStage,
-      section: _user?.isAdmin == true ? null : _user?.section,
+      section: (_user?.isAdmin == true && _selectedSection != 'ALL')
+          ? _selectedSection
+          : (_user?.isAdmin == true ? null : _user?.section),
       semester: _selectedSemester,
+      forceRefresh: forceRefresh,
     );
 
     if (mounted) {
@@ -225,6 +231,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
           : null,
       body: Column(
         children: [
+          // شريط الرقابة والإشراف العام (خاص بالمشرف العام لمراقبة كافة الأقسام والشُعب)
+          if (_user?.isAdmin == true) _buildSupervisorBar(),
+
           // شريط البحث
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -506,6 +515,189 @@ class _LecturesScreenState extends State<LecturesScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildSupervisorBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF59E0B), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'مراقبة المحاضرات والمقررات (إشراف عام)',
+                          style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 0.6),
+                          ),
+                          child: Text(
+                            'المشرف العام',
+                            style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'استعراض المحاضرات والمقررات المرفوعة لكافة الأقسام والمراحل والشُعب',
+                      style: GoogleFonts.cairo(color: Colors.white70, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              if (_selectedDept != 'ALL' || _selectedStage != 'ALL' || _selectedSection != 'ALL')
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedDept = 'ALL';
+                      _selectedStage = 'ALL';
+                      _selectedSection = 'ALL';
+                    });
+                    _loadLectures();
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 14, color: Color(0xFFFBBF24)),
+                  label: Text(
+                    'عرض الكل',
+                    style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: _buildSupervisorDropdown(
+                  label: 'القسم',
+                  value: _selectedDept,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كافة الأقسام 🌐', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedDept = val);
+                      _loadLectures();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'المرحلة',
+                  value: _selectedStage,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كل المراحل', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedStage = val);
+                      _loadLectures();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'الشعبة',
+                  value: _selectedSection,
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('كل الشُعب', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedSection = val);
+                      _loadLectures();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupervisorDropdown({
+    required String label,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: const Color(0xFF1E293B),
+          icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 18),
+          style: GoogleFonts.cairo(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+          items: items,
+          onChanged: onChanged,
+        ),
       ),
     );
   }

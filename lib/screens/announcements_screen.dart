@@ -22,25 +22,93 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   String _searchQuery = '';
   AppUserModel? _user;
 
+  // ── فلاتر المشرف العام لمراقبة كافة الأقسام والمراحل والشُعب ─────────
+  String _supervisorDept = 'ALL';
+  String _supervisorStage = 'ALL';
+  String _supervisorSection = 'ALL';
+
   @override
   void initState() {
     super.initState();
     _loadAnnouncements();
   }
 
-  Future<void> _loadAnnouncements() async {
+  Future<void> _loadAnnouncements({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     final service = SupabaseService();
     _user = service.currentUser;
 
+    final isAdmin = _user?.isAdmin == true;
+    final dept = isAdmin
+        ? (_supervisorDept == 'ALL' ? null : _supervisorDept)
+        : _user?.department;
+    final stage = isAdmin
+        ? (_supervisorStage == 'ALL' ? null : _supervisorStage)
+        : _user?.stage;
+    final section = isAdmin
+        ? (_supervisorSection == 'ALL' ? null : _supervisorSection)
+        : _user?.section;
+
     _announcements = await service.fetchAnnouncements(
-      department: _user?.department,
-      stage: _user?.stage,
-      section: _user?.section,
+      department: dept,
+      stage: stage,
+      section: section,
+      forceRefresh: forceRefresh,
     );
 
     if (mounted) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _confirmDeleteAnnouncement(AnnouncementModel announcement) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 8),
+            Text('حذف التبليغ', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف التبليغ "${announcement.title}"؟\nسيتم حذفه من قاعدة البيانات وتيليجرام فوراً.',
+          style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('إلغاء', style: GoogleFonts.cairo(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text('نعم، حذف نهائي', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final ok = await SupabaseService().deleteAnnouncement(announcement.id);
+      if (mounted) {
+        if (ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم حذف التبليغ بنجاح وتحديث اللوحة')),
+          );
+          _loadAnnouncements(forceRefresh: true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذر حذف التبليغ، يرجى المحاولة لاحقاً')),
+          );
+        }
+      }
     }
   }
 
@@ -70,7 +138,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
-            onPressed: _loadAnnouncements,
+            onPressed: () => _loadAnnouncements(forceRefresh: true),
           ),
         ],
       ),
@@ -84,17 +152,20 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 1)),
-                ).then((_) => _loadAnnouncements());
+                ).then((_) => _loadAnnouncements(forceRefresh: true));
               },
             )
           : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : RefreshIndicator(
-              onRefresh: _loadAnnouncements,
+              onRefresh: () => _loadAnnouncements(forceRefresh: true),
               color: AppTheme.primary,
               child: Column(
                 children: [
+                  // شريط الرقابة والإشراف العام (خاص بالمشرف العام لمراقبة كافة الأقسام والشُعب)
+                  if (_user?.isAdmin == true) _buildSupervisorBar(),
+
                   // شريط البحث
                   Container(
                     color: Colors.white,
@@ -192,6 +263,192 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     );
   }
 
+  Widget _buildSupervisorBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF59E0B), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'وضع المراقبة والإشراف العام',
+                          style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 0.6),
+                          ),
+                          child: Text(
+                            'المشرف العام',
+                            style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'مراقبة منشورات وتبليغات كافة الأقسام والمراحل والشُعب',
+                      style: GoogleFonts.cairo(color: Colors.white70, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              if (_supervisorDept != 'ALL' || _supervisorStage != 'ALL' || _supervisorSection != 'ALL')
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _supervisorDept = 'ALL';
+                      _supervisorStage = 'ALL';
+                      _supervisorSection = 'ALL';
+                    });
+                    _loadAnnouncements();
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 14, color: Color(0xFFFBBF24)),
+                  label: Text(
+                    'عرض الكل',
+                    style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // اختيار القسم
+              Expanded(
+                flex: 4,
+                child: _buildSupervisorDropdown(
+                  label: 'القسم',
+                  value: _supervisorDept,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كافة الأقسام 🌐', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _supervisorDept = val);
+                      _loadAnnouncements();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              // اختيار المرحلة
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'المرحلة',
+                  value: _supervisorStage,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كل المراحل', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _supervisorStage = val);
+                      _loadAnnouncements();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              // اختيار الشعبة
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'الشعبة',
+                  value: _supervisorSection,
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('كل الشُعب', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _supervisorSection = val);
+                      _loadAnnouncements();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupervisorDropdown({
+    required String label,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: const Color(0xFF1E293B),
+          icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 18),
+          style: GoogleFonts.cairo(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
   Widget _buildAnnouncementCard(AnnouncementModel announcement) {
     Color categoryColor = AppTheme.primary;
     if (announcement.category == 'urgent') categoryColor = AppTheme.danger;
@@ -243,11 +500,36 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                     ),
                   ),
                 ],
+                if (_user?.isAdmin == true && (announcement.department != 'ALL' || announcement.stage != 'ALL')) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                    ),
+                    child: Text(
+                      '${announcement.department} • ${announcement.stage}',
+                      style: GoogleFonts.cairo(fontSize: 9, color: const Color(0xFF475569), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
                   style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
                 ),
+                if (_user?.isAdmin == true) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'حذف التبليغ (صلاحية المشرف)',
+                    onPressed: () => _confirmDeleteAnnouncement(announcement),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 10),
@@ -305,6 +587,20 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       contentText: announcement.displayContent,
       accentColor: AppTheme.primary,
       actions: [
+        if (_user?.isAdmin == true)
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDeleteAnnouncement(announcement);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.redAccent,
+              side: const BorderSide(color: Colors.redAccent),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.delete_rounded, size: 18),
+            label: Text('حذف المنشور', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context),
           style: ElevatedButton.styleFrom(

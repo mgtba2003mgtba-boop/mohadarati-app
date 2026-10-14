@@ -103,4 +103,23 @@ class AnnouncementModel {
       'subject_name': subjectName,
     };
   }
+
+  Map<String, dynamic> toCacheJson() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'author_id': authorId,
+      'author_name': authorName,
+      'author_role': authorRole,
+      'department': department,
+      'stage': stage,
+      'section': section,
+      'category': category,
+      'is_pinned': isPinned,
+      'image_url': imageUrl,
+      'subject_name': subjectName,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }

@@ -29,6 +29,70 @@ class SupabaseService {
 
   final Map<String, _OtpRecord> _otpCache = {};
 
+  // ── محرك الذاكرة المؤقتة الذكي (Smart In-Memory RAM & Persistent Cache Engine) ───
+  final Map<String, dynamic> _memoryCache = {};
+  final Map<String, DateTime> _cacheTimestamps = {};
+
+  /// جلب البيانات من الذاكرة المؤقتة المحلية (RAM أولاً ثم SharedPreferences)
+  Future<T?> _getCachedData<T>({
+    required String key,
+    required T Function(dynamic json) fromJson,
+    Duration maxAge = const Duration(minutes: 15),
+  }) async {
+    // 1. فحص ذاكرة الوصول العشوائي RAM (فوري في أقل من 0.001 ثانية)
+    if (_memoryCache.containsKey(key)) {
+      final ts = _cacheTimestamps[key];
+      if (ts != null && DateTime.now().difference(ts) < maxAge) {
+        return _memoryCache[key] as T?;
+      }
+    }
+
+    // 2. فحص التخزين المحلي الدائم SharedPreferences عبر المتصفح/الجهاز
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cache_$key');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        final data = fromJson(decoded);
+        _memoryCache[key] = data;
+        _cacheTimestamps[key] = DateTime.now();
+        return data;
+      }
+    } catch (e) {
+      debugPrint('[-] Cache read error for $key: $e');
+    }
+    return null;
+  }
+
+  /// حفظ البيانات في الذاكرة المؤقتة RAM و SharedPreferences
+  Future<void> _setCachedData({
+    required String key,
+    required dynamic rawData,
+    required dynamic Function() toJson,
+  }) async {
+    try {
+      _memoryCache[key] = rawData;
+      _cacheTimestamps[key] = DateTime.now();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cache_$key', jsonEncode(toJson()));
+    } catch (e) {
+      debugPrint('[-] Cache write error for $key: $e');
+    }
+  }
+
+  /// إبطال الكاش عند إضافة أو تعديل أو حذف بيانات لضمان التزامن الفوري
+  void invalidateCachePattern(String pattern) {
+    _memoryCache.removeWhere((k, _) => k.contains(pattern));
+    _cacheTimestamps.removeWhere((k, _) => k.contains(pattern));
+    SharedPreferences.getInstance().then((prefs) {
+      final keys = prefs.getKeys().where((k) => k.startsWith('cache_') && k.contains(pattern)).toList();
+      for (final k in keys) {
+        prefs.remove(k);
+      }
+    }).catchError((_) {});
+  }
+
   SupabaseClient get client => Supabase.instance.client;
 
   /// ── سيرفر البصمة ونظام الحضور القديم (Read-Only Data Source) ───────────
@@ -312,42 +376,119 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب سجلات الحضور والغياب (قراءة فقط من سيرفر الحضور القديم) ───────
-  Future<List<AttendanceRecordModel>> fetchStudentAttendance(String studentId) async {
+  /// ── جلب سجلات الحضور والغياب (مع كاش محلي سريع ومرونة قصوى) ───────
+  Future<List<AttendanceRecordModel>> fetchStudentAttendance(
+    String studentId, {
+    bool forceRefresh = false,
+  }) async {
+    final cleanId = studentId.trim();
+    if (cleanId.isEmpty) return [];
+    final cacheKey = 'attendance_$cleanId';
+
+    // 1. استرجاع فوري من الذاكرة المؤقتة (RAM / LocalStorage) في 0.001 ثانية
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<AttendanceRecordModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((i) => AttendanceRecordModel.fromJson(i)).toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        // تحديث صامت في الخلفية إن مضى أكثر من دقيقتين
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+          _fetchFreshAttendanceAndCache(cleanId, cacheKey).catchError((_) => <AttendanceRecordModel>[]);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshAttendanceAndCache(cleanId, cacheKey);
+  }
+
+  Future<List<AttendanceRecordModel>> _fetchFreshAttendanceAndCache(
+    String studentId,
+    String cacheKey,
+  ) async {
     try {
       final res = await _attendanceClient
           .from('attendance_records')
           .select('*')
-          .eq('student_id', studentId.trim())
-          .order('date', ascending: false);
+          .eq('student_id', studentId)
+          .order('date', ascending: false)
+          .timeout(const Duration(seconds: 8));
 
-      return (res as List)
+      final list = (res as List)
           .map((item) => AttendanceRecordModel.fromJson(item))
           .toList();
+
+      await _setCachedData(
+        key: cacheKey,
+        rawData: list,
+        toJson: () => list.map((a) => a.toJson()).toList(),
+      );
+
+      return list;
     } catch (e) {
-      debugPrint('[-] Error fetching attendance: $e');
-      return [];
+      debugPrint('[-] Error fetching attendance (falling back to cache): $e');
+      final cached = await _getCachedData<List<AttendanceRecordModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((i) => AttendanceRecordModel.fromJson(i)).toList(),
+        maxAge: const Duration(days: 30),
+      );
+      return cached ?? [];
     }
   }
 
-  /// ── جلب الإعلانات الأكاديمية والتبليغات (مع فلترة الشعبة) ─────────────────
+  /// ── جلب الإعلانات الأكاديمية والتبليغات (كاش فوري ومقاوم لبطء الشبكة) ─────────────────
   Future<List<AnnouncementModel>> fetchAnnouncements({
     String? department,
     String? stage,
     String? section,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'announcements_${department ?? "ALL"}_${stage ?? "ALL"}_${section ?? "ALL"}';
+
+    // 1. عرض فوري في 0.01 ثانية من الكاش المحلي
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<AnnouncementModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => AnnouncementModel.fromJson(item)).toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        // تحديث في الخلفية دون تجميد واجهة المستخدم
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+          _fetchFreshAnnouncementsAndCache(department: department, stage: stage, section: section, cacheKey: cacheKey)
+              .catchError((_) => <AnnouncementModel>[]);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshAnnouncementsAndCache(
+      department: department,
+      stage: stage,
+      section: section,
+      cacheKey: cacheKey,
+    );
+  }
+
+  Future<List<AnnouncementModel>> _fetchFreshAnnouncementsAndCache({
+    String? department,
+    String? stage,
+    String? section,
+    required String cacheKey,
   }) async {
     try {
       var query = client.from('announcements').select('*');
 
-      // فلترة الإعلانات العامة وتلك الموجهة لقسم أو مرحلة الطالب
       final res = await query
           .order('is_pinned', ascending: false)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 8));
 
       var list = (res as List)
           .map((item) => AnnouncementModel.fromJson(item))
           .where((a) {
-            // استبعاد الجداول الدراسية والمقررات لكي تظهر حصراً في خاناتها المخصصة
             final isSchedule = a.content.contains('[SCHEDULE_TIMETABLE]') ||
                 a.subjectName == 'SCHEDULE';
             final isCourse = a.content.contains('[COURSE_REGISTRY') ||
@@ -366,19 +507,29 @@ class SupabaseService {
             a.stage == 'ALL' || a.stage == stage).toList();
       }
 
-      // فلترة الشعبة: المنشورات العامة (ALL) وتلك المخصصة لشعبة الطالب
       if (section != null && section.isNotEmpty && section != 'ALL') {
         list = list.where((a) => a.section == 'ALL' || a.section == section).toList();
       }
 
+      await _setCachedData(
+        key: cacheKey,
+        rawData: list,
+        toJson: () => list.map((a) => a.toCacheJson()).toList(),
+      );
+
       return list;
     } catch (e) {
-      debugPrint('[-] Error fetching announcements: $e');
-      return [];
+      debugPrint('[-] Error fetching announcements (falling back to cache): $e');
+      final cached = await _getCachedData<List<AnnouncementModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => AnnouncementModel.fromJson(item)).toList(),
+        maxAge: const Duration(days: 30),
+      );
+      return cached ?? [];
     }
   }
 
-  /// ── إضافة إعلان جديد ─────────────────────────────────────────────────────
+  /// ── إضافة إعلان جديد (مع إبطال الكاش فورا للتزامن) ─────────────────────────
   Future<bool> createAnnouncement(AnnouncementModel announcement) async {
     try {
       final json = announcement.toJson();
@@ -393,6 +544,7 @@ class SupabaseService {
         json.remove('subject_name');
       }
       await client.from('announcements').insert(json);
+      invalidateCachePattern('announcements_');
       return true;
     } catch (e) {
       debugPrint('[-] Error creating announcement: $e');
@@ -400,7 +552,7 @@ class SupabaseService {
     }
   }
 
-  /// ── حذف إعلان / بوستر / جدول (مع حذف الرسالة من قناة تيليجرام بالتزامن) ───
+  /// ── حذف إعلان / بوستر / جدول (مع حذف تيليجرام وتفريغ الكاش) ───
   Future<bool> deleteAnnouncement(String id) async {
     try {
       // 1. استعلام مسبق لحذف المنشور المقابل من قناة تيليجرام إن وجد
@@ -419,7 +571,6 @@ class SupabaseService {
             msgId = int.tryParse(match.group(1) ?? '');
           }
 
-          // محاولة بديلة: إذا كان رابط الصورة يحمل معرف الرسالة
           if (msgId == null) {
             final imageUrl = row['image_url']?.toString() ?? '';
             final urlMatch = RegExp(r'/api/file/(\d+)').firstMatch(imageUrl);
@@ -438,6 +589,8 @@ class SupabaseService {
 
       // 2. حذف السجل من قاعدة بيانات Supabase
       await client.from('announcements').delete().eq('id', id);
+      invalidateCachePattern('announcements_');
+      invalidateCachePattern('schedules_');
       return true;
     } catch (e) {
       debugPrint('[-] Error deleting announcement: $e');
@@ -445,23 +598,63 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب الجداول الدراسية والامتحانية (منعزلة عن الإعلانات ومفلترة حسب الشعبة) ──────────────
+  /// ── جلب الجداول الدراسية والامتحانية (كاش فوري + دعم إشراف شامل لكافة الأقسام) ──────────────
   Future<List<ScheduleModel>> fetchSchedules({
     required String department,
     required String stage,
     String? section,
     String? type,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'schedules_${department}_${stage}_${section ?? "ALL"}_${type ?? "ALL"}';
+
+    // 1. عرض فوري في 0.01 ثانية من الكاش المحلي
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<ScheduleModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+          _fetchFreshSchedulesAndCache(
+            department: department,
+            stage: stage,
+            section: section,
+            type: type,
+            cacheKey: cacheKey,
+          ).catchError((_) => <ScheduleModel>[]);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshSchedulesAndCache(
+      department: department,
+      stage: stage,
+      section: section,
+      type: type,
+      cacheKey: cacheKey,
+    );
+  }
+
+  Future<List<ScheduleModel>> _fetchFreshSchedulesAndCache({
+    required String department,
+    required String stage,
+    String? section,
+    String? type,
+    required String cacheKey,
   }) async {
     try {
       final res = await client
           .from('announcements')
           .select('*')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 8));
 
       final list = (res as List).where((item) {
         final content = item['content']?.toString() ?? '';
         final subjectName = item['subject_name']?.toString() ?? '';
-        // الجداول حصراً تحمل وسم [SCHEDULE_TIMETABLE] أو subject_name = SCHEDULE
         return content.contains('[SCHEDULE_TIMETABLE]') || subjectName == 'SCHEDULE';
       }).map((item) {
         final cat = item['category']?.toString() ?? '';
@@ -492,10 +685,10 @@ class SupabaseService {
         );
       }).toList();
 
-      return list.where((s) {
-        final matchDept = s.department == 'ALL' || s.department == department;
-        final matchStage = s.stage == 'ALL' || s.stage == stage;
-        final matchType = type == null || s.type == type;
+      final filtered = list.where((s) {
+        final matchDept = department == 'ALL' || s.department == 'ALL' || s.department == department;
+        final matchStage = stage == 'ALL' || s.stage == 'ALL' || s.stage == stage;
+        final matchType = type == null || type == 'ALL' || s.type == type;
         final matchSection = section == null ||
             section.isEmpty ||
             section == 'ALL' ||
@@ -503,13 +696,26 @@ class SupabaseService {
             s.section == section;
         return matchDept && matchStage && matchType && matchSection;
       }).toList();
+
+      await _setCachedData(
+        key: cacheKey,
+        rawData: filtered,
+        toJson: () => filtered.map((s) => s.toJson()).toList(),
+      );
+
+      return filtered;
     } catch (e) {
-      debugPrint('[-] Error fetching schedules: $e');
-      return [];
+      debugPrint('[-] Error fetching schedules (falling back to cache): $e');
+      final cached = await _getCachedData<List<ScheduleModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
+        maxAge: const Duration(days: 30),
+      );
+      return cached ?? [];
     }
   }
 
-  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام عن الإعلانات وتوثيق الشعبة المستهدفة) ─────────────
+  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام وتحديث الكاش) ─────────────
   Future<bool> createSchedule(ScheduleModel schedule) async {
     try {
       final tgTag = schedule.telegramMessageId != null ? ' [TG_MSG_ID:${schedule.telegramMessageId}]' : '';
@@ -528,6 +734,8 @@ class SupabaseService {
         'subject_name': 'SCHEDULE',
       };
       await client.from('announcements').insert(payload);
+      invalidateCachePattern('schedules_');
+      invalidateCachePattern('announcements_');
       return true;
     } catch (e) {
       debugPrint('[-] Error creating schedule: $e');
@@ -539,12 +747,52 @@ class SupabaseService {
     return deleteAnnouncement(id);
   }
 
-  /// ── جلب المحاضرات (موحدة لكافة شُعب المرحلة والقسم) ──────────────────
+  /// ── جلب المحاضرات (كاش فوري وموحدة لكافة طلبة المرحلة والقسم) ──────────────────
   Future<List<LectureModel>> fetchLectures({
     String? department,
     String? stage,
     String? section,
     int? semester,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'lectures_${department ?? "ALL"}_${stage ?? "ALL"}_${section ?? "ALL"}_${semester ?? 0}';
+
+    // 1. عرض فوري في 0.01 ثانية من الكاش المحلي
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<LectureModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+          _fetchFreshLecturesAndCache(
+            department: department,
+            stage: stage,
+            section: section,
+            semester: semester,
+            cacheKey: cacheKey,
+          ).catchError((_) => <LectureModel>[]);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshLecturesAndCache(
+      department: department,
+      stage: stage,
+      section: section,
+      semester: semester,
+      cacheKey: cacheKey,
+    );
+  }
+
+  Future<List<LectureModel>> _fetchFreshLecturesAndCache({
+    String? department,
+    String? stage,
+    String? section,
+    int? semester,
+    required String cacheKey,
   }) async {
     try {
       var query = client.from('lectures').select('*');
@@ -555,24 +803,41 @@ class SupabaseService {
       if (stage != null && stage.isNotEmpty && stage != 'ALL') {
         query = query.eq('stage', stage);
       }
-      if (semester != null) {
+      if (semester != null && semester != 0) {
         query = query.eq('semester', semester);
       }
 
-      final res = await query.order('created_at', ascending: false);
+      final res = await query.order('created_at', ascending: false).timeout(const Duration(seconds: 8));
 
-      // المحاضرات تظهر لكافة طلبة المرحلة والشعب بصورة موحدة
-      return (res as List).map((item) => LectureModel.fromJson(item)).toList();
+      var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
+
+      if (section != null && section.isNotEmpty && section != 'ALL') {
+        list = list.where((l) => l.section == 'ALL' || l.section == section).toList();
+      }
+
+      await _setCachedData(
+        key: cacheKey,
+        rawData: list,
+        toJson: () => list.map((l) => l.toJson()).toList(),
+      );
+
+      return list;
     } catch (e) {
-      debugPrint('[-] Error fetching lectures: $e');
-      return [];
+      debugPrint('[-] Error fetching lectures (falling back to cache): $e');
+      final cached = await _getCachedData<List<LectureModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
+        maxAge: const Duration(days: 30),
+      );
+      return cached ?? [];
     }
   }
 
-  /// ── نشر محاضرة جديدة برابط Google Drive ────────────────────────────────
+  /// ── نشر محاضرة جديدة برابط Google Drive (وتحديث الكاش) ────────────────
   Future<bool> createLecture(LectureModel lecture) async {
     try {
       await client.from('lectures').insert(lecture.toJson());
+      invalidateCachePattern('lectures_');
       return true;
     } catch (e) {
       debugPrint('[-] Error creating lecture: $e');
@@ -580,7 +845,7 @@ class SupabaseService {
     }
   }
 
-  /// ── حذف محاضرة (مع حذف الرسالة من قناة تيليجرام بالتزامن) ────────────────
+  /// ── حذف محاضرة (مع حذف الرسالة من قناة تيليجرام وتفريغ الكاش) ──────────────
   Future<bool> deleteLecture(String id) async {
     try {
       // 1. استعلام مسبق لجلب معرف رسالة تيليجرام والقناة
@@ -607,6 +872,7 @@ class SupabaseService {
 
       // 2. حذف السجل من قاعدة بيانات Supabase
       await client.from('lectures').delete().eq('id', id);
+      invalidateCachePattern('lectures_');
       return true;
     } catch (e) {
       debugPrint('[-] Error deleting lecture: $e');
