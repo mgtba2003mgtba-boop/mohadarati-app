@@ -22,6 +22,14 @@
       "destination": "/pdf_viewer.html"
     },
     {
+      "source": "/ios_install_guide.mp4",
+      "destination": "/ios_install_guide.mp4"
+    },
+    {
+      "source": "/ios_install_guide.gif",
+      "destination": "/ios_install_guide.gif"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

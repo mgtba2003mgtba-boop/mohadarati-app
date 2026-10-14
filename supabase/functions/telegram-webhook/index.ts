@@ -10,6 +10,7 @@ export const corsHeaders = {
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 const APK_FILE_ID = 'BQACAgIAAxkDAAI6EGrP1diKArAHAVteCeV1MkjuhjBFAAJOowACYkqBSgkTdN4F2td5PQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
+const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
   saturday: 'السبت',
   sunday: 'الأحد',
@@ -710,6 +711,34 @@ async function sendTelegramDocument(botToken, chatId, documentUrlOrId, caption, 
     };
   }
 }
+async function sendTelegramAnimation(botToken, chatId, animationUrlOrId, caption, replyMarkup) {
+  const url = `${TELEGRAM_API}${botToken}/sendAnimation`;
+  const body = {
+    chat_id: chatId,
+    animation: animationUrlOrId,
+    parse_mode: 'HTML'
+  };
+  if (caption) {
+    body.caption = caption;
+  }
+  if (replyMarkup) {
+    body.reply_markup = replyMarkup;
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    return await res.json();
+  } catch {
+    return {
+      ok: false
+    };
+  }
+}
 async function sendAndroidApkFile(botToken, chatId) {
   const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -720,13 +749,14 @@ async function sendAndroidInstallGuide(botToken, chatId) {
   await sendAndroidApkFile(botToken, chatId);
 }
 async function sendIosInstallGuide(botToken, chatId) {
-  const msg = `🍏 <b>تثبيت تطبيق محاضراتي للآيفون (iOS)</b>\n` +
+  const caption = `🍏 <b>تثبيت تطبيق محاضراتي للآيفون (iOS)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `1️⃣ اضغط على الزر أدناه ثم اختر <b>(سماح / Allow)</b>.\n` +
     `2️⃣ افتح <b>الإعدادات (Settings)</b> ⚙️ على هاتفك.\n` +
-    `3️⃣ اضغط على <b>(تم تنزيل ملف التعريف)</b> في الأعلى ثم <b>تثبيت (Install)</b>.\n\n` +
-    `🎉 سيظهر التطبيق كأيقونة رسمية على شاشتك الرئيسية!`;
-  await sendTelegramMessage(botToken, chatId, msg, {
+    `3️⃣ اضغط على <b>(تم تنزيل ملف التعريف)</b> في الأعلى ثم <b>تثبيت (Install)</b>.\n` +
+    `4️⃣ أدخل رمز قفل الشاشة (Passcode) الخاص بهاتفك لتأكيد التثبيت.\n\n` +
+    `🎉 <i>شاهد الحركة التوضيحية أعلاه لمعاينة الخطوات بنقرة واحدة!</i>`;
+  const replyMarkup = {
     inline_keyboard: [
       [
         {
@@ -735,7 +765,11 @@ async function sendIosInstallGuide(botToken, chatId) {
         }
       ]
     ]
-  });
+  };
+  const animRes = await sendTelegramAnimation(botToken, chatId, IOS_GUIDE_FILE_ID, caption, replyMarkup);
+  if (!animRes || !animRes.ok) {
+    await sendTelegramMessage(botToken, chatId, caption, replyMarkup);
+  }
 }
 async function sendAppOverviewMenu(botToken, chatId) {
   const appMsg = `📲 <b>تطبيق محاضراتي</b>\n` +
