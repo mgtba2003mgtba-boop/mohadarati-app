@@ -711,79 +711,54 @@ async function sendTelegramDocument(botToken, chatId, documentUrlOrId, caption, 
   }
 }
 async function sendAndroidApkFile(botToken, chatId) {
-  const caption = `🤖 <b>حزمة تطبيق محاضراتي للأندرويد (نسخة APK البديلة)</b>\n` +
+  const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `⚡ <b>طريقة التثبيت:</b>\n` +
-    `1️⃣ اضغط على ملف التطبيق أعلاه لتنزيله فوراً.\n` +
-    `2️⃣ بعد اكتمال التنزيل، اضغط عليه واختر <b>تثبيت (Install)</b>.\n` +
-    `3️⃣ افتح التطبيق وسجّل دخولك بمعرفك الجامعي مباشرة!\n\n` +
-    `💡 <i>ملاحظة: للحصول على التحديثات الفورية تلقائياً، ننصح باستخدام زر التثبيت الذكي عبر المنصة.</i>\n\n` +
-    `🏛️ <i>الجامعة الوطنية للعلوم والتكنولوجيا — NUST</i>`;
+    `اضغط على الملف أعلاه لتنزيله ثم اختر <b>تثبيت (Install)</b>.`;
   await sendTelegramDocument(botToken, chatId, APK_FILE_ID, caption);
 }
 async function sendAndroidInstallGuide(botToken, chatId) {
-  const msg = `🤖 <b>تطبيق محاضراتي لأجهزة أندرويد (Android)</b>\n` +
+  await sendAndroidApkFile(botToken, chatId);
+}
+async function sendIosInstallGuide(botToken, chatId) {
+  const msg = `🍏 <b>تثبيت تطبيق محاضراتي للآيفون (iOS)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🌟 <b>الخيار الذكي الموصى به (تحديث تلقائي):</b>\n` +
-    `ثبّت التطبيق مباشرة كأيقونة على شاشتك الرئيسية، وسيتحدث تلقائياً بكل ميزة جديدة دون الحاجة لإعادة التنزيل!\n\n` +
-    `📦 <b>الخيار البديل:</b>\n` +
-    `يمكنك تنزيل ملف الـ APK المباشر وتثبيته يدوياً على جهازك.\n\n` +
-    `🏛️ <i>الجامعة الوطنية للعلوم والتكنولوجيا — NUST</i>`;
+    `1️⃣ اضغط على الزر أدناه ثم اختر <b>(سماح / Allow)</b>.\n` +
+    `2️⃣ افتح <b>الإعدادات (Settings)</b> ⚙️ على هاتفك.\n` +
+    `3️⃣ اضغط على <b>(تم تنزيل ملف التعريف)</b> في الأعلى ثم <b>تثبيت (Install)</b>.\n\n` +
+    `🎉 سيظهر التطبيق كأيقونة رسمية على شاشتك الرئيسية!`;
   await sendTelegramMessage(botToken, chatId, msg, {
     inline_keyboard: [
       [
         {
-          text: '🚀 تثبيت التطبيق الآن (تحديث تلقائي)',
-          url: 'https://mohadarati.vercel.app'
-        }
-      ],
-      [
-        {
-          text: '📦 إرسال ملف APK المباشر',
-          callback_data: 'cmd:apk'
+          text: '🚀 تنزيل ملف التعريف وتثبيت التطبيق',
+          url: 'https://mohadarati.vercel.app/api/mobileconfig'
         }
       ]
     ]
   });
 }
-async function sendIosInstallGuide(botToken, chatId) {
-  const caption = `🍏 <b>ملف تعريف تطبيق محاضراتي للآيفون (iOS)</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `⚡ <b>طريقة التثبيت الرسمية السريعة:</b>\n\n` +
-    `1️⃣ اضغط على ملف التعريف أعلاه لتنزيله.\n` +
-    `2️⃣ توجّه فوراً إلى <b>الإعدادات (Settings)</b> ⚙️ في هاتفك.\n` +
-    `3️⃣ ستجد في الأعلى خيار: <b>(تم تنزيل ملف التعريف / Profile Downloaded)</b> ⬅️ اضغط عليه.\n` +
-    `4️⃣ اضغط <b>(تثبيت / Install)</b> في الزاوية العلوية ثم أكّد التثبيت.\n\n` +
-    `🎉 <b>مبروك!</b> سيظهر تطبيق محاضراتي فوراً كأيقونة رسمية على شاشتك الرئيسية ويعمل ملء الشاشة بدون متصفح كأي تطبيق أصلي!\n\n` +
-    `🏛️ <i>الجامعة الوطنية للعلوم والتكنولوجيا — NUST</i>`;
-  await sendTelegramDocument(botToken, chatId, IOS_CONFIG_FILE_ID, caption);
-}
 async function sendAppOverviewMenu(botToken, chatId) {
-  const appMsg = `📱 <b>تثبيت تطبيق محاضراتي للهواتف الذكية</b>\n` +
-    `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` +
+  const appMsg = `📲 <b>تطبيق محاضراتي</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `استغنِ عن المتصفح وثبّت التطبيق كأيقونة أصلية تتحدث تلقائياً:\n\n` +
-    `🤖 <b>أجهزة أندرويد (تحديث تلقائي فوري):</b>\n` +
-    `تثبيت التطبيق مباشرة على شاشتك الرئيسية ليعمل كأيقونة مستقلة تتحدث تلقائياً بكل ميزة جديدة.\n\n` +
-    `🍏 <b>أجهزة آيفون (ملف تعريف iOS):</b>\n` +
-    `ملف تعريف رسمي يثبت أيقونة ملء الشاشة كأي تطبيق أصلي.\n\n` +
-    `👇 <b>اختر طريقة التثبيت المناسبة لجهازك:</b>`;
+    `اختر طريقة التثبيت المناسبة لجهازك:`;
   await sendTelegramMessage(botToken, chatId, appMsg, {
     inline_keyboard: [
       [
         {
-          text: '🤖 تثبيت للأندرويد (تحديث تلقائي)',
-          url: 'https://mohadarati.vercel.app'
-        },
-        {
-          text: '🍏 تثبيت للآيفون (ملف تعريف)',
+          text: '🍏 تثبيت تطبيق الآيفون (iOS)',
           callback_data: 'cmd:ios'
         }
       ],
       [
         {
-          text: '📦 تحميل حزمة APK بديلة (أندرويد)',
+          text: '🤖 تحميل تطبيق الأندرويد (APK)',
           callback_data: 'cmd:apk'
+        }
+      ],
+      [
+        {
+          text: '🌐 فتح عبر المتصفح (لجميع الأجهزة)',
+          url: 'https://mohadarati.vercel.app'
         }
       ]
     ]
