@@ -668,7 +668,11 @@ class SupabaseService {
         final tgMsgId = tgMatch != null ? int.tryParse(tgMatch.group(1) ?? '') : null;
 
         final secMatch = RegExp(r'\[SECTION:([A-Za-z0-9_]+)\]').firstMatch(content);
-        final itemSection = item['section']?.toString() ?? secMatch?.group(1) ?? 'ALL';
+        String? rawSec = item['section']?.toString();
+        if (rawSec == null || rawSec.isEmpty || rawSec == 'null') {
+          rawSec = secMatch?.group(1) ?? 'ALL';
+        }
+        final itemSection = rawSec.trim().toUpperCase();
 
         return ScheduleModel(
           id: item['id']?.toString() ?? '',
@@ -694,7 +698,7 @@ class SupabaseService {
         final matchType = type == null || type == 'ALL' || s.type == type;
         final matchSection = (section == null || section.isEmpty || section == 'ALL')
             ? true
-            : s.section.toUpperCase() == section.toUpperCase();
+            : (s.section.toUpperCase() == section.toUpperCase() || s.section.toUpperCase() == 'ALL');
         return matchDept && matchStage && matchType && matchSection;
       }).toList();
 
@@ -722,11 +726,10 @@ class SupabaseService {
       final tgTag = schedule.telegramMessageId != null ? ' [TG_MSG_ID:${schedule.telegramMessageId}]' : '';
       final payload = {
         'title': schedule.title,
-        'content': '[SCHEDULE_TIMETABLE]$tgTag [SECTION:${schedule.section}] جدول دراسي',
+        'content': '[SCHEDULE_TIMETABLE]$tgTag [SECTION:${schedule.section.toUpperCase()}] جدول دراسي',
         'category': schedule.isExam ? 'exam' : 'academic',
         'department': schedule.department,
         'stage': schedule.stage,
-        'section': schedule.section,
         'image_url': schedule.fileUrl,
         'author_name': schedule.uploaderName ?? 'ممثل الشعبة',
         'author_id': schedule.uploaderId ?? 'REP',

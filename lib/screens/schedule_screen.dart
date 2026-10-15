@@ -241,7 +241,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     bool isPicking = false;
     bool isUploading = false;
     final isAdmin = _user?.isAdmin == true;
-    String targetSection = isAdmin ? 'A' : (_user?.section ?? 'A');
+    final preview = AdminPreviewService();
+    String targetSection = isAdmin
+        ? (preview.section != null && preview.section!.isNotEmpty ? preview.section! : 'A')
+        : (_user?.section != null && _user!.section!.trim().isNotEmpty ? _user!.section!.trim().toUpperCase() : 'A');
 
     showDialog(
       context: context,
@@ -357,7 +360,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'الشعبة المستهدفة: شعبة ${_user?.section ?? "A"} (قفل تلقائي)',
+                            'الشعبة المستهدفة: شعبة $targetSection (قفل تلقائي)',
                             style: GoogleFonts.cairo(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -547,6 +550,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           ),
                         );
                         _loadSchedules();
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('تعذر حفظ بيانات الجدول في قاعدة البيانات، يرجى المحاولة مرة أخرى', style: GoogleFonts.cairo()),
+                            backgroundColor: AppTheme.danger,
+                          ),
+                        );
                       }
                     },
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
@@ -562,7 +572,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   @override
   Widget build(BuildContext context) {
-    final canPublish = _user?.canManageLectures == true || _user?.isAdmin == true;
+    final canPublish = _user?.isAdmin == true || _user?.isRepresentative == true || _user?.canManageLectures == true;
 
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
@@ -784,7 +794,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Widget _buildEmptyScheduleState({required bool isExam}) {
-    final canPublish = _user?.canManageLectures == true || _user?.isAdmin == true;
+    final canPublish = _user?.isAdmin == true || _user?.isRepresentative == true || _user?.canManageLectures == true;
 
     return Center(
       child: Padding(
