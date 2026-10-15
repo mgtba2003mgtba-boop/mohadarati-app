@@ -51,3 +51,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Temporary scraping and data generation files
+scratch_courses_props.json
+structured_comp_courses.json
+dart_comp_subjects.txt
+supabase/.temp/

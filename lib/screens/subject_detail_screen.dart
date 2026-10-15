@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/constants/app_constants.dart';
+import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
@@ -213,14 +214,42 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final subModel = BiometricSubjects.findSubject(
+      widget.subjectName,
+      department: _effectiveDept,
+      stage: _effectiveStage,
+    );
+
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-          widget.subjectName,
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.subjectName,
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (subModel?.code != null || subModel?.units != null)
+              Row(
+                children: [
+                  if (subModel?.code != null)
+                    Text(
+                      'كود: ${subModel!.code}  ',
+                      style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                    ),
+                  if (subModel?.units != null)
+                    Text(
+                      '•  ${subModel!.units} وحدات معتمدة',
+                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFB45309)),
+                    ),
+                ],
+              ),
+          ],
         ),
         actions: [
           if (_canPublish) ...[
