@@ -1,3 +1,4 @@
+import 'app_constants.dart';
 import '../../models/subject_model.dart';
 
 /// قاعدة بيانات المواد الدراسية الرسمية الـ 119 المستخرجة مباشرة من نظام البصمة الجامعي
@@ -1234,6 +1235,7 @@ class BiometricSubjects {
     String? stage,
     int? semester,
   }) {
+    final normStage = stage != null && stage != 'ALL' ? AppConstants.normalizeStage(stage) : null;
     return allSubjects.where((s) {
       if (department != null && department != 'ALL') {
         final matchDept = s.departmentName == department ||
@@ -1241,10 +1243,10 @@ class BiometricSubjects {
             department.contains(s.departmentName);
         if (!matchDept) return false;
       }
-      if (stage != null && stage != 'ALL') {
-        final matchStage = s.stageName == stage ||
-            s.stageName.contains(stage) ||
-            stage.contains(s.stageName);
+      if (normStage != null) {
+        final matchStage = s.stageName == normStage ||
+            s.stageName.contains(normStage) ||
+            normStage.contains(s.stageName);
         if (!matchStage) return false;
       }
       if (semester != null && semester != 0) {
@@ -1276,6 +1278,7 @@ class BiometricSubjects {
     String? stage,
   }) {
     final cleanName = name.trim().toLowerCase();
+    final normStage = stage != null && stage != 'ALL' ? AppConstants.normalizeStage(stage) : null;
     for (final s in allSubjects) {
       if (s.name.trim().toLowerCase() == cleanName) {
         if (department != null && department != 'ALL') {
@@ -1284,10 +1287,10 @@ class BiometricSubjects {
               department.contains(s.departmentName);
           if (!matchDept) continue;
         }
-        if (stage != null && stage != 'ALL') {
-          final matchStage = s.stageName == stage ||
-              s.stageName.contains(stage) ||
-              stage.contains(s.stageName);
+        if (normStage != null) {
+          final matchStage = s.stageName == normStage ||
+              s.stageName.contains(normStage) ||
+              normStage.contains(s.stageName);
           if (!matchStage) continue;
         }
         return s;

@@ -64,7 +64,7 @@ class AppUserModel {
       studentId: json['student_id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       department: json['department']?.toString() ?? '',
-      stage: json['stage']?.toString() ?? '',
+      stage: AppConstants.normalizeStage(json['stage']?.toString()),
       section: json['section']?.toString(),
       email: json['email']?.toString(),
       phone: json['phone']?.toString(),

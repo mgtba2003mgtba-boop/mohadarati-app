@@ -1,3 +1,5 @@
+import '../core/constants/app_constants.dart';
+
 class StudentModel {
   final String id;
   final String name;
@@ -40,7 +42,7 @@ class StudentModel {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       department: json['department']?.toString() ?? 'غير محدد',
-      stage: json['stage']?.toString() ?? 'المرحلة الأولى',
+      stage: AppConstants.normalizeStage(json['stage']?.toString()),
       section: json['section']?.toString(),
       telegramChatId: json['telegram_chat_id']?.toString(),
       photoUrl: photo,

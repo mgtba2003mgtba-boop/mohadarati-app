@@ -1142,7 +1142,56 @@ void main() {
       expect(studentSchedules.first.id, 'sch-sec-a');
       expect(studentSchedules.contains(scheduleB), false, reason: 'جداول الشعب الأخرى محظورة تماماً عن الطالب');
     });
+
+    test('اختبار معالجة ومطابقة أسماء المراحل والسنوات الأكاديمية (Stage Normalization & Biometric Compatibility)', () {
+      // 1. اختبار AppConstants.normalizeStage
+      expect(AppConstants.normalizeStage('السنة الأولى'), 'المرحلة الأولى');
+      expect(AppConstants.normalizeStage('السنة الثانية'), 'المرحلة الثانية');
+      expect(AppConstants.normalizeStage('السنة الثالثة'), 'المرحلة الثالثة');
+      expect(AppConstants.normalizeStage('السنة الرابعة'), 'المرحلة الرابعة');
+      expect(AppConstants.normalizeStage('المرحلة الثالثة'), 'المرحلة الثالثة');
+
+      // 2. اختبار AppConstants.getStageAliases
+      final aliases3 = AppConstants.getStageAliases('المرحلة الثالثة');
+      expect(aliases3.contains('المرحلة الثالثة'), true);
+      expect(aliases3.contains('السنة الثالثة'), true);
+
+      // 3. اختبار جلب مقررات المرحلة الثالثة لأجهزة طبية عند تمرير "السنة الثالثة"
+      final subjectsYear3 = BiometricSubjects.getSubjects(
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'السنة الثالثة',
+      );
+      expect(subjectsYear3.isNotEmpty, true, reason: 'يجب أن تظهر مقررات المرحلة الثالثة حتى لو كانت المرحلة مخزنة باسم السنة الثالثة');
+
+      final subjectsStage3 = BiometricSubjects.getSubjects(
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثالثة',
+      );
+      expect(subjectsYear3.length, subjectsStage3.length);
+
+      // 4. اختبار نموذج الطالب والمستخدم وتطبيع المرحلة
+      final student = StudentModel.fromJson({
+        'id': 'ST-NUST-0013414835-876',
+        'name': 'يوسف حمزه قاسم سرحان',
+        'department': 'هندسة تقنيات الأجهزة الطبية',
+        'stage': 'السنة الثالثة',
+        'section': 'C',
+      });
+      expect(student.stage, 'المرحلة الثالثة');
+
+      final appUser = AppUserModel.fromJson({
+        'id': 'usr-test-1',
+        'student_id': 'ST-NUST-0013414835-876',
+        'name': 'يوسف حمزه قاسم سرحان',
+        'department': 'هندسة تقنيات الأجهزة الطبية',
+        'stage': 'السنة الثالثة',
+        'section': 'C',
+        'role': 'student',
+      });
+      expect(appUser.stage, 'المرحلة الثالثة');
+    });
   });
 }
+
 
 

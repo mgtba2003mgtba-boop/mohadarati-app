@@ -180,7 +180,7 @@ class SupabaseService {
         final updatedData = {
           'name': student.name,
           'department': student.department,
-          'stage': student.stage,
+          'stage': AppConstants.normalizeStage(student.stage),
           'section': student.section,
           'photo_url': student.photoUrl,
           'pin_code': (existing.pinCode != null && existing.pinCode!.trim().isNotEmpty)
@@ -208,7 +208,7 @@ class SupabaseService {
         'student_id': student.id,
         'name': student.name,
         'department': student.department,
-        'stage': student.stage,
+        'stage': AppConstants.normalizeStage(student.stage),
         'section': student.section,
         'email': email,
         'phone': phone,
@@ -890,11 +890,12 @@ class SupabaseService {
     required String stage,
   }) async {
     try {
+      final aliases = AppConstants.getStageAliases(stage);
       final res = await _attendanceClient
           .from('students')
           .select('section')
           .eq('department', department)
-          .eq('stage', stage);
+          .filter('stage', 'in', '(${aliases.map((a) => '"$a"').join(",")})');
 
       if (res is List && res.isNotEmpty) {
         final Set<String> found = {};
@@ -924,11 +925,12 @@ class SupabaseService {
     int limit = 60,
   }) async {
     try {
+      final aliases = AppConstants.getStageAliases(stage);
       var q = _attendanceClient
           .from('students')
           .select('*')
           .eq('department', department)
-          .eq('stage', stage)
+          .filter('stage', 'in', '(${aliases.map((a) => '"$a"').join(",")})')
           .eq('section', section);
 
       final cleanQuery = query?.trim() ?? '';
@@ -954,12 +956,13 @@ class SupabaseService {
     bool canAnnouncements = true,
   }) async {
     try {
+      final normStage = AppConstants.normalizeStage(student.stage);
       final existing = await getAppUserByStudentId(student.id);
       if (existing != null) {
         await client.from('app_users').update({
           'role': AppConstants.roleRepresentative,
           'department': student.department,
-          'stage': student.stage,
+          'stage': normStage,
           'section': section,
           'can_publish_lectures': canLectures,
           'can_publish_announcements': canAnnouncements,
@@ -971,7 +974,7 @@ class SupabaseService {
           'student_id': student.id,
           'name': student.name,
           'department': student.department,
-          'stage': student.stage,
+          'stage': normStage,
           'section': section,
           'role': AppConstants.roleRepresentative,
           'can_publish_lectures': canLectures,
@@ -1018,9 +1021,10 @@ class SupabaseService {
     } catch (e) {
       debugPrint('[-] Biometric subjects live query note: $e');
     }
+    final normStage = stage != null && stage != 'ALL' ? AppConstants.normalizeStage(stage) : stage;
     return BiometricSubjects.getSubjects(
       department: department,
-      stage: stage,
+      stage: normStage,
       semester: semester,
     );
   }
@@ -1032,9 +1036,10 @@ class SupabaseService {
     int? semester,
   }) async {
     final targetSemester = semester ?? 1;
+    final normStage = AppConstants.normalizeStage(stage);
     return BiometricSubjects.getSubjectNames(
       department: department,
-      stage: stage,
+      stage: normStage,
       semester: targetSemester,
     );
   }
@@ -1048,6 +1053,7 @@ class SupabaseService {
   }) async {
     final cleanName = courseName.trim();
     if (cleanName.isEmpty) return false;
+    final normStage = AppConstants.normalizeStage(stage);
 
     try {
       final payload = {
@@ -1055,7 +1061,7 @@ class SupabaseService {
         'content': '[COURSE_REGISTRY:ADD] مقرر دراسي مضاف',
         'category': 'academic',
         'department': department,
-        'stage': stage,
+        'stage': normStage,
         'author_id': user.studentId,
         'author_name': user.name,
         'author_role': user.role,
@@ -1065,11 +1071,11 @@ class SupabaseService {
       await client.from('announcements').insert(payload);
 
       // تحديث الكاش المحلي فورياً
-      final current = await fetchCourses(department: department, stage: stage);
+      final current = await fetchCourses(department: department, stage: normStage);
       if (!current.contains(cleanName)) {
         current.add(cleanName);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('custom_courses_${department}_$stage', jsonEncode(current));
+        await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
       }
       return true;
     } catch (e) {
@@ -1089,6 +1095,7 @@ class SupabaseService {
     final cleanOld = oldName.trim();
     final cleanNew = newName.trim();
     if (cleanNew.isEmpty || cleanOld == cleanNew) return false;
+    final normStage = AppConstants.normalizeStage(stage);
 
     try {
       final payload = {
@@ -1096,7 +1103,7 @@ class SupabaseService {
         'content': '[COURSE_REGISTRY:EDIT] old_name:$cleanOld',
         'category': 'academic',
         'department': department,
-        'stage': stage,
+        'stage': normStage,
         'author_id': user.studentId,
         'author_name': user.name,
         'author_role': user.role,
@@ -1114,11 +1121,11 @@ class SupabaseService {
       } catch (_) {}
 
       // تحديث الكاش المحلي
-      final current = await fetchCourses(department: department, stage: stage);
+      final current = await fetchCourses(department: department, stage: normStage);
       current.remove(cleanOld);
       if (!current.contains(cleanNew)) current.add(cleanNew);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('custom_courses_${department}_$stage', jsonEncode(current));
+      await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
 
       return true;
     } catch (e) {
@@ -1136,6 +1143,7 @@ class SupabaseService {
   }) async {
     final cleanName = courseName.trim();
     if (cleanName.isEmpty) return false;
+    final normStage = AppConstants.normalizeStage(stage);
 
     try {
       final payload = {
@@ -1143,7 +1151,7 @@ class SupabaseService {
         'content': '[COURSE_REGISTRY:DELETE] مقرر محذوف',
         'category': 'academic',
         'department': department,
-        'stage': stage,
+        'stage': normStage,
         'author_id': user.studentId,
         'author_name': user.name,
         'author_role': user.role,
@@ -1153,10 +1161,10 @@ class SupabaseService {
       await client.from('announcements').insert(payload);
 
       // تحديث الكاش المحلي فورياً
-      final current = await fetchCourses(department: department, stage: stage);
+      final current = await fetchCourses(department: department, stage: normStage);
       current.remove(cleanName);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('custom_courses_${department}_$stage', jsonEncode(current));
+      await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
 
       return true;
     } catch (e) {

@@ -95,6 +95,42 @@ class AppConstants {
     'المرحلة الرابعة',
   ];
 
+  /// توحيد مسميات المراحل الدراسية لمعالجة تباين أنظمة البصمة ('السنة الثانية' -> 'المرحلة الثانية')
+  static String normalizeStage(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'المرحلة الأولى';
+    final clean = raw.trim();
+    if (clean.contains('ثانية') || clean.contains('الثانية') || clean.contains('2')) {
+      return 'المرحلة الثانية';
+    }
+    if (clean.contains('ثالثة') || clean.contains('الثالثة') || clean.contains('3')) {
+      return 'المرحلة الثالثة';
+    }
+    if (clean.contains('رابعة') || clean.contains('الرابعة') || clean.contains('4')) {
+      return 'المرحلة الرابعة';
+    }
+    if (clean.contains('أولى') || clean.contains('الاولى') || clean.contains('الأولى') || clean.contains('1')) {
+      return 'المرحلة الأولى';
+    }
+    return clean;
+  }
+
+  /// استرجاع كافة التسميات المحتملة للمرحلة في نظام البصمة للاستعلام الآمن
+  static List<String> getStageAliases(String? stage) {
+    final norm = normalizeStage(stage);
+    switch (norm) {
+      case 'المرحلة الأولى':
+        return ['المرحلة الأولى', 'السنة الأولى', 'المرحلة 1', 'السنة 1'];
+      case 'المرحلة الثانية':
+        return ['المرحلة الثانية', 'السنة الثانية', 'المرحلة 2', 'السنة 2'];
+      case 'المرحلة الثالثة':
+        return ['المرحلة الثالثة', 'السنة الثالثة', 'المرحلة 3', 'السنة 3'];
+      case 'المرحلة الرابعة':
+        return ['المرحلة الرابعة', 'السنة الرابعة', 'المرحلة 4', 'السنة 4'];
+      default:
+        return [norm];
+    }
+  }
+
   // ── الشُعب الدراسية ───────────────────────────────────────────────
   static const List<String> sections = ['A', 'B', 'C', 'D'];
 
