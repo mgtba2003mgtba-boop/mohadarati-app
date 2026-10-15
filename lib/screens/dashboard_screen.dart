@@ -223,8 +223,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     _syncLectureSubjectSelection();
 
+    _loadDashboardData(forceRefresh: true);
     if (_isMujtaba) {
-      _loadDashboardData();
       _loadBanners();
       _loadBiometricSections();
     }
@@ -262,13 +262,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.dispose();
   }
 
-  Future<void> _loadDashboardData() async {
+  Future<void> _loadDashboardData({bool forceRefresh = false}) async {
     setState(() => _isLoadingDashboard = true);
     final service = SupabaseService();
     try {
       final results = await Future.wait([
-        service.fetchLectures(),
-        service.fetchAnnouncements(),
+        service.fetchLectures(forceRefresh: forceRefresh),
+        service.fetchAnnouncements(forceRefresh: forceRefresh),
         service.fetchAllUsers(),
       ]);
 
@@ -281,6 +281,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         if (u.section != null && u.section!.isNotEmpty) {
           userSections[u.studentId] = u.section!;
         }
+      }
+      if (_currentUser?.section != null && _currentUser!.section!.isNotEmpty) {
+        userSections[_currentUser!.studentId] = _currentUser!.section!;
       }
 
       final List<RepresentativeActivityItem> items = [];
@@ -430,6 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _driveUrlController.clear();
       _lectureDescController.clear();
       _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
+      _loadDashboardData(forceRefresh: true);
     } else {
       _showSnackbar(result.message, isError: true);
     }
@@ -483,6 +487,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _announcementSubjectController.clear();
       setState(() => _isAnnouncePinned = false);
       _showSnackbar('تم نشر الإعلان بنجاح');
+      _loadDashboardData(forceRefresh: true);
     } else {
       _showSnackbar('حدث خطأ أثناء نشر الإعلان', isError: true);
     }
@@ -1285,6 +1290,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
+          const SizedBox(height: 32),
+          _buildMyRecentLecturesSection(),
         ],
       ),
     );
@@ -1483,6 +1490,535 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
                 : const Text('إرسال ونشر الإعلان للطلبة'),
+          ),
+          const SizedBox(height: 32),
+          _buildMyRecentAnnouncementsSection(),
+        ],
+      ),
+    );
+  }
+
+  // ── سجل محاضراتي المنشورة مؤخراً للممثل مع حالة النشر الحية ─────────────
+  Widget _buildMyRecentLecturesSection() {
+    final myLectures = _allLectures.where((l) {
+      if (_isMujtaba) return true;
+      if (_currentUser == null) return false;
+      return l.uploaderId == _currentUser!.studentId ||
+          (l.department == _currentUser!.department &&
+              l.stage == _currentUser!.stage &&
+              (l.section == _currentUser!.section || l.section == 'ALL'));
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryLight.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.history_edu_rounded, color: AppTheme.primaryLight, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        _isMujtaba ? 'سجل المحاضرات المرفوعة بالنظام' : 'سجل محاضراتي المرفوعة للشعبة',
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${myLectures.length}',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryLight,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'تظهر هنا المحاضرات التي قمت برفعها وتأكيد وصولها للطلبة فوراً',
+                    style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryLight, size: 20),
+              tooltip: 'تحديث فوري للسجل',
+              onPressed: () => _loadDashboardData(forceRefresh: true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (_isLoadingDashboard)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppTheme.primaryLight, strokeWidth: 2),
+            ),
+          )
+        else if (myLectures.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.cloud_upload_outlined, size: 36, color: Colors.white.withValues(alpha: 0.3)),
+                const SizedBox(height: 8),
+                Text(
+                  'لم يتم رفع أي محاضرات حتى الآن',
+                  style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFCBD5E1)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'بمجرد رفعك لأي محاضرة من النموذج أعلاه ستظهر هنا فوراً مع حالة النشر وزر المعاينة والحذف',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          )
+        else
+          ...myLectures.map((l) => _buildRecentLectureItemCard(l)),
+      ],
+    );
+  }
+
+  Widget _buildRecentLectureItemCard(LectureModel l) {
+    final bool isMyUpload = _currentUser != null && _currentUser!.studentId == l.uploaderId;
+    final bool canDelete = _isMujtaba || isMyUpload;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  l.subjectName,
+                  style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (l.type == 'practical' ? AppTheme.accent : AppTheme.primaryLight).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  l.typeLabel,
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: l.type == 'practical' ? AppTheme.accent : AppTheme.primaryLight,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // حالة النشر المؤكدة
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      'منشورة للطلبة ✓',
+                      style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.success),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l.title,
+            style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${l.department} • ${l.stage}${l.section.isNotEmpty && l.section != 'ALL' ? ' • شعبة ${l.section}' : ' • كافة الشعب'} • بواسطة: ${l.uploaderName}',
+            style: GoogleFonts.cairo(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.primaryLight),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.remove_red_eye_rounded, size: 15, color: AppTheme.primaryLight),
+                  label: Text(
+                    'معاينة المحاضرة',
+                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primaryLight, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    final target = l.streamUrl ?? (l.driveUrl.isNotEmpty && l.driveUrl != 'telegram' ? l.driveUrl : l.downloadUrl);
+                    if (target != null && target.isNotEmpty) {
+                      AppMediaPreviewModal.show(
+                        context: context,
+                        title: l.title,
+                        subtitle: '${l.subjectName} • ${l.uploaderName}',
+                        url: target,
+                        fileName: l.fileName ?? l.title,
+                      );
+                    }
+                  },
+                ),
+              ),
+              if (canDelete) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                  tooltip: 'حذف المحاضرة',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppTheme.darkCard,
+                        title: Text('تأكيد حذف المحاضرة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
+                        content: Text('هل تريد بالتأكيد حذف "${l.title}" نهائياً من المنظومة؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('حذف'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      final ok = await SupabaseService().deleteLecture(l.id);
+                      if (ok) {
+                        _showSnackbar('تم حذف المحاضرة بنجاح');
+                        _loadDashboardData(forceRefresh: true);
+                      } else {
+                        _showSnackbar('تعذر حذف المحاضرة', isError: true);
+                      }
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── سجل إعلاناتي وتبليغاتي المنشورة مؤخراً للممثل مع حالة النشر الحية ────────
+  Widget _buildMyRecentAnnouncementsSection() {
+    final myAnnouncements = _allAnnouncements.where((a) {
+      if (a.subjectName == 'BANNER' || a.subjectName == 'SCHEDULE' || a.subjectName == 'COURSE') return false;
+      if (_isMujtaba) return true;
+      if (_currentUser == null) return false;
+      return a.authorId == _currentUser!.studentId ||
+          (a.department == _currentUser!.department &&
+              a.stage == _currentUser!.stage &&
+              (a.section == _currentUser!.section || a.section == 'ALL' || a.section.isEmpty));
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.campaign_rounded, color: AppTheme.accent, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        _isMujtaba ? 'سجل الإعلانات والتبليغات بالنظام' : 'سجل تبليغاتي المنشورة',
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${myAnnouncements.length}',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'تظهر هنا التبليغات المنشورة مع حالة وصولها للطلبة وخيار الحذف',
+                    style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppTheme.accent, size: 20),
+              tooltip: 'تحديث فوري للسجل',
+              onPressed: () => _loadDashboardData(forceRefresh: true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (_isLoadingDashboard)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2),
+            ),
+          )
+        else if (myAnnouncements.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.darkCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.campaign_outlined, size: 36, color: Colors.white.withValues(alpha: 0.3)),
+                const SizedBox(height: 8),
+                Text(
+                  'لم يتم نشر أي إعلانات حتى الآن',
+                  style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFCBD5E1)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'بمجرد إرسالك لأي إعلان من النموذج أعلاه سيظهر هنا فوراً مع حالة النشر وخيار الحذف',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          )
+        else
+          ...myAnnouncements.map((a) => _buildRecentAnnouncementItemCard(a)),
+      ],
+    );
+  }
+
+  Widget _buildRecentAnnouncementItemCard(AnnouncementModel a) {
+    final bool isMyAuthor = _currentUser != null && _currentUser!.studentId == a.authorId;
+    final bool canDelete = _isMujtaba || isMyAuthor;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  a.subjectName ?? 'عام',
+                  style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                ),
+              ),
+              if (a.isPinned) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.push_pin_rounded, size: 11, color: AppTheme.primaryLight),
+                      const SizedBox(width: 2),
+                      Text('مثبت', style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primaryLight, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(),
+              // حالة النشر
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      'منشور للطلبة ✓',
+                      style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.success),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            a.title,
+            style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            a.displayContent,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${a.department} • ${a.stage}${a.section.isNotEmpty && a.section != 'ALL' ? ' • شعبة ${a.section}' : ' • كافة الشعب'} • بواسطة: ${a.authorName}',
+            style: GoogleFonts.cairo(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.accent),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.menu_book_rounded, size: 15, color: AppTheme.accent),
+                  label: Text(
+                    'قراءة التبليغ كاملاً',
+                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppTheme.darkCard,
+                        title: Text(a.title, style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+                        content: SingleChildScrollView(
+                          child: Text(a.displayContent, style: GoogleFonts.cairo(color: const Color(0xFFCBD5E1), fontSize: 12, height: 1.5)),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق')),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (canDelete) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                  tooltip: 'حذف التبليغ',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: AppTheme.darkCard,
+                        title: Text('تأكيد حذف التبليغ', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
+                        content: Text('هل تريد بالتأكيد حذف "${a.title}" نهائياً من المنظومة؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('حذف'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      final ok = await SupabaseService().deleteAnnouncement(a.id);
+                      if (ok) {
+                        _showSnackbar('تم حذف التبليغ بنجاح');
+                        _loadDashboardData(forceRefresh: true);
+                      } else {
+                        _showSnackbar('تعذر حذف التبليغ', isError: true);
+                      }
+                    }
+                  },
+                ),
+              ],
+            ],
           ),
         ],
       ),

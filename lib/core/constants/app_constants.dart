@@ -178,4 +178,37 @@ class AppConstants {
   static const double secondWarningThreshold = 0.07; // 7% غياب: إنذار ثاني
   static const double finalWarningThreshold = 0.10; // 10% غياب: إنذار نهائي
   static const double failureThreshold = 0.15; // 15% غياب: فصل بالغياب
+
+  /// تطبيع النصوص العربية لتوحيد المقارنات ومنع أخطاء الحروف (أ/إ/آ -> ا, ة -> ه, ى -> ي)
+  static String normalizeArabic(String? str) {
+    if (str == null) return '';
+    return str
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '') // حذف حركات التشكيل
+        .replaceAll('\u0640', '') // حذف التطويل
+        .replaceAll(RegExp(r'[أإآٱ]'), 'ا')
+        .replaceAll('ة', 'ه')
+        .replaceAll('ى', 'ي')
+        .replaceAll('ؤ', 'و')
+        .replaceAll('ئ', 'ي')
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /// مطابقة نصين عربيين بمرونة كاملة
+  static bool arabicEquals(String? a, String? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return normalizeArabic(a) == normalizeArabic(b);
+  }
+
+  /// هل يحتوي النص العربي على نص آخر بمرونة
+  static bool arabicContains(String? source, String? target) {
+    if (source == null || target == null) return false;
+    final normSource = normalizeArabic(source);
+    final normTarget = normalizeArabic(target);
+    if (normTarget.isEmpty) return true;
+    return normSource.contains(normTarget);
+  }
 }
+

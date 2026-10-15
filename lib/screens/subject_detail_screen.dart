@@ -101,7 +101,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     super.dispose();
   }
 
-  Future<void> _loadSubjectData() async {
+  Future<void> _loadSubjectData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     final service = SupabaseService();
     _user = service.currentUser;
@@ -111,40 +111,43 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final stage = _effectiveStage;
       final userSection = _effectiveSection;
 
-      // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين)
+      // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي)
       final allLectures = await service.fetchLectures(
         department: dept,
         stage: stage,
         section: userSection,
+        forceRefresh: forceRefresh,
       );
       _subjectLectures = allLectures.where((l) {
-        return l.subjectName.trim().toLowerCase() ==
-            widget.subjectName.trim().toLowerCase();
+        return AppConstants.arabicEquals(l.subjectName, widget.subjectName) ||
+            AppConstants.arabicContains(l.subjectName, widget.subjectName) ||
+            AppConstants.arabicContains(widget.subjectName, l.subjectName);
       }).toList();
 
-      // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين)
+      // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي)
       final allAnnouncements = await service.fetchAnnouncements(
         department: dept,
         stage: stage,
         section: userSection,
+        forceRefresh: forceRefresh,
       );
       _subjectAnnouncements = allAnnouncements.where((a) {
-        if (a.subjectName != null && a.subjectName!.isNotEmpty) {
-          return a.subjectName!.trim().toLowerCase() ==
-              widget.subjectName.trim().toLowerCase();
+        if (a.subjectName != null && a.subjectName!.trim().isNotEmpty && a.subjectName != 'عام') {
+          return AppConstants.arabicEquals(a.subjectName, widget.subjectName) ||
+              AppConstants.arabicContains(a.subjectName, widget.subjectName) ||
+              AppConstants.arabicContains(widget.subjectName, a.subjectName);
         }
-        final normSub = widget.subjectName.trim().toLowerCase();
-        return a.title.toLowerCase().contains(normSub) ||
-            a.content.toLowerCase().contains(normSub);
+        return AppConstants.arabicContains(a.title, widget.subjectName) ||
+            AppConstants.arabicContains(a.content, widget.subjectName);
       }).toList();
 
       // 3. جلب سجلات الحضور الخاصة بهذه المادة
       if (_user != null) {
-        final records = await service.fetchStudentAttendance(_user!.studentId);
+        final records = await service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh);
         _subjectAttendanceRecords = records.where((r) {
           return r.subjectName != null &&
-              r.subjectName!.trim().toLowerCase() ==
-                  widget.subjectName.trim().toLowerCase();
+              (AppConstants.arabicEquals(r.subjectName, widget.subjectName) ||
+               AppConstants.arabicContains(r.subjectName, widget.subjectName));
         }).toList();
       }
     } catch (e) {
@@ -171,8 +174,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ? (l.section == 'ALL' || l.section.isEmpty)
                 : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
       } else {
-        // للطالب أو الممثل: تظهر فقط محاضرات شعبته والمحاضرات الموحدة، ولا تخلط باقي الشُعب أبداً
-        matchesSection = l.section == 'ALL' ||
+        // للطالب أو الممثل: تظهر فقط محاضرات شعبته والمحاضرات الموحدة، وأي محاضرة قام هو برفعها
+        final bool isAuthor = _user != null && (_user!.studentId == l.uploaderId);
+        matchesSection = isAuthor ||
+            l.section == 'ALL' ||
             l.section.isEmpty ||
             (userSec.isNotEmpty && l.section.toUpperCase() == userSec.toUpperCase());
       }
@@ -195,8 +200,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ? (a.section == 'ALL' || a.section == null || a.section!.isEmpty)
                 : (a.section?.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL' || a.section == null));
       } else {
-        // للطالب أو الممثل: تظهر فقط تبليغات شعبته والتبليغات العامة الموحدة
-        matchesSection = a.section == 'ALL' ||
+        // للطالب أو الممثل: تظهر فقط تبليغات شعبته والتبليغات العامة الموحدة، وأي تبليغ نشره هو بنفسه
+        final bool isAuthor = _user != null && (_user!.studentId == a.authorId);
+        matchesSection = isAuthor ||
+            a.section == 'ALL' ||
             a.section == null ||
             a.section!.isEmpty ||
             (userSec.isNotEmpty && a.section!.toUpperCase() == userSec.toUpperCase());
@@ -341,7 +348,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
             tooltip: 'تحديث البيانات',
-            onPressed: _loadSubjectData,
+            onPressed: () => _loadSubjectData(forceRefresh: true),
           ),
         ],
         bottom: TabBar(
@@ -1102,7 +1109,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         currentUser: _user,
         initialMode: initialMode,
         onSuccess: () {
-          _loadSubjectData();
+          _loadSubjectData(forceRefresh: true);
         },
       ),
     );

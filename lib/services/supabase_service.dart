@@ -503,8 +503,9 @@ class SupabaseService {
       }
 
       if (stage != null && stage.isNotEmpty && stage != 'ALL') {
+        final aliases = AppConstants.getStageAliases(stage);
         list = list.where((a) =>
-            a.stage == 'ALL' || a.stage == stage).toList();
+            a.stage == 'ALL' || aliases.contains(a.stage) || a.stage == stage).toList();
       }
 
       if (section != null && section.isNotEmpty && section != 'ALL') {
@@ -536,6 +537,7 @@ class SupabaseService {
   Future<bool> createAnnouncement(AnnouncementModel announcement) async {
     try {
       final json = announcement.toJson();
+      json['stage'] = AppConstants.normalizeStage(announcement.stage);
       const allowedCategories = ['academic', 'urgent', 'exam', 'activity'];
       if (!allowedCategories.contains(json['category'])) {
         json['category'] = 'academic';
@@ -805,7 +807,8 @@ class SupabaseService {
         query = query.eq('department', department);
       }
       if (stage != null && stage.isNotEmpty && stage != 'ALL') {
-        query = query.eq('stage', stage);
+        final aliases = AppConstants.getStageAliases(stage);
+        query = query.filter('stage', 'in', '(${aliases.map((a) => '"$a"').join(",")})');
       }
       if (semester != null && semester != 0) {
         query = query.eq('semester', semester);
@@ -816,7 +819,10 @@ class SupabaseService {
       var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
 
       if (section != null && section.isNotEmpty && section != 'ALL') {
-        list = list.where((l) => l.section == 'ALL' || l.section == section).toList();
+        list = list.where((l) =>
+            l.section == 'ALL' ||
+            l.section.isEmpty ||
+            l.section.toUpperCase() == section.toUpperCase()).toList();
       }
 
       await _setCachedData(
@@ -840,7 +846,9 @@ class SupabaseService {
   /// ── نشر محاضرة جديدة برابط Google Drive (وتحديث الكاش) ────────────────
   Future<bool> createLecture(LectureModel lecture) async {
     try {
-      await client.from('lectures').insert(lecture.toJson());
+      final payload = lecture.toJson();
+      payload['stage'] = AppConstants.normalizeStage(lecture.stage);
+      await client.from('lectures').insert(payload);
       invalidateCachePattern('lectures_');
       return true;
     } catch (e) {

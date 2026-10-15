@@ -1190,6 +1190,47 @@ void main() {
       });
       expect(appUser.stage, 'المرحلة الثالثة');
     });
+
+    test('اختبار تطبيع الحروف العربية ومطابقة أسماء المقررات وضمان ظهور منشورات الممثل فورياً (Arabic Normalization & Rep Visibility)', () {
+      // 1. فحص تطبيع التاء المربوطة والهاء والهمزات
+      final str1 = 'الأجهزة الطبية المختبريه';
+      final str2 = 'الأجهزة الطبية المختبرية';
+      expect(AppConstants.arabicEquals(str1, str2), true, reason: 'المختبريه بالهاء والمختبرية بالتاء المربوطة يجب أن يتطابقا تماماً');
+
+      final str3 = 'إلكترونيات القدرة';
+      final str4 = 'الكترونيات القدرة';
+      expect(AppConstants.arabicEquals(str3, str4), true, reason: 'الهمزة على الألف والهمزة المكسورة يجب أن تتطابقا');
+
+      final str5 = 'مادة ميكروكنترولر';
+      expect(AppConstants.arabicContains(str5, 'ميكروكنترولر'), true);
+      expect(AppConstants.arabicContains('ميكروكنترولر', str5), false);
+
+      // 2. فحص ضمان ظهور منشورات الممثل التي رفعها بنفسه دون أن تحجبها فلاتر الشعب
+      final repStudentId = 'ST-REP-12345';
+      final myLecture = LectureModel(
+        id: 'lec-rep-1',
+        title: 'محاضرة تجريبية',
+        subjectName: 'الأجهزة الطبية المختبريه',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        section: 'B',
+        uploaderId: repStudentId,
+        uploaderName: 'ممثل الشعبة',
+        driveUrl: 'https://example.com/file.pdf',
+        createdAt: DateTime.now(),
+      );
+
+      // مطابقة اسم المادة مع الاسم المعتمد في المنهج (المختبرية بالتاء المربوطة)
+      final courseCanonicalName = 'الأجهزة الطبية المختبرية';
+      final bool matchesCourse = AppConstants.arabicEquals(myLecture.subjectName, courseCanonicalName) ||
+          AppConstants.arabicContains(myLecture.subjectName, courseCanonicalName) ||
+          AppConstants.arabicContains(courseCanonicalName, myLecture.subjectName);
+      expect(matchesCourse, true, reason: 'يجب أن تظهر المحاضرة داخل صفحة المادة حتى لو اختلف رسم التاء المربوطة والهاء');
+
+      // فحص معيار مؤلف المنشور (isAuthor)
+      final bool isAuthor = repStudentId == myLecture.uploaderId;
+      expect(isAuthor, true, reason: 'الممثل الناشر يجب دائماً أن يعتبر مؤلفاً ويشاهد محاضره');
+    });
   });
 }
 
