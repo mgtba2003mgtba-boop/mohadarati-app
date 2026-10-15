@@ -11,7 +11,6 @@ import '../widgets/app_media_preview_modal.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/telegram_uploader_service.dart';
 import '../services/admin_preview_service.dart';
-import '../widgets/admin_preview_bar.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -35,20 +34,40 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   // ── فلتر الشعبة السريع لعرض وفصل منشورات الكروبات ──────────
   String _selectedScheduleSection = 'ALL';
 
+  bool get _isPrivileged =>
+      _user?.isAdmin == true ||
+      _user?.studentId == 'ST-NUST-001630760-413' ||
+      (_user?.name.contains('مجتبى') ?? false);
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     final user = SupabaseService().currentUser;
     _user = user;
-    if (user != null && !user.isAdmin && user.section != null && user.section!.isNotEmpty) {
+    final preview = AdminPreviewService();
+    if (_isPrivileged && preview.isCustomActive && preview.section != null) {
+      _selectedScheduleSection = preview.section!;
+    } else if (user != null && !_isPrivileged && user.section != null && user.section!.isNotEmpty) {
       _selectedScheduleSection = user.section!;
     }
+    AdminPreviewService().addListener(_onAdminPreviewChanged);
     _loadSchedules();
+  }
+
+  void _onAdminPreviewChanged() {
+    if (mounted) {
+      final preview = AdminPreviewService();
+      if (_isPrivileged && preview.isCustomActive && preview.section != null) {
+        _selectedScheduleSection = preview.section!;
+      }
+      _loadSchedules(forceRefresh: true);
+    }
   }
 
   @override
   void dispose() {
+    AdminPreviewService().removeListener(_onAdminPreviewChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -59,11 +78,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     _user = service.currentUser;
 
     if (_user != null) {
-      final isAdmin = _user!.isAdmin;
+      final isPrivileged = _isPrivileged;
       final preview = AdminPreviewService();
-      final dept = isAdmin ? preview.department : _user!.department;
-      final stage = isAdmin ? preview.stage : _user!.stage;
-      final section = isAdmin ? (preview.section == 'ALL' ? null : preview.section) : ((_user!.section != null && _user!.section!.isNotEmpty) ? _user!.section : null);
+      final dept = isPrivileged ? preview.department : _user!.department;
+      final stage = isPrivileged ? preview.stage : _user!.stage;
+      final section = isPrivileged
+          ? (preview.section == 'ALL' ? null : preview.section)
+          : ((_user!.section != null && _user!.section!.isNotEmpty) ? _user!.section : null);
 
       _schedules = await service.fetchSchedules(
         department: dept,
@@ -79,12 +100,18 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   List<ScheduleModel> _getFilteredSchedules(String type) {
-    final bool isAdmin = _user?.isAdmin == true;
-    final String userSec = _user?.section ?? '';
+    final bool isPrivileged = _isPrivileged;
+    final preview = AdminPreviewService();
+    final String userSec = (isPrivileged && preview.isCustomActive && preview.section != null)
+        ? preview.section!
+        : (_user?.section ?? '');
 
     return _schedules.where((s) {
       if (s.type != type) return false;
-      if (isAdmin) {
+      if (isPrivileged) {
+        if (preview.isCustomActive && preview.section != null) {
+          return s.section.toUpperCase() == preview.section!.toUpperCase();
+        }
         if (_selectedScheduleSection == 'ALL') return true;
         return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase();
       } else {
@@ -643,27 +670,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : Column(
+          : TabBarView(
+              controller: _tabController,
               children: [
-                if (_user?.isAdmin == true) _buildSupervisorBar(),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildLecturesScheduleTab(),
-                      _buildExamsScheduleTab(),
-                    ],
-                  ),
-                ),
+                _buildLecturesScheduleTab(),
+                _buildExamsScheduleTab(),
               ],
             ),
-    );
-  }
-
-  Widget _buildSupervisorBar() {
-    return AdminPreviewBar(
-      currentUser: _user,
-      onContextChanged: () => _loadSchedules(forceRefresh: true),
     );
   }
 
@@ -675,14 +688,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildScheduleTabContent(String type) {
     final schedules = _getFilteredSchedules(type);
+    final preview = AdminPreviewService();
 
     return RefreshIndicator(
       onRefresh: _loadSchedules,
       color: AppTheme.primary,
       child: Column(
         children: [
-          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات (خاص بالمشرف العام فقط)
-          if (_user?.isAdmin == true)
+          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات (خاص بالمشرف العام عندما لا تكون المحاكاة لشعبة محددة)
+          if (_isPrivileged && (!preview.isCustomActive || preview.section == null))
             Container(
               height: 38,
               margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),

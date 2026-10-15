@@ -16,12 +16,10 @@ import '../widgets/app_icon_badge.dart';
 import '../widgets/app_network_image.dart';
 import 'courses_screen.dart';
 import 'schedule_screen.dart';
-import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
 import 'announcements_screen.dart';
 import '../services/admin_preview_service.dart';
-import '../widgets/admin_preview_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -66,15 +64,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  bool get _isPrivileged =>
+      _user?.isAdmin == true ||
+      _user?.studentId == 'ST-NUST-001630760-413' ||
+      (_user?.name.contains('مجتبى') ?? false);
+
   @override
   void initState() {
     super.initState();
     _bannerController = PageController(viewportFraction: 0.92);
+    AdminPreviewService().addListener(_onAdminPreviewChanged);
     _loadData();
+  }
+
+  void _onAdminPreviewChanged() {
+    if (mounted) _loadData(forceRefresh: true);
   }
 
   @override
   void dispose() {
+    AdminPreviewService().removeListener(_onAdminPreviewChanged);
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
@@ -108,9 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final previewService = AdminPreviewService();
         previewService.initialize(_user);
-        final effectiveDept = _user!.isAdmin ? previewService.department : _user!.department;
-        final effectiveStage = _user!.isAdmin ? previewService.stage : _user!.stage;
-        final effectiveSection = _user!.isAdmin ? previewService.section : _user!.section;
+        final effectiveDept = _isPrivileged ? previewService.department : _user!.department;
+        final effectiveStage = _isPrivileged ? previewService.stage : _user!.stage;
+        final effectiveSection = _isPrivileged ? previewService.section : _user!.section;
 
         // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار بنسبة 70%
         final results = await Future.wait([
@@ -157,8 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> get _subjectNames {
     if (_user == null) return [];
     final previewService = AdminPreviewService();
-    final effectiveDept = _user!.isAdmin ? previewService.department : _user!.department;
-    final effectiveStage = _user!.isAdmin ? previewService.stage : _user!.stage;
+    final effectiveDept = _isPrivileged ? previewService.department : _user!.department;
+    final effectiveStage = _isPrivileged ? previewService.stage : _user!.stage;
     return BiometricSubjects.getSubjectNames(
       department: effectiveDept,
       stage: effectiveStage,
@@ -285,38 +294,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  Row(
-                    children: [
-                      if (isMujtabaAdmin) ...[
-                        IconButton(
-                          tooltip: 'لوحة التحكم والإدارة',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const DashboardScreen()),
-                            ).then((_) => _loadData());
-                          },
-                          icon: AppIconBadge.sky(
-                            icon: Icons.dashboard_customize_rounded,
-                            size: 40,
-                            iconSize: 20,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // شريط المعاينة والتبديل السريع للمشرف العام (الآدمن)
-              AdminPreviewBar(
-                currentUser: _user,
-                onContextChanged: () => _loadData(forceRefresh: true),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
               // شاشة الإعلانات بالصور المتحركة والكاروسيل التفاعلي
               _buildAnnouncementsMovingCarousel(),

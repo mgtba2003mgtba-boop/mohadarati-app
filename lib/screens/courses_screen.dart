@@ -13,7 +13,6 @@ import '../widgets/app_icon_badge.dart';
 import 'subject_detail_screen.dart';
 import 'dashboard_screen.dart';
 import '../services/admin_preview_service.dart';
-import '../widgets/admin_preview_bar.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -31,22 +30,27 @@ class _CoursesScreenState extends State<CoursesScreen> {
   String _searchQuery = '';
   final int _selectedSemester = 1; // الكورس الأول حصراً
 
+  bool get _isPrivileged =>
+      _user?.isAdmin == true ||
+      _user?.studentId == 'ST-NUST-001630760-413' ||
+      (_user?.name.contains('مجتبى') ?? false);
+
   String get _effectiveDept {
-    if (_user?.isAdmin == true) {
+    if (_isPrivileged) {
       return AdminPreviewService().department;
     }
     return _user?.department ?? AppConstants.departments.first;
   }
 
   String get _effectiveStage {
-    if (_user?.isAdmin == true) {
+    if (_isPrivileged) {
       return AdminPreviewService().stage;
     }
     return _user?.stage ?? AppConstants.stages.first;
   }
 
   String? get _effectiveSection {
-    if (_user?.isAdmin == true) {
+    if (_isPrivileged) {
       return AdminPreviewService().section;
     }
     return _user?.section;
@@ -56,7 +60,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
   void initState() {
     super.initState();
     _user = SupabaseService().currentUser;
+    AdminPreviewService().addListener(_onAdminPreviewChanged);
     _loadCourses();
+  }
+
+  void _onAdminPreviewChanged() {
+    if (mounted) _loadCourses(forceRefresh: true);
+  }
+
+  @override
+  void dispose() {
+    AdminPreviewService().removeListener(_onAdminPreviewChanged);
+    super.dispose();
   }
 
   Future<void> _loadCourses({bool forceRefresh = false}) async {
@@ -193,8 +208,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
               color: AppTheme.primary,
               child: Column(
                 children: [
-                  if (_user?.isAdmin == true) _buildSupervisorBar(),
-
                   // شريط البحث المقتضب
                   Container(
                     color: Colors.white,
@@ -216,8 +229,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         fillColor: AppTheme.lightSurface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
                         ),
                       ),
                     ),
@@ -265,13 +278,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildSupervisorBar() {
-    return AdminPreviewBar(
-      currentUser: _user,
-      onContextChanged: () => _loadCourses(forceRefresh: true),
     );
   }
 
