@@ -268,8 +268,10 @@ Deno.serve(async (req)=>{
     }
     const chatId = String(message.chat?.id);
     const text = (message.text || '').trim();
+    const lower = text.toLowerCase().trim();
+
     // 1. Command: /id (إرسال رقم المعرف مجرداً تماماً بدون أي نص إضافي)
-    if (text.startsWith('/id') || text === 'id' || text === '/id' || text === 'معرفي' || text === 'كود') {
+    if (lower.startsWith('/id') || lower === 'id' || lower === 'معرفي' || lower === 'كود' || lower === 'رقمي' || lower === 'معرف') {
       const idMsg = await getStudentIdOnly(chatId);
       await sendTelegramMessage(botToken, chatId, idMsg);
       return new Response(JSON.stringify({
@@ -281,8 +283,18 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    // 2. Command: /android (تحميل تطبيق الأندرويد APK مباشر)
-    if (text.startsWith('/android') || text === 'اندرويد' || text === 'أندرويد' || text === 'apk' || text === 'APK') {
+
+    // 2. Command: /android or apk (تحميل تطبيق الأندرويد APK مباشر)
+    if (
+      lower.startsWith('/android') ||
+      lower.startsWith('/apk') ||
+      lower === 'android' ||
+      lower === 'apk' ||
+      lower === 'اندرويد' ||
+      lower === 'أندرويد' ||
+      lower === 'تطبيق اندرويد' ||
+      lower === 'تطبيق الأندرويد'
+    ) {
       await sendAndroidInstallGuide(botToken, chatId);
       return new Response(JSON.stringify({
         ok: true
@@ -293,8 +305,16 @@ Deno.serve(async (req)=>{
         }
       });
     }
+
     // 3. Command: /ios (تثبيت تطبيق محاضراتي على الآيفون بدون متصفح)
-    if (text.startsWith('/ios') || text === 'ايفون' || text === 'آيفون' || text === 'ios' || text === 'IOS') {
+    if (
+      lower.startsWith('/ios') ||
+      lower === 'ios' ||
+      lower === 'ايفون' ||
+      lower === 'آيفون' ||
+      lower === 'تطبيق ايفون' ||
+      lower === 'تطبيق الآيفون'
+    ) {
       await sendIosInstallGuide(botToken, chatId);
       return new Response(JSON.stringify({
         ok: true
@@ -305,8 +325,28 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    // 4. Command: /app or /download (تثبيت وتحميل التطبيق لجميع الأنظمة)
-    if (text.startsWith('/app') || text.startsWith('/download') || text.startsWith('/install') || text === 'تطبيق' || text === 'تحميل' || text === 'تثبيت') {
+
+    // 4. Command: /app or app or /download (تثبيت وتحميل التطبيق لجميع الأنظمة)
+    if (
+      lower.startsWith('/app') ||
+      lower === 'app' ||
+      lower.startsWith('app ') ||
+      lower.startsWith('/download') ||
+      lower === 'download' ||
+      lower.startsWith('/install') ||
+      lower === 'install' ||
+      lower === 'تطبيق' ||
+      lower === 'تحميل' ||
+      lower === 'تثبيت' ||
+      lower === 'تنزيل' ||
+      lower === 'برنامج' ||
+      lower === 'محاضراتي' ||
+      lower === 'تطبيق محاضراتي' ||
+      lower === 'تحميل التطبيق' ||
+      lower === 'رابط التطبيق' ||
+      lower === 'حمل التطبيق' ||
+      lower === 'تثبيت التطبيق'
+    ) {
       await sendAppOverviewMenu(botToken, chatId);
       return new Response(JSON.stringify({
         ok: true
