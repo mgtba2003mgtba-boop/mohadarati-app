@@ -30,16 +30,33 @@ for f in ["mohadarati.mobileconfig", "ios_install_guide.gif", "ios_install_guide
         shutil.copy2(src_f, os.path.join(BUILD_WEB, f))
         print(f"[+] Copied {f}")
 
-# 4. Ensure index.html has base href="/"
+# 4. Generate dynamic version.json and update index.html
+import json
+import time
+build_time = int(time.time())
+version_data = {
+    "app_name": "nust_student_portal",
+    "version": "1.0.0",
+    "build_number": str(build_time),
+    "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+}
+for target_dir in [BUILD_WEB, WEB_SRC]:
+    v_path = os.path.join(target_dir, "version.json")
+    with open(v_path, "w", encoding="utf-8") as f:
+        json.dump(version_data, f, indent=2)
+print(f"[+] Injected build_number: {build_time} into version.json")
+
 idx_path = os.path.join(BUILD_WEB, "index.html")
 if os.path.exists(idx_path):
     with open(idx_path, "r", encoding="utf-8") as f:
         content = f.read()
     if '<base href="/mohadarati/">' in content:
         content = content.replace('<base href="/mohadarati/">', '<base href="/">')
-        with open(idx_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        print("[+] Fixed base href in index.html to /")
+    if 'src="flutter_bootstrap.js"' in content:
+        content = content.replace('src="flutter_bootstrap.js"', f'src="flutter_bootstrap.js?v={build_time}"')
+    with open(idx_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"[+] Updated index.html with base href='/' and flutter_bootstrap.js?v={build_time}")
 
 # 5. Git setup in build/web
 git_dir = os.path.join(BUILD_WEB, ".git")
@@ -59,7 +76,7 @@ elif token:
 # 6. Fetch / reset origin main to ensure clean sync
 print("[*] Staging and committing build/web...")
 subprocess.run(["git", "add", "-A"], cwd=BUILD_WEB, check=True)
-subprocess.run(["git", "commit", "-m", "deploy: update Computer Engineering official syllabus across 8 semesters and section privacy features"], cwd=BUILD_WEB)
+subprocess.run(["git", "commit", "-m", "deploy: pwa & ios auto-update, cache-busting, syllabus and representative features"], cwd=BUILD_WEB)
 
 # 7. Push to mohadarati
 print("[*] Pushing to mohadarati main...")

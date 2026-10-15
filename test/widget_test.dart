@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:nust_student_portal/models/student_model.dart';
 import 'package:nust_student_portal/models/lecture_model.dart';
 import 'package:nust_student_portal/models/attendance_model.dart';
@@ -12,6 +13,7 @@ import 'package:nust_student_portal/models/schedule_model.dart';
 import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
 import 'package:nust_student_portal/widgets/ios_install_dialog.dart';
 import 'package:nust_student_portal/services/admin_preview_service.dart';
+import 'package:nust_student_portal/services/auto_update_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1097,6 +1099,16 @@ void main() {
       expect(filteredBanners.first.id, 'ann-banner-1');
       expect(filteredBanners.contains(subjectAnnounce), false, reason: 'تبليغات المواد يجب ألا تظهر نهائياً في كاروسيل الواجهة الرئيسية');
       expect(filteredBanners.contains(scheduleAnnounce), false, reason: 'الجداول معزولة تماماً');
+    });
+
+    test('اختبار خدمة التحديث التلقائي الإجباري ومراقبة دورة الحياة (AutoUpdateService Singleton & Observer)', () {
+      final service = AutoUpdateService();
+      expect(service, isNotNull);
+      // التحقق من تهيئة المراقب
+      service.initialize();
+      // محاكاة استئناف التطبيق من الخلفية
+      service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      expect(service, isA<AutoUpdateService>());
     });
   });
 }
