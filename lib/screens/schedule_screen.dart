@@ -76,11 +76,20 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   List<ScheduleModel> _getFilteredSchedules(String type) {
+    final bool isAdmin = _user?.isAdmin == true;
+    final String userSec = _user?.section ?? '';
+
     return _schedules.where((s) {
       if (s.type != type) return false;
-      if (_selectedScheduleSection == 'ALL') return true;
-      if (_selectedScheduleSection == 'UNIFIED') return s.isUnified;
-      return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.isUnified;
+      if (isAdmin) {
+        if (_selectedScheduleSection == 'ALL') return true;
+        if (_selectedScheduleSection == 'UNIFIED') return s.isUnified;
+        return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.isUnified;
+      } else {
+        // للطالب أو الممثل: تظهر فقط جداول شعبته والجداول الموحدة لكافة الشُعب
+        if (s.isUnified || s.section == 'ALL') return true;
+        return userSec.isNotEmpty && s.section.toUpperCase() == userSec.toUpperCase();
+      }
     }).toList();
   }
 
@@ -847,28 +856,29 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       color: AppTheme.primary,
       child: Column(
         children: [
-          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات
-          Container(
-            height: 38,
-            margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildScheduleSectionChip(type, 'ALL', 'الكل 🌐', _countSchedulesForSection(type, 'ALL')),
-                const SizedBox(width: 6),
-                _buildScheduleSectionChip(type, 'A', 'شعبة A', _countSchedulesForSection(type, 'A')),
-                const SizedBox(width: 6),
-                _buildScheduleSectionChip(type, 'B', 'شعبة B', _countSchedulesForSection(type, 'B')),
-                const SizedBox(width: 6),
-                _buildScheduleSectionChip(type, 'C', 'شعبة C', _countSchedulesForSection(type, 'C')),
-                const SizedBox(width: 6),
-                _buildScheduleSectionChip(type, 'D', 'شعبة D', _countSchedulesForSection(type, 'D')),
-                const SizedBox(width: 6),
-                _buildScheduleSectionChip(type, 'UNIFIED', 'موحد لجميع الشُعب 📋', _countSchedulesForSection(type, 'UNIFIED')),
-              ],
+          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات (خاص بالمشرف العام فقط)
+          if (_user?.isAdmin == true)
+            Container(
+              height: 38,
+              margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildScheduleSectionChip(type, 'ALL', 'الكل 🌐', _countSchedulesForSection(type, 'ALL')),
+                  const SizedBox(width: 6),
+                  _buildScheduleSectionChip(type, 'A', 'شعبة A', _countSchedulesForSection(type, 'A')),
+                  const SizedBox(width: 6),
+                  _buildScheduleSectionChip(type, 'B', 'شعبة B', _countSchedulesForSection(type, 'B')),
+                  const SizedBox(width: 6),
+                  _buildScheduleSectionChip(type, 'C', 'شعبة C', _countSchedulesForSection(type, 'C')),
+                  const SizedBox(width: 6),
+                  _buildScheduleSectionChip(type, 'D', 'شعبة D', _countSchedulesForSection(type, 'D')),
+                  const SizedBox(width: 6),
+                  _buildScheduleSectionChip(type, 'UNIFIED', 'موحد لجميع الشُعب 📋', _countSchedulesForSection(type, 'UNIFIED')),
+                ],
+              ),
             ),
-          ),
 
           Expanded(
             child: schedules.isEmpty

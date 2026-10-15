@@ -161,7 +161,7 @@ class TelegramUploaderService {
       final tag = fileType == 'schedule'
           ? '📅 جدول دراسي/امتحاني'
           : fileType == 'banner'
-              ? '📢 إعلان وبوستر رسمي'
+              ? '📢 إعلان جامعي'
               : '📁 ملف جامعي';
       final fullCaption = caption != null && caption.trim().isNotEmpty
           ? '$tag\n${caption.trim()}'

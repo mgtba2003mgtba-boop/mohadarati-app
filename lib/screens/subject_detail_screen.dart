@@ -141,26 +141,51 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   List<LectureModel> get _filteredLectures {
+    final bool isAdmin = _user?.isAdmin == true;
+    final String userSec = _user?.section ?? '';
+
     return _subjectLectures.where((l) {
       final matchesType =
           _lectureTypeFilter == 'ALL' || l.type == _lectureTypeFilter;
-      final matchesSection = _selectedSectionFilter == 'ALL' ||
-          (_selectedSectionFilter == 'UNIFIED'
-              ? (l.section == 'ALL' || l.section.isEmpty)
-              : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
+
+      final bool matchesSection;
+      if (isAdmin) {
+        matchesSection = _selectedSectionFilter == 'ALL' ||
+            (_selectedSectionFilter == 'UNIFIED'
+                ? (l.section == 'ALL' || l.section.isEmpty)
+                : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
+      } else {
+        // للطالب أو الممثل: تظهر فقط محاضرات شعبته والمحاضرات الموحدة، ولا تخلط باقي الشُعب أبداً
+        matchesSection = l.section == 'ALL' ||
+            l.section.isEmpty ||
+            (userSec.isNotEmpty && l.section.toUpperCase() == userSec.toUpperCase());
+      }
+
       final matchesSearch = _searchQuery.isEmpty ||
-          l.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          l.uploaderName.toLowerCase().contains(_searchQuery.toLowerCase());
+          l.title.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesType && matchesSection && matchesSearch;
     }).toList();
   }
 
   List<AnnouncementModel> get _filteredAnnouncements {
+    final bool isAdmin = _user?.isAdmin == true;
+    final String userSec = _user?.section ?? '';
+
     return _subjectAnnouncements.where((a) {
-      final matchesSection = _selectedSectionFilter == 'ALL' ||
-          (_selectedSectionFilter == 'UNIFIED'
-              ? (a.section == 'ALL' || a.section == null || a.section!.isEmpty)
-              : (a.section?.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL' || a.section == null));
+      final bool matchesSection;
+      if (isAdmin) {
+        matchesSection = _selectedSectionFilter == 'ALL' ||
+            (_selectedSectionFilter == 'UNIFIED'
+                ? (a.section == 'ALL' || a.section == null || a.section!.isEmpty)
+                : (a.section?.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL' || a.section == null));
+      } else {
+        // للطالب أو الممثل: تظهر فقط تبليغات شعبته والتبليغات العامة الموحدة
+        matchesSection = a.section == 'ALL' ||
+            a.section == null ||
+            a.section!.isEmpty ||
+            (userSec.isNotEmpty && a.section!.toUpperCase() == userSec.toUpperCase());
+      }
+
       final matchesSearch = _searchQuery.isEmpty ||
           a.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           a.content.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -502,28 +527,29 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ),
         ),
 
-        // شريط فلاتر الشُعب / الكروبات
-        Container(
-          height: 38,
-          margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _buildSectionFilterChip('ALL', 'الكل 🌐', _subjectLectures.length),
-              const SizedBox(width: 6),
-              _buildSectionFilterChip('A', 'شعبة A', _countLecturesForSection('A')),
-              const SizedBox(width: 6),
-              _buildSectionFilterChip('B', 'شعبة B', _countLecturesForSection('B')),
-              const SizedBox(width: 6),
-              _buildSectionFilterChip('C', 'شعبة C', _countLecturesForSection('C')),
-              const SizedBox(width: 6),
-              _buildSectionFilterChip('D', 'شعبة D', _countLecturesForSection('D')),
-              const SizedBox(width: 6),
-              _buildSectionFilterChip('UNIFIED', 'موحد 📋', _countLecturesForSection('UNIFIED')),
-            ],
+        // شريط فلاتر الشُعب / الكروبات (خاص بالمشرف العام فقط لتبديل واستعراض الكروبات)
+        if (_user?.isAdmin == true)
+          Container(
+            height: 38,
+            margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildSectionFilterChip('ALL', 'الكل 🌐', _subjectLectures.length),
+                const SizedBox(width: 6),
+                _buildSectionFilterChip('A', 'شعبة A', _countLecturesForSection('A')),
+                const SizedBox(width: 6),
+                _buildSectionFilterChip('B', 'شعبة B', _countLecturesForSection('B')),
+                const SizedBox(width: 6),
+                _buildSectionFilterChip('C', 'شعبة C', _countLecturesForSection('C')),
+                const SizedBox(width: 6),
+                _buildSectionFilterChip('D', 'شعبة D', _countLecturesForSection('D')),
+                const SizedBox(width: 6),
+                _buildSectionFilterChip('UNIFIED', 'موحد 📋', _countLecturesForSection('UNIFIED')),
+              ],
+            ),
           ),
-        ),
 
         Expanded(
           child: _filteredLectures.isEmpty
@@ -732,14 +758,18 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
 
-          if (lecture.uploaderName.isNotEmpty) ...[
+          if (lecture.uploaderName.isNotEmpty || lecture.uploaderRole != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
                 const Icon(Icons.person_outline_rounded, size: 13, color: AppTheme.textMuted),
                 const SizedBox(width: 4),
                 Text(
-                  'الناشر: ${lecture.uploaderName} ${lecture.uploaderRole == "admin" ? "(إشراف عام)" : "(شعبة ${lecture.section})"}',
+                  lecture.uploaderRole == "admin"
+                      ? 'الناشر: إدارة الكلية (إشراف عام 🛡️)'
+                      : (_user?.isAdmin == true
+                          ? 'الناشر: ممثل شعبة ${lecture.section} ⭐ (${lecture.uploaderName})'
+                          : 'الناشر: ممثل شعبة ${lecture.section} ⭐'),
                   style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textMuted),
                 ),
               ],

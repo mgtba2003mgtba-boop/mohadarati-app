@@ -3869,9 +3869,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return;
     }
 
-    final baseContent = _bannerContentController.text.trim().isNotEmpty
-        ? _bannerContentController.text.trim()
-        : 'إعلان وبوستر رسمي في الواجهة الرئيسية';
+    final baseContent = _bannerContentController.text.trim();
     final tgTag = res.telegramMessageId != null ? ' [TG_MSG_ID:${res.telegramMessageId}]' : '';
 
     final newBanner = AnnouncementModel(

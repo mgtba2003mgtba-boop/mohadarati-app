@@ -263,24 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   Row(
                     children: [
-                      IconButton(
-                        tooltip: 'لوحة الإعلانات والتبليغات',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
-                          ).then((_) => _loadData());
-                        },
-                        icon: AppIconBadge.indigo(
-                          icon: Icons.campaign_rounded,
-                          size: 40,
-                          iconSize: 20,
-                        ),
-                      ),
                       if (hasAdminOrRepPrivileges) ...[
-                        const SizedBox(width: 8),
                         IconButton(
                           tooltip: 'لوحة التحكم والإدارة',
                           padding: EdgeInsets.zero,
@@ -343,13 +326,31 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? announcement.imageUrl!
                   : _defaultBannerImages[0];
 
-              final title = announcement?.title ?? 'الكلية التقنية الهندسية';
-              final content = (announcement?.displayContent.isNotEmpty == true)
+              final rawTitle = announcement?.title ?? 'الكلية التقنية الهندسية';
+              final rawContent = (announcement?.displayContent.isNotEmpty == true)
                   ? announcement!.displayContent
                   : 'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)';
-              final isPureBanner = announcement != null &&
-                  (announcement.displayContent.isEmpty ||
-                      announcement.displayContent == 'إعلان وبوستر رسمي في الواجهة الرئيسية');
+
+              final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
+                  rawContent.contains('إعلان بوستر رسمي') ||
+                  rawContent.contains('بوستر رسمي');
+              final content = isBoilerplate
+                  ? ''
+                  : rawContent
+                      .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                      .replaceAll('إعلان وبوستر رسمي', '')
+                      .replaceAll('إعلان بوستر رسمي', '')
+                      .trim();
+
+              String title = rawTitle
+                  .replaceAll('إعلان وبوستر رسمي', '')
+                  .replaceAll('إعلان بوستر رسمي', '')
+                  .trim();
+              if (RegExp(r'^\d+$').hasMatch(title)) {
+                title = 'الكلية التقنية الهندسية';
+              }
+
+              final isPureBanner = announcement != null && (content.isEmpty || isBoilerplate);
 
               return GestureDetector(
                 onTap: () {
@@ -464,13 +465,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAnnouncementDetails(AnnouncementModel announcement, String imageUrl) {
+    final cleanContent = announcement.displayContent
+        .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+        .replaceAll('إعلان وبوستر رسمي', '')
+        .replaceAll('إعلان بوستر رسمي', '')
+        .replaceAll('بوستر رسمي', '')
+        .trim();
+
+    String cleanTitle = announcement.title
+        .replaceAll('إعلان وبوستر رسمي', '')
+        .replaceAll('إعلان بوستر رسمي', '')
+        .trim();
+    if (RegExp(r'^\d+$').hasMatch(cleanTitle)) {
+      cleanTitle = 'إعلان الكلية التقنية الهندسية';
+    }
+
     AppFullscreenModal.show(
       context: context,
-      title: announcement.title,
+      title: cleanTitle.isNotEmpty ? cleanTitle : 'الكلية التقنية الهندسية',
       subtitle: '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
-      contentText: announcement.displayContent,
+      contentText: cleanContent,
       accentColor: AppTheme.primary,
       actions: [
         ElevatedButton(
