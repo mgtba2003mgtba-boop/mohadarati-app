@@ -686,14 +686,12 @@ class SupabaseService {
       }).toList();
 
       final filtered = list.where((s) {
-        final matchDept = department == 'ALL' || s.department == 'ALL' || s.department == department;
-        final matchStage = stage == 'ALL' || s.stage == 'ALL' || s.stage == stage;
+        final matchDept = department == 'ALL' || s.department == department;
+        final matchStage = stage == 'ALL' || s.stage == stage;
         final matchType = type == null || type == 'ALL' || s.type == type;
-        final matchSection = section == null ||
-            section.isEmpty ||
-            section == 'ALL' ||
-            s.section == 'ALL' ||
-            s.section == section;
+        final matchSection = (section == null || section.isEmpty || section == 'ALL')
+            ? true
+            : s.section.toUpperCase() == section.toUpperCase();
         return matchDept && matchStage && matchType && matchSection;
       }).toList();
 

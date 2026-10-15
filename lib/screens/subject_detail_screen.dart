@@ -732,8 +732,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  _buildSectionBadge(lecture.section),
+                  if (_user?.isAdmin == true) ...[
+                    const SizedBox(width: 6),
+                    _buildSectionBadge(lecture.section),
+                  ],
                 ],
               ),
               Row(
@@ -760,7 +762,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
 
-          if (lecture.uploaderName.isNotEmpty || lecture.uploaderRole != null) ...[
+          if (_user?.isAdmin == true && (lecture.uploaderName.isNotEmpty || lecture.uploaderRole != null)) ...[
             const SizedBox(height: 4),
             Row(
               children: [
@@ -769,9 +771,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 Text(
                   lecture.uploaderRole == "admin"
                       ? 'الناشر: إدارة الكلية (إشراف عام 🛡️)'
-                      : (_user?.isAdmin == true
-                          ? 'الناشر: ممثل شعبة ${lecture.section} ⭐ (${lecture.uploaderName})'
-                          : 'الناشر: ممثل شعبة ${lecture.section} ⭐'),
+                      : 'الناشر: ممثل شعبة ${lecture.section} ⭐ (${lecture.uploaderName})',
                   style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textMuted),
                 ),
               ],
@@ -788,33 +788,21 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             ),
           ],
 
-          // في حال وجود وسائط سحابية (Telegram CDN)
+          // في حال وجود وسائط
           if (lecture.hasTelegramMedia) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primarySubtle,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
+            if (lecture.formattedFileSize.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  const Icon(Icons.bolt_rounded, size: 16, color: AppTheme.primary),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.description_outlined, size: 14, color: AppTheme.textMuted),
+                  const SizedBox(width: 4),
                   Text(
-                    'بث سحابي مباشر',
-                    style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    'حجم الملف: ${lecture.formattedFileSize}',
+                    style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textSecondary),
                   ),
-                  const Spacer(),
-                  if (lecture.formattedFileSize.isNotEmpty)
-                    Text(
-                      lecture.formattedFileSize,
-                      style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                    ),
                 ],
               ),
-            ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1563,33 +1551,6 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               ),
               const SizedBox(height: 12),
 
-              // نطاق المحاضرة الموحد
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primarySubtle,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.school_rounded, size: 18, color: AppTheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'نشر عام موحد لكافة شُعب المرحلة الدراسية 🌐',
-                        style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
               // مساحة اختيار ملف المحاضرة (مستند PDF أو صورة أو عرض تقديمي)
               if (_selectedFile == null)
                 OutlinedButton.icon(
@@ -1714,32 +1675,6 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                   onChanged: (val) {
                     if (val != null) setState(() => _targetSection = val);
                   },
-                ),
-                const SizedBox(height: 12),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.lock_rounded, size: 18, color: AppTheme.accent),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'نطاق التبليغ مقفل تلقائياً لطلاب: شعبة (${widget.currentUser?.section ?? "A"})',
-                          style: GoogleFonts.cairo(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.accent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 12),
               ],

@@ -1131,47 +1131,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ],
             ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_rounded, color: AppTheme.accent, size: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'نطاق النشر مقيد بصفك وشعبتك حصراً',
-                          style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
-                        ),
-                        Text(
-                          '${_currentUser?.department ?? _selectedLectureDept} • ${_currentUser?.stage ?? _selectedLectureStage}',
-                          style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'الكورس 1 📘',
-                      style: GoogleFonts.cairo(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
           const SizedBox(height: 14),
 
@@ -1249,33 +1208,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             decoration: const InputDecoration(
               labelText: 'عنوان المحاضرة (مثال: المحاضرة 1 - مقدمة عامة)',
               prefixIcon: Icon(Icons.title_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // ── نطاق نشر المحاضرة الموحد ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.school_rounded, size: 20, color: AppTheme.primaryLight),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'نشر عام موحد لكافة شُعب المرحلة الدراسية 🌐',
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryLight,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: 14),
@@ -1453,36 +1385,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               onChanged: (val) {
                 if (val != null) setState(() => _selectedAnnounceSection = val);
               },
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_rounded, color: AppTheme.accent, size: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'نطاق الإعلان موجه لطلبة شعبتك حصراً',
-                          style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
-                        ),
-                        Text(
-                          '${_currentUser?.department ?? _selectedAnnounceDept} • ${_currentUser?.stage ?? _selectedAnnounceStage} • شعبة (${_currentUser?.section ?? "A"})',
-                          style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
           const SizedBox(height: 14),

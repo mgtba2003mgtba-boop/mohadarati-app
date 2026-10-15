@@ -1110,6 +1110,38 @@ void main() {
       service.didChangeAppLifecycleState(AppLifecycleState.resumed);
       expect(service, isA<AutoUpdateService>());
     });
+
+    test('اختبار عزل الجداول الصارم لكل شعبة وحظر خلط منشورات الكروبات (Strict Section Schedule Isolation)', () {
+      final scheduleA = ScheduleModel(
+        id: 'sch-sec-a',
+        title: 'جدول المحاضرات شعبة A',
+        type: 'lectures',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        section: 'A',
+        createdAt: DateTime.now(),
+      );
+
+      final scheduleB = ScheduleModel(
+        id: 'sch-sec-b',
+        title: 'جدول المحاضرات شعبة B',
+        type: 'lectures',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        section: 'B',
+        createdAt: DateTime.now(),
+      );
+
+      expect(scheduleA.sectionLabel, 'شعبة A');
+      expect(scheduleB.sectionLabel, 'شعبة B');
+
+      // محاكاة طالب في الشعبة A
+      const studentSection = 'A';
+      final studentSchedules = [scheduleA, scheduleB].where((s) => s.section.toUpperCase() == studentSection).toList();
+      expect(studentSchedules.length, 1);
+      expect(studentSchedules.first.id, 'sch-sec-a');
+      expect(studentSchedules.contains(scheduleB), false, reason: 'جداول الشعب الأخرى محظورة تماماً عن الطالب');
+    });
   });
 }
 

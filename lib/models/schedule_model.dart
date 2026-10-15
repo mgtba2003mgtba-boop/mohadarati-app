@@ -33,7 +33,7 @@ class ScheduleModel {
   bool get isExam => type == 'exams';
   bool get hasFile => fileUrl != null && fileUrl!.trim().isNotEmpty;
   bool get isUnified => section == 'ALL' || section.trim().isEmpty;
-  String get sectionLabel => isUnified ? 'موحد لكل الشُعب' : 'شعبة $section';
+  String get sectionLabel => (section.isEmpty || section == 'ALL') ? 'شعبة A' : 'شعبة $section';
   String get formattedDate => '${createdAt.year}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.day.toString().padLeft(2, '0')}';
   bool get isImage {
     if (!hasFile) return false;

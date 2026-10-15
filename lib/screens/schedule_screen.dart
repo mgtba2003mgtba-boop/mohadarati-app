@@ -63,7 +63,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       final preview = AdminPreviewService();
       final dept = isAdmin ? preview.department : _user!.department;
       final stage = isAdmin ? preview.stage : _user!.stage;
-      final section = isAdmin ? preview.section : null;
+      final section = isAdmin ? (preview.section == 'ALL' ? null : preview.section) : ((_user!.section != null && _user!.section!.isNotEmpty) ? _user!.section : null);
 
       _schedules = await service.fetchSchedules(
         department: dept,
@@ -86,12 +86,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       if (s.type != type) return false;
       if (isAdmin) {
         if (_selectedScheduleSection == 'ALL') return true;
-        if (_selectedScheduleSection == 'UNIFIED') return s.isUnified;
-        return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.isUnified;
+        return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase();
       } else {
-        // للطالب أو الممثل: تظهر فقط جداول شعبته والجداول الموحدة لكافة الشُعب
-        if (s.isUnified || s.section == 'ALL') return true;
-        return userSec.isNotEmpty && s.section.toUpperCase() == userSec.toUpperCase();
+        // للطالب أو الممثل: تظهر فقط جداول شعبته حصراً ولا تظهر أي شعبة أخرى
+        if (userSec.isEmpty) return false;
+        return s.section.toUpperCase() == userSec.toUpperCase();
       }
     }).toList();
   }
@@ -100,7 +99,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     return _schedules.where((s) {
       if (s.type != type) return false;
       if (sectionKey == 'ALL') return true;
-      if (sectionKey == 'UNIFIED') return s.isUnified;
       return s.section.toUpperCase() == sectionKey.toUpperCase();
     }).length;
   }
@@ -216,7 +214,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     bool isPicking = false;
     bool isUploading = false;
     final isAdmin = _user?.isAdmin == true;
-    String targetSection = isAdmin ? 'ALL' : (_user?.section ?? 'A');
+    String targetSection = isAdmin ? 'A' : (_user?.section ?? 'A');
 
     showDialog(
       context: context,
@@ -309,7 +307,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'ALL', child: Text('عام (لكل الشُعب - موحد)')),
                       DropdownMenuItem(value: 'A', child: Text('شعبة A')),
                       DropdownMenuItem(value: 'B', child: Text('شعبة B')),
                       DropdownMenuItem(value: 'C', child: Text('شعبة C')),
@@ -497,12 +494,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         telegramMsgId = uploadRes.telegramMessageId;
                       }
 
+                      final preview = AdminPreviewService();
                       final schedule = ScheduleModel(
                         id: '',
                         title: title,
                         type: type,
-                        department: _user?.department ?? 'ALL',
-                        stage: _user?.stage ?? 'ALL',
+                        department: isAdmin ? preview.department : (_user?.department ?? 'هندسة تقنيات الحاسوب'),
+                        stage: isAdmin ? preview.stage : (_user?.stage ?? 'المرحلة الأولى'),
                         section: targetSection,
                         fileUrl: finalFileUrl,
                         fileName: selectedFile?.name ?? title,
@@ -701,8 +699,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   _buildScheduleSectionChip(type, 'C', 'شعبة C', _countSchedulesForSection(type, 'C')),
                   const SizedBox(width: 6),
                   _buildScheduleSectionChip(type, 'D', 'شعبة D', _countSchedulesForSection(type, 'D')),
-                  const SizedBox(width: 6),
-                  _buildScheduleSectionChip(type, 'UNIFIED', 'موحد لجميع الشُعب 📋', _countSchedulesForSection(type, 'UNIFIED')),
                 ],
               ),
             ),
@@ -900,26 +896,22 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
-                              color: schedule.isUnified
-                                  ? const Color(0xFFECFDF5)
-                                  : (schedule.section.toUpperCase() == 'A'
-                                      ? const Color(0xFFEFF6FF)
-                                      : (schedule.section.toUpperCase() == 'B'
-                                          ? const Color(0xFFFAF5FF)
-                                          : (schedule.section.toUpperCase() == 'C'
-                                              ? const Color(0xFFFFFBEB)
-                                              : const Color(0xFFF0FDFA)))),
+                              color: schedule.section.toUpperCase() == 'A'
+                                  ? const Color(0xFFEFF6FF)
+                                  : (schedule.section.toUpperCase() == 'B'
+                                      ? const Color(0xFFFAF5FF)
+                                      : (schedule.section.toUpperCase() == 'C'
+                                          ? const Color(0xFFFFFBEB)
+                                          : const Color(0xFFF0FDFA))),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: schedule.isUnified
-                                    ? const Color(0xFFA7F3D0)
-                                    : (schedule.section.toUpperCase() == 'A'
-                                        ? const Color(0xFFBFDBFE)
-                                        : (schedule.section.toUpperCase() == 'B'
-                                            ? const Color(0xFFE9D5FF)
-                                            : (schedule.section.toUpperCase() == 'C'
-                                                ? const Color(0xFFFDE68A)
-                                                : const Color(0xFF99F6E4)))),
+                                color: schedule.section.toUpperCase() == 'A'
+                                    ? const Color(0xFFBFDBFE)
+                                    : (schedule.section.toUpperCase() == 'B'
+                                        ? const Color(0xFFE9D5FF)
+                                        : (schedule.section.toUpperCase() == 'C'
+                                            ? const Color(0xFFFDE68A)
+                                            : const Color(0xFF99F6E4))),
                               ),
                             ),
                             child: Text(
@@ -927,15 +919,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               style: GoogleFonts.cairo(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: schedule.isUnified
-                                    ? const Color(0xFF047857)
-                                    : (schedule.section.toUpperCase() == 'A'
-                                        ? const Color(0xFF1D4ED8)
-                                        : (schedule.section.toUpperCase() == 'B'
-                                            ? const Color(0xFF7E22CE)
-                                            : (schedule.section.toUpperCase() == 'C'
-                                                ? const Color(0xFFB45309)
-                                                : const Color(0xFF0F766E)))),
+                                color: schedule.section.toUpperCase() == 'A'
+                                    ? const Color(0xFF1D4ED8)
+                                    : (schedule.section.toUpperCase() == 'B'
+                                        ? const Color(0xFF7E22CE)
+                                        : (schedule.section.toUpperCase() == 'C'
+                                            ? const Color(0xFFB45309)
+                                            : const Color(0xFF0F766E))),
                               ),
                             ),
                           ),
