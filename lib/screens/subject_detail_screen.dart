@@ -15,6 +15,7 @@ import '../services/telegram_uploader_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
+import '../services/admin_preview_service.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final String subjectName;
@@ -50,11 +51,25 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   String _selectedSectionFilter = 'ALL'; // 'ALL', 'A', 'B', 'C', 'D', 'UNIFIED'
   String _searchQuery = '';
 
-  String get _effectiveDepartment =>
-      widget.department ?? _user?.department ?? AppConstants.departments.first;
+  bool get _isPrivileged =>
+      _user?.isAdmin == true ||
+      _user?.studentId == 'ST-NUST-001630760-413' ||
+      (_user?.name.contains('مجتبى') ?? false);
 
-  String get _effectiveStage =>
-      widget.stage ?? _user?.stage ?? AppConstants.stages.first;
+  String get _effectiveDepartment {
+    final preview = AdminPreviewService();
+    return widget.department ?? (_isPrivileged ? preview.department : _user?.department) ?? AppConstants.departments.first;
+  }
+
+  String get _effectiveStage {
+    final preview = AdminPreviewService();
+    return widget.stage ?? (_isPrivileged ? preview.stage : _user?.stage) ?? AppConstants.stages.first;
+  }
+
+  String? get _effectiveSection {
+    final preview = AdminPreviewService();
+    return widget.section ?? (_isPrivileged ? preview.section : _user?.section);
+  }
 
   bool get _canPublish {
     if (_user == null) return false;
@@ -69,8 +84,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    if (widget.section != null && widget.section!.isNotEmpty) {
-      _selectedSectionFilter = widget.section!;
+    final sec = widget.section ?? (AdminPreviewService().isCustomActive ? AdminPreviewService().section : null);
+    if (sec != null && sec.isNotEmpty) {
+      _selectedSectionFilter = sec;
     }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
@@ -91,11 +107,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     _user = service.currentUser;
 
     try {
-      final dept = widget.department ?? _user?.department;
-      final stage = widget.stage ?? _user?.stage;
-      final userSection = _user?.isAdmin == true
-          ? (widget.section == 'ALL' ? null : widget.section)
-          : _user?.section;
+      final dept = _effectiveDepartment;
+      final stage = _effectiveStage;
+      final userSection = _effectiveSection;
 
       // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين)
       final allLectures = await service.fetchLectures(
@@ -1084,6 +1098,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         subjectName: widget.subjectName,
         department: _effectiveDepartment,
         stage: _effectiveStage,
+        section: _effectiveSection,
         currentUser: _user,
         initialMode: initialMode,
         onSuccess: () {
@@ -1161,6 +1176,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
   final String subjectName;
   final String department;
   final String stage;
+  final String? section;
   final AppUserModel? currentUser;
   final String initialMode;
   final VoidCallback onSuccess;
@@ -1169,6 +1185,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
     required this.subjectName,
     required this.department,
     required this.stage,
+    this.section,
     required this.currentUser,
     this.initialMode = 'lecture',
     required this.onSuccess,
@@ -1186,7 +1203,9 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   void initState() {
     super.initState();
     _isLectureMode = widget.initialMode != 'announcement';
-    if (widget.currentUser?.isAdmin == true) {
+    if (widget.section != null && widget.section!.isNotEmpty && widget.section != 'ALL') {
+      _targetSection = widget.section!;
+    } else if (widget.currentUser?.isAdmin == true) {
       _targetSection = 'ALL';
     } else {
       _targetSection = widget.currentUser?.section ?? 'ALL';
@@ -1656,7 +1675,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               if (widget.currentUser?.isAdmin == true) ...[
                 DropdownButtonFormField<String>(
                   value: _targetSection,
-                  dropdownColor: AppTheme.darkCard,
+                  dropdownColor: Colors.white,
                   style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'الشعبة المستهدفة بالتبليغ',
@@ -1671,6 +1690,8 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                     DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
                     DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
                     DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                    DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
+                    DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _targetSection = val);

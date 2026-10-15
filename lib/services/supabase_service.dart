@@ -508,7 +508,10 @@ class SupabaseService {
       }
 
       if (section != null && section.isNotEmpty && section != 'ALL') {
-        list = list.where((a) => a.section == 'ALL' || a.section == section).toList();
+        list = list.where((a) =>
+            a.section == 'ALL' ||
+            a.section.isEmpty ||
+            a.section.toUpperCase() == section.toUpperCase()).toList();
       }
 
       await _setCachedData(

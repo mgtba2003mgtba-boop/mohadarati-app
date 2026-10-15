@@ -69,6 +69,34 @@ class _HomeScreenState extends State<HomeScreen> {
       _user?.studentId == 'ST-NUST-001630760-413' ||
       (_user?.name.contains('مجتبى') ?? false);
 
+  String get _effectiveDept {
+    final preview = AdminPreviewService();
+    return _isPrivileged ? preview.department : (_user?.department ?? AppConstants.departments.first);
+  }
+
+  String get _effectiveStage {
+    final preview = AdminPreviewService();
+    return _isPrivileged ? preview.stage : (_user?.stage ?? AppConstants.stages.first);
+  }
+
+  String? get _effectiveSection {
+    final preview = AdminPreviewService();
+    return _isPrivileged ? preview.section : _user?.section;
+  }
+
+  // قائمة تبليغات ومنشورات الشعبة المعتمدة
+  List<AnnouncementModel> get _sectionAnnouncements {
+    return _announcements.where((a) {
+      if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
+          a.content.contains('[COURSE_REGISTRY') ||
+          a.subjectName == 'SCHEDULE' ||
+          a.subjectName == 'COURSE') {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -117,9 +145,9 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final previewService = AdminPreviewService();
         previewService.initialize(_user);
-        final effectiveDept = _isPrivileged ? previewService.department : _user!.department;
-        final effectiveStage = _isPrivileged ? previewService.stage : _user!.stage;
-        final effectiveSection = _isPrivileged ? previewService.section : _user!.section;
+        final effectiveDept = _effectiveDept;
+        final effectiveStage = _effectiveStage;
+        final effectiveSection = _effectiveSection;
 
         // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار بنسبة 70%
         final results = await Future.wait([
@@ -165,12 +193,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول)
   List<String> get _subjectNames {
     if (_user == null) return [];
-    final previewService = AdminPreviewService();
-    final effectiveDept = _isPrivileged ? previewService.department : _user!.department;
-    final effectiveStage = _isPrivileged ? previewService.stage : _user!.stage;
     return BiometricSubjects.getSubjectNames(
-      department: effectiveDept,
-      stage: effectiveStage,
+      department: _effectiveDept,
+      stage: _effectiveStage,
       semester: 1,
     );
   }
@@ -304,6 +329,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // بطاقات الوصول السريع (المقررات والجدول)
               _buildQuickActionCards(),
+              const SizedBox(height: 20),
+
+              // تبليغات وتوجيهات الشعبة
+              _buildSectionAnnouncementsSection(),
               const SizedBox(height: 20),
 
               // أحدث المحاضرات المضافة حديثاً
@@ -782,6 +811,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     MaterialPageRoute(
                       builder: (_) => SubjectDetailScreen(
                         subjectName: lec.subjectName,
+                        department: _effectiveDept,
+                        stage: _effectiveStage,
+                        section: _effectiveSection,
                       ),
                     ),
                   ).then((_) => _loadData());
@@ -840,6 +872,265 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icons.arrow_forward_ios_rounded,
                         size: 14,
                         color: Color(0xFF94A3B8),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  /// قسم تبليغات وتوجيهات الشعبة المعتمد
+  Widget _buildSectionAnnouncementsSection() {
+    final announcements = _sectionAnnouncements;
+    final currentSec = _effectiveSection;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.campaign_rounded, color: AppTheme.primary, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  'تبليغات وتوجيهات الشعبة',
+                  style: GoogleFonts.cairo(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                if (currentSec != null && currentSec.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'شعبة $currentSec',
+                      style: GoogleFonts.cairo(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (announcements.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${announcements.length}',
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (announcements.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.lightBorder),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.notifications_none_rounded, size: 34, color: Color(0xFF94A3B8)),
+                const SizedBox(height: 8),
+                Text(
+                  (currentSec != null && currentSec.isNotEmpty)
+                      ? 'لا توجد تبليغات منشورة لشعبة $currentSec حالياً'
+                      : 'لا توجد تبليغات منشورة حالياً',
+                  style: GoogleFonts.cairo(fontSize: 12.5, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'أي تبليغ ينشره ممثل الشعبة أو إدارة الكلية سيظهر هنا فوراً',
+                  style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: announcements.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final item = announcements[index];
+              final hasSubject = item.subjectName != null &&
+                  item.subjectName!.isNotEmpty &&
+                  item.subjectName != 'GENERAL' &&
+                  item.subjectName != 'BANNER' &&
+                  item.subjectName != 'ALL' &&
+                  item.subjectName != 'عام';
+
+              return InkWell(
+                onTap: () => _showAnnouncementDetails(item, item.imageUrl ?? ''),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: item.isPinned ? const Color(0xFFFDE68A) : AppTheme.lightBorder,
+                    ),
+                    boxShadow: AppTheme.cardShadow,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // الصف العلوي: الوسوم والتاريخ
+                      Row(
+                        children: [
+                          if (item.isPinned) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.push_pin_rounded, size: 11, color: Color(0xFFD97706)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'مثبت',
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFD97706),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: hasSubject ? const Color(0xFFEEF2FF) : AppTheme.primarySubtle,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              hasSubject ? item.subjectName! : 'تبليغ رسمي',
+                              style: GoogleFonts.cairo(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: hasSubject ? const Color(0xFF4F46E5) : AppTheme.primary,
+                              ),
+                            ),
+                          ),
+                          if (item.section != 'ALL' && item.section.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'شعبة ${item.section}',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Text(
+                            '${item.createdAt.year}/${item.createdAt.month.toString().padLeft(2, '0')}/${item.createdAt.day.toString().padLeft(2, '0')}',
+                            style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // عنوان التبليغ
+                      Text(
+                        item.title,
+                        style: GoogleFonts.cairo(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+
+                      // محتوى التبليغ
+                      Text(
+                        item.displayContent,
+                        style: GoogleFonts.cairo(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          height: 1.45,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+
+                      // الصف السفلي: اسم الناشر ورابط التفاصيل
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(
+                                item.authorName.isNotEmpty ? item.authorName : 'ممثل الشعبة',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 10.5,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                'التفاصيل',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppTheme.primary),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
