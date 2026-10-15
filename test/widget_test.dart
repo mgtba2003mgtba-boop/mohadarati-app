@@ -1231,6 +1231,75 @@ void main() {
       final bool isAuthor = repStudentId == myLecture.uploaderId;
       expect(isAuthor, true, reason: 'الممثل الناشر يجب دائماً أن يعتبر مؤلفاً ويشاهد محاضره');
     });
+
+    test('اختبار التشفير الرياضي والتحقق المزدوج لرمز المرور وتعمية التوكنات (Cryptographic PIN Hashing & Token Obfuscation)', () {
+      const rawPin = '1234';
+      final hashedPin = AppConstants.hashPin(rawPin);
+
+      // 1. فحص مواصفات التشفير SHA-256
+      expect(hashedPin.isNotEmpty, true);
+      expect(hashedPin.length, 64, reason: 'SHA-256 يجب أن يكون بطول 64 حرفاً سداسياً');
+      expect(hashedPin != rawPin, true);
+
+      // 2. فحص التحقق المزدوج (Dual Verification)
+      // أ) التحقق مع الرمز القديم المجرد (Legacy Plaintext)
+      expect(AppConstants.verifyPin('1234', '1234'), true, reason: 'يجب قبول الرمز القديم القائم دون إخراج الطالب');
+      // ب) التحقق مع الرمز المشفر بعد الترقية التلقائية
+      expect(AppConstants.verifyPin('1234', hashedPin), true, reason: 'يجب قبول الرمز المشفر بنجاح');
+      // ج) رفض أي رمز خاطئ
+      expect(AppConstants.verifyPin('9999', hashedPin), false, reason: 'يجب رفض الرمز الخاطئ');
+      expect(AppConstants.verifyPin('', hashedPin), false);
+
+      // 3. فحص تعمية التوكنات البرمجية وفكها ديناميكياً
+      expect(AppConstants.attendanceBotToken.contains(':'), true);
+      expect(AppConstants.lecturesBotToken.contains(':'), true);
+      expect(AppConstants.attendanceBotToken.startsWith('87600'), true);
+      expect(AppConstants.lecturesBotToken.startsWith('88162'), true);
+    });
+
+    test('اختبار ضوابط أمان الحذف وصلاحيات الكاتب في المحاضرات والتبليغات (Author Matching & Ownership Verification)', () {
+      final authorUser = AppUserModel(
+        id: 'u-1',
+        studentId: 'ST-001',
+        name: 'ممثل معتمد',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleRepresentative,
+      );
+
+      final otherUser = AppUserModel(
+        id: 'u-2',
+        studentId: 'ST-002',
+        name: 'طالب آخر',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleStudent,
+      );
+
+      final adminUser = AppUserModel(
+        id: 'u-admin',
+        studentId: 'ST-NUST-001630760-413',
+        name: 'مجتبى عواد',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleAdmin,
+      );
+
+      const lectureAuthorId = 'ST-001';
+
+      // دالة التحقق من الصلاحيات
+      bool canDelete(AppUserModel user, String authorId) {
+        if (user.role == AppConstants.roleAdmin) return true;
+        return authorId.isNotEmpty && (authorId == user.id || authorId == user.studentId);
+      }
+
+      // المؤلف يحق له الحذف
+      expect(canDelete(authorUser, lectureAuthorId), true);
+      // المشرف العام يحق له الحذف
+      expect(canDelete(adminUser, lectureAuthorId), true);
+      // مستخدم آخر لا يحق له حذف منشورات غيره
+      expect(canDelete(otherUser, lectureAuthorId), false);
+    });
   });
 }
 

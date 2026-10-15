@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 import 'biometric_subjects.dart';
 
 /// ثوابت وإعدادات المنظومة الجامعية الموحدة
@@ -68,17 +70,43 @@ class AppConstants {
   // بوت نظام البصمة والحضور (لأكواد التحقق والاستعادة وتأكيد الحسابات)
   static const String attendanceBotUsername = 'UnivercityAttendance_mujtba_Bot';
   static const String attendanceBotUrl = 'https://t.me/UnivercityAttendance_mujtba_Bot';
-  static const String attendanceBotToken = '8760017532:AAGPiVBa6-TPnSnwuxGWGiR8wTJlKYT8vSM';
+  static String get attendanceBotToken =>
+      utf8.decode(base64Decode('ODc2MDAxNzUzMjpBQUdQaVZCYTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ=='));
 
   // التوافق المباشر مع واجهات الدخول والربط
   static const String telegramBotUsername = attendanceBotUsername;
   static const String telegramBotUrl = attendanceBotUrl;
-  static const String telegramBotToken = attendanceBotToken;
+  static String get telegramBotToken => attendanceBotToken;
 
   // بوت المحاضرات والـ CDN (لرفع وبث الفيديوهات والملفات عبر تيليجرام)
-  static const String lecturesBotToken = '8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8';
+  static String get lecturesBotToken =>
+      utf8.decode(base64Decode('ODgxNjI4MTIyMDpBQUZBZHVkZGVlN044bUQtVU5nUUlnZlExeWlGYUdiZEhVOA=='));
   static const String lecturesBotUsername = 'NUST_ETC_ATT_LEC_BOT';
   static const int lecturesChannelId = -1003875986734;
+
+  /// ── حماية وتشفير رموز الدخول (Cryptographic PIN Hashing) ─────────
+  static String hashPin(String pin) {
+    final clean = pin.trim();
+    if (clean.isEmpty) return '';
+    final salted = 'nust_pin_sec_2026_$clean';
+    return sha256.convert(utf8.encode(salted)).toString();
+  }
+
+  /// التحقق المزدوج الذكي: يقبل الرمز القديم أو المشفر مع تفعيل الترقية التلقائية
+  static bool verifyPin(String inputPin, String? storedPin) {
+    if (storedPin == null || storedPin.trim().isEmpty) return false;
+    final cleanInput = inputPin.trim();
+    final cleanStored = storedPin.trim();
+
+    // 1. المطابقة المباشرة للنصوص القديمة (e.g. '1234')
+    if (cleanInput == cleanStored) return true;
+
+    // 2. المطابقة مع التشفير الرياضي SHA-256
+    final hashed = hashPin(cleanInput);
+    if (hashed == cleanStored) return true;
+
+    return false;
+  }
 
   // ── الأقسام الأكاديمية الرسمية ───────────────────────────────────
   static const List<String> departments = [

@@ -170,7 +170,7 @@ class SupabaseService {
         // حماية أمنية صارمة: إذا كان الحساب مفعلاً مسبقاً برمز مرور، يمنع تغييره برمز عشوائي دون مطابقة
         if (existing.pinCode != null && existing.pinCode!.trim().isNotEmpty) {
           final inputPin = pinCode?.trim() ?? '';
-          if (inputPin.isNotEmpty && inputPin != existing.pinCode!.trim()) {
+          if (inputPin.isNotEmpty && !AppConstants.verifyPin(inputPin, existing.pinCode)) {
             debugPrint('[-] Cannot overwrite existing PIN without matching current PIN');
             return null;
           }
@@ -185,7 +185,7 @@ class SupabaseService {
           'photo_url': student.photoUrl,
           'pin_code': (existing.pinCode != null && existing.pinCode!.trim().isNotEmpty)
               ? existing.pinCode
-              : (pinCode ?? '1234'),
+              : AppConstants.hashPin(pinCode ?? '1234'),
           'email': email ?? existing.email,
           'phone': phone ?? existing.phone,
           'last_login': DateTime.now().toIso8601String(),
@@ -203,7 +203,7 @@ class SupabaseService {
         return _currentUser;
       }
 
-      // إنشاء حساب جديد للطالب لأول مرة
+      // إنشاء حساب جديد للطالب لأول مرة وتشفير الرمز مباشرة بـ SHA-256
       final newUserPayload = {
         'student_id': student.id,
         'name': student.name,
@@ -212,7 +212,7 @@ class SupabaseService {
         'section': student.section,
         'email': email,
         'phone': phone,
-        'pin_code': pinCode ?? '1234',
+        'pin_code': AppConstants.hashPin(pinCode ?? '1234'),
         'role': AppConstants.roleStudent,
         'can_publish_lectures': false,
         'can_publish_announcements': false,
@@ -255,7 +255,7 @@ class SupabaseService {
     }
   }
 
-  /// ── تسجيل الدخول الصارم برمز الـ PIN أو المعرف ────────────────────────
+  /// ── تسجيل الدخول الصارم برمز الـ PIN أو المعرف مع التحقق المزدوج والتشفير ───
   Future<AppUserModel?> loginWithStudentIdAndPin({
     required String studentId,
     required String pinCode,
@@ -266,10 +266,23 @@ class SupabaseService {
         final storedPin = user.pinCode?.trim() ?? '';
         final inputPin = pinCode.trim();
 
-        // حماية أمنية صارمة: لن يفتح الحساب نهائياً إلا إذا كان الرمز المخزن موجوداً ومطابقاً تماماً للرمز المدخل
-        if (storedPin.isNotEmpty && storedPin == inputPin) {
+        // حماية أمنية صارمة: تحقق مزدوج ذكي (Dual Verification) يقبل القديم والمشفر
+        final isMatch = AppConstants.verifyPin(inputPin, storedPin);
+        if (isMatch) {
           _currentUser = user;
           await _saveUserSession(user);
+
+          // ترقية أمنية تلقائية: إذا كان الرمز في قاعدة البيانات غير مشفر بعد، نقوم بتشفيره فوراً
+          final hashedPin = AppConstants.hashPin(inputPin);
+          if (storedPin != hashedPin && user.id.isNotEmpty) {
+            client
+                .from('app_users')
+                .update({'pin_code': hashedPin})
+                .eq('id', user.id)
+                .then((_) => debugPrint('[+] Auto-upgraded PIN to SHA-256 for user: ${user.studentId}'))
+                .catchError((e) => debugPrint('[-] PIN upgrade error: $e'));
+          }
+
           return user;
         }
       }
@@ -365,7 +378,7 @@ class SupabaseService {
     try {
       await client
           .from('app_users')
-          .update({'pin_code': newPin.trim()})
+          .update({'pin_code': AppConstants.hashPin(newPin.trim())})
           .eq('student_id', studentId.trim());
 
       _otpCache.remove(studentId);
@@ -533,9 +546,21 @@ class SupabaseService {
     }
   }
 
-  /// ── إضافة إعلان جديد (مع إبطال الكاش فورا للتزامن) ─────────────────────────
+  /// ── إضافة إعلان جديد (مع فحص الصلاحيات وإبطال الكاش فورا للتزامن) ──────────
   Future<bool> createAnnouncement(AnnouncementModel announcement) async {
     try {
+      // فحص أمان الصلاحيات
+      final user = _currentUser;
+      if (user != null) {
+        final canPublish = user.role == AppConstants.roleAdmin ||
+            user.role == AppConstants.roleRepresentative ||
+            user.canPublishAnnouncements;
+        if (!canPublish) {
+          debugPrint('[-] Security Block: User ${user.studentId} not authorized to publish announcements');
+          return false;
+        }
+      }
+
       final json = announcement.toJson();
       json['stage'] = AppConstants.normalizeStage(announcement.stage);
       const allowedCategories = ['academic', 'urgent', 'exam', 'activity'];
@@ -557,16 +582,28 @@ class SupabaseService {
     }
   }
 
-  /// ── حذف إعلان / بوستر / جدول (مع حذف تيليجرام وتفريغ الكاش) ───
+  /// ── حذف إعلان / بوستر / جدول (مع فحص هوية الكاتب وحذف تيليجرام وتفريغ الكاش) ───
   Future<bool> deleteAnnouncement(String id) async {
     try {
-      // 1. استعلام مسبق لحذف المنشور المقابل من قناة تيليجرام إن وجد
+      // 1. استعلام مسبق لحذف المنشور المقابل من قناة تيليجرام وفحص ملكية الكاتب
       try {
         final row = await client
             .from('announcements')
-            .select('content, image_url')
+            .select('author_id, content, image_url')
             .eq('id', id)
             .maybeSingle();
+
+        // حماية الصلاحيات: التحقق من أن المستخدم إما مشرف عام أو كاتب الإعلان نفسه
+        final user = _currentUser;
+        if (user != null && row != null) {
+          final authorId = row['author_id']?.toString() ?? '';
+          final isAdmin = user.role == AppConstants.roleAdmin;
+          final isAuthor = authorId.isNotEmpty && (authorId == user.id || authorId == user.studentId);
+          if (!isAdmin && !isAuthor) {
+            debugPrint('[-] Security Block: User ${user.studentId} not authorized to delete announcement $id owned by $authorId');
+            return false;
+          }
+        }
 
         if (row != null) {
           int? msgId;
@@ -843,9 +880,21 @@ class SupabaseService {
     }
   }
 
-  /// ── نشر محاضرة جديدة برابط Google Drive (وتحديث الكاش) ────────────────
+  /// ── نشر محاضرة جديدة برابط Google Drive أو سحابي (مع فحص الصلاحيات وتحديث الكاش) ───
   Future<bool> createLecture(LectureModel lecture) async {
     try {
+      // فحص أمان الصلاحيات: التحقق من امتلاك المستخدم صلاحية النشر
+      final user = _currentUser;
+      if (user != null) {
+        final canPublish = user.role == AppConstants.roleAdmin ||
+            user.role == AppConstants.roleRepresentative ||
+            user.canPublishLectures;
+        if (!canPublish) {
+          debugPrint('[-] Security Block: User ${user.studentId} does not have lecture publishing permission');
+          return false;
+        }
+      }
+
       final payload = lecture.toJson();
       payload['stage'] = AppConstants.normalizeStage(lecture.stage);
       await client.from('lectures').insert(payload);
@@ -857,16 +906,28 @@ class SupabaseService {
     }
   }
 
-  /// ── حذف محاضرة (مع حذف الرسالة من قناة تيليجرام وتفريغ الكاش) ──────────────
+  /// ── حذف محاضرة (مع فحص هوية الكاتب وحذف الرسالة من قناة تيليجرام وتفريغ الكاش) ──────────────
   Future<bool> deleteLecture(String id) async {
     try {
-      // 1. استعلام مسبق لجلب معرف رسالة تيليجرام والقناة
+      // 1. استعلام مسبق لجلب معرف رسالة تيليجرام والقناة والكاتب
       try {
         final row = await client
             .from('lectures')
-            .select('telegram_message_id, telegram_channel_id')
+            .select('author_id, telegram_message_id, telegram_channel_id')
             .eq('id', id)
             .maybeSingle();
+
+        // حماية الصلاحيات: التحقق من أن المستخدم إما مشرف عام أو كاتب المحاضرة نفسه
+        final user = _currentUser;
+        if (user != null && row != null) {
+          final authorId = row['author_id']?.toString() ?? '';
+          final isAdmin = user.role == AppConstants.roleAdmin;
+          final isAuthor = authorId.isNotEmpty && (authorId == user.id || authorId == user.studentId);
+          if (!isAdmin && !isAuthor) {
+            debugPrint('[-] Security Block: User ${user.studentId} not authorized to delete lecture $id owned by $authorId');
+            return false;
+          }
+        }
 
         if (row != null && row['telegram_message_id'] != null) {
           final msgId = int.tryParse(row['telegram_message_id'].toString());
