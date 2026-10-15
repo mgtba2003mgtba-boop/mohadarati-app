@@ -234,8 +234,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final hasAdminOrRepPrivileges =
-        _user!.canManageLectures || _user!.canManageAnnouncements || _user!.isAdmin;
+    final isMujtabaAdmin = _user != null &&
+        (_user!.studentId == 'ST-NUST-001630760-413' ||
+            _user!.name.contains('مجتبى') ||
+            _user!.isAdmin);
 
     return SafeArea(
       child: RefreshIndicator(
@@ -285,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   Row(
                     children: [
-                      if (hasAdminOrRepPrivileges) ...[
+                      if (isMujtabaAdmin) ...[
                         IconButton(
                           tooltip: 'لوحة التحكم والإدارة',
                           padding: EdgeInsets.zero,
