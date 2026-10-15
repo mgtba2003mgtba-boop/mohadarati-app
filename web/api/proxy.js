@@ -1,4 +1,37 @@
-const BOT_TOKEN = '8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8';
+const BOT_TOKEN = process.env.LECTURES_BOT_TOKEN || '8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8';
+
+// نطاقات آمنة ومصرح لها بالمرور حصراً لمنع ثغرات Server-Side Request Forgery (SSRF)
+const ALLOWED_DOMAINS = [
+  'api.telegram.org',
+  'mrubdzgcjofjwirkdfwo.supabase.co',
+  'rlupqsmqwvidmwrvqrcc.supabase.co',
+  'mohadarati.vercel.app',
+  'mohadarati-app.vercel.app',
+  'quickchart.io',
+];
+
+function isSafeUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    // حظر عناوين الشبكة المحلية والـ Metadata السحابية منعاً باتاً
+    if (
+      hostname === 'localhost' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname === '169.254.169.254' ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return false;
+    }
+    return ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -30,7 +63,11 @@ module.exports = async (req, res) => {
     }
 
     if (!targetUrl && url) {
-      targetUrl = decodeURIComponent(url);
+      const decoded = decodeURIComponent(url);
+      if (!isSafeUrl(decoded)) {
+        return res.status(403).json({ error: 'Forbidden: Target URL domain is not in the safe allowlist' });
+      }
+      targetUrl = decoded;
     }
 
     if (!targetUrl) {

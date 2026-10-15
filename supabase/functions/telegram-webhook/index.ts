@@ -29,7 +29,30 @@ Deno.serve(async (req)=>{
   try {
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8760017532:AAGPiVBa6-TPnSnwuxGWGiR8wTJlKYT8vSM';
     const body = await req.json();
-    // ── 1. Direct API Invocation (from Dashboard / Frontend / Edge Functions) ─────
+
+    // ── 1. Direct API Invocation (محمي بتصريح أمني صارم لمنع العبث بالبوت) ─────
+    if (body.action) {
+      const authHeader = req.headers.get('authorization') || '';
+      const customKey = req.headers.get('x-admin-key') || '';
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      const adminKey = Deno.env.get('ADMIN_KEY') || 'nust_admin_sec_2026_att';
+
+      const isAuthorized =
+        (Boolean(serviceRoleKey) && authHeader.includes(serviceRoleKey)) ||
+        (Boolean(customKey) && customKey === adminKey) ||
+        (authHeader.replace('Bearer ', '').trim() === adminKey);
+
+      if (!isAuthorized) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: Administrative actions require valid authentication key.' }), {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
+
     if (body.action === 'get_webhook_info') {
       const res = await fetch(`${TELEGRAM_API}${botToken}/getWebhookInfo`);
       const data = await res.json();

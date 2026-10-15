@@ -1,5 +1,8 @@
 module.exports = async (req, res) => {
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'mohadarati.vercel.app';
+  const rawHost = req.headers['x-forwarded-host'] || req.headers.host || 'mohadarati.vercel.app';
+  const cleanHostName = rawHost.split(':')[0].toLowerCase();
+  const allowedHosts = ['mohadarati.vercel.app', 'mohadarati-app.vercel.app', 'localhost', '127.0.0.1'];
+  const host = allowedHosts.includes(cleanHostName) ? rawHost : 'mohadarati.vercel.app';
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const fullUrl = `${proto}://${host}/`;
 
