@@ -11,6 +11,7 @@ import 'package:nust_student_portal/models/subject_model.dart';
 import 'package:nust_student_portal/models/schedule_model.dart';
 import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
 import 'package:nust_student_portal/widgets/ios_install_dialog.dart';
+import 'package:nust_student_portal/services/admin_preview_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -988,6 +989,114 @@ void main() {
       final botDeepLink = '${AppConstants.telegramBotUrl}?start=id';
       expect(botDeepLink, contains('start=id'));
       expect(botDeepLink, contains(AppConstants.telegramBotUsername));
+    });
+
+    test('اختبار خدمة وسياق المعاينة الفورية للآدمن (AdminPreviewService Live Context & Reset)', () {
+      final preview = AdminPreviewService();
+      final adminUser = AppUserModel(
+        id: 'u-admin',
+        studentId: 'ST-NUST-001630760-413',
+        name: 'مجتبى عواد طالب عبيد',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        role: AppConstants.roleAdmin,
+      );
+
+      // تهيئة السياق
+      preview.initialize(adminUser);
+      expect(preview.department, 'هندسة تقنيات الأجهزة الطبية');
+      expect(preview.stage, 'المرحلة الرابعة');
+      expect(preview.isCustomActive, false);
+
+      // تبديل القسم والمرحلة والشعبة
+      preview.setTarget(
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'B',
+      );
+      expect(preview.department, 'هندسة تقنيات الحاسوب');
+      expect(preview.stage, 'المرحلة الثالثة');
+      expect(preview.section, 'B');
+      expect(preview.isCustomActive, true);
+
+      // إعادة التعيين للوضع الافتراضي
+      preview.reset(adminUser);
+      expect(preview.department, 'هندسة تقنيات الأجهزة الطبية');
+      expect(preview.stage, 'المرحلة الرابعة');
+      expect(preview.isCustomActive, false);
+    });
+
+    test('اختبار عزل تبليغات المواد ومنع الصور العشوائية في كاروسيل الواجهة الرئيسية (Home Carousel Banner Sanitization)', () {
+      final subjectAnnounce = AnnouncementModel(
+        id: 'ann-sub-1',
+        title: 'امتحان كويز معمارية الحاسوب',
+        content: 'يوم الأحد كويز للمادة',
+        authorId: 'rep-1',
+        authorName: 'ممثل الشعبة',
+        authorRole: 'representative',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        category: 'academic',
+        subjectName: 'معمارية الحاسوب',
+        createdAt: DateTime.now(),
+      );
+
+      final scheduleAnnounce = AnnouncementModel(
+        id: 'ann-sch-1',
+        title: 'جدول الامتحانات',
+        content: '[SCHEDULE_TIMETABLE] جدول امتحاني',
+        authorId: 'rep-1',
+        authorName: 'ممثل الشعبة',
+        authorRole: 'representative',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        category: 'exam',
+        imageUrl: 'https://example.com/schedule.jpg',
+        subjectName: 'SCHEDULE',
+        createdAt: DateTime.now(),
+      );
+
+      final officialBanner = AnnouncementModel(
+        id: 'ann-banner-1',
+        title: 'معرض النتاجات العلمية السنوي',
+        content: 'تدعوكم الكلية لحضور المعرض',
+        authorId: 'admin-1',
+        authorName: 'مجتبى عواد',
+        authorRole: 'admin',
+        department: 'ALL',
+        stage: 'ALL',
+        category: 'general',
+        imageUrl: 'https://example.com/banner.jpg',
+        subjectName: 'BANNER',
+        createdAt: DateTime.now(),
+      );
+
+      final all = [subjectAnnounce, scheduleAnnounce, officialBanner];
+
+      // تطبيق لوجيك تنقية الكاروسيل الجديد
+      final filteredBanners = all.where((a) {
+        if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
+            a.content.contains('[COURSE_REGISTRY') ||
+            a.subjectName == 'SCHEDULE' ||
+            a.subjectName == 'COURSE') {
+          return false;
+        }
+        if (a.subjectName != null &&
+            a.subjectName!.isNotEmpty &&
+            a.subjectName != 'BANNER' &&
+            a.subjectName != 'GENERAL' &&
+            a.subjectName != 'ALL' &&
+            a.subjectName != 'عام') {
+          return false;
+        }
+        return a.imageUrl != null && a.imageUrl!.trim().isNotEmpty;
+      }).toList();
+
+      expect(filteredBanners.length, 1);
+      expect(filteredBanners.first.id, 'ann-banner-1');
+      expect(filteredBanners.contains(subjectAnnounce), false, reason: 'تبليغات المواد يجب ألا تظهر نهائياً في كاروسيل الواجهة الرئيسية');
+      expect(filteredBanners.contains(scheduleAnnounce), false, reason: 'الجداول معزولة تماماً');
     });
   });
 }

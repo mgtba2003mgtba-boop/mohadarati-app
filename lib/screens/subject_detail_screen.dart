@@ -93,7 +93,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     try {
       final dept = widget.department ?? _user?.department;
       final stage = widget.stage ?? _user?.stage;
-      final userSection = _user?.isAdmin == true ? null : _user?.section;
+      final userSection = _user?.isAdmin == true
+          ? (widget.section == 'ALL' ? null : widget.section)
+          : _user?.section;
 
       // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين)
       final allLectures = await service.fetchLectures(

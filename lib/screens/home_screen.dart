@@ -20,6 +20,8 @@ import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
 import 'announcements_screen.dart';
+import '../services/admin_preview_service.dart';
+import '../widgets/admin_preview_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,13 +45,26 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _bannerTimer;
   int _currentBannerPage = 0;
 
-  // صور وبوسترات افتراضية عالية الجودة للإعلانات الجامعية في حال عدم إرفاق صورة
-  final List<String> _defaultBannerImages = [
-    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
-  ];
+  // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد والجداول)
+  List<AnnouncementModel> get _carouselBanners {
+    return _announcements.where((a) {
+      if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
+          a.content.contains('[COURSE_REGISTRY') ||
+          a.subjectName == 'SCHEDULE' ||
+          a.subjectName == 'COURSE') {
+        return false;
+      }
+      if (a.subjectName != null &&
+          a.subjectName!.isNotEmpty &&
+          a.subjectName != 'BANNER' &&
+          a.subjectName != 'GENERAL' &&
+          a.subjectName != 'ALL' &&
+          a.subjectName != 'عام') {
+        return false;
+      }
+      return a.imageUrl != null && a.imageUrl!.trim().isNotEmpty;
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -91,26 +106,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_user != null) {
       try {
+        final previewService = AdminPreviewService();
+        previewService.initialize(_user);
+        final effectiveDept = _user!.isAdmin ? previewService.department : _user!.department;
+        final effectiveStage = _user!.isAdmin ? previewService.stage : _user!.stage;
+        final effectiveSection = _user!.isAdmin ? previewService.section : _user!.section;
+
         // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار بنسبة 70%
-        final userSection = _user!.isAdmin ? null : _user!.section;
         final results = await Future.wait([
           service.fetchAnnouncements(
-            department: _user!.department,
-            stage: _user!.stage,
-            section: userSection,
+            department: effectiveDept,
+            stage: effectiveStage,
+            section: effectiveSection,
             forceRefresh: forceRefresh,
           ),
           service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh),
           service.fetchLectures(
-            department: _user!.department,
-            stage: _user!.stage,
-            section: userSection,
+            department: effectiveDept,
+            stage: effectiveStage,
+            section: effectiveSection,
             semester: 1,
             forceRefresh: forceRefresh,
           ),
           service.fetchCourses(
-            department: _user!.department,
-            stage: _user!.stage,
+            department: effectiveDept,
+            stage: effectiveStage,
             semester: 1,
           ),
         ]);
@@ -121,9 +141,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _lectures = results[2] as List<LectureModel>;
         _coursesList = results[3] as List<String>;
 
-        // بدء تحريك كاروسيل الإعلانات
-        final totalBanners = _announcements.isNotEmpty ? _announcements.length : _defaultBannerImages.length;
-        _startBannerTimer(totalBanners);
+        // بدء تحريك كاروسيل الإعلانات الرسمية فقط
+        _startBannerTimer(_carouselBanners.length);
       } catch (e) {
         debugPrint('[-] Error loading home data in parallel: $e');
       }
@@ -137,9 +156,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول)
   List<String> get _subjectNames {
     if (_user == null) return [];
+    final previewService = AdminPreviewService();
+    final effectiveDept = _user!.isAdmin ? previewService.department : _user!.department;
+    final effectiveStage = _user!.isAdmin ? previewService.stage : _user!.stage;
     return BiometricSubjects.getSubjectNames(
-      department: _user!.department,
-      stage: _user!.stage,
+      department: effectiveDept,
+      stage: effectiveStage,
       semester: 1,
     );
   }
@@ -285,7 +307,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // شريط المعاينة والتبديل السريع للمشرف العام (الآدمن)
+              AdminPreviewBar(
+                currentUser: _user,
+                onContextChanged: () => _loadData(forceRefresh: true),
+              ),
+              const SizedBox(height: 12),
 
               // شاشة الإعلانات بالصور المتحركة والكاروسيل التفاعلي
               _buildAnnouncementsMovingCarousel(),
@@ -305,10 +334,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بانر الإعلانات والبوسترات بصور متحركة وسلسة ومنسقة (بدون نصوص إضافية فوقها وبدون إعلانات وهمية)
+  /// بانر الإعلانات والبوسترات الرسمية بصور حقيقية (ممنوع أي صور عشوائية)
   Widget _buildAnnouncementsMovingCarousel() {
-    final hasRealAnnouncements = _announcements.isNotEmpty;
-    final count = hasRealAnnouncements ? _announcements.length : 1;
+    final banners = _carouselBanners;
+
+    // إذا لم تتوفر بوسترات رسمية مرفوعة بصور حقيقية، نظهر بطاقة هوية الكلية التقنية الفخمة
+    if (banners.isEmpty) {
+      return _buildDefaultUniversityBanner();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -318,18 +351,14 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 180,
           child: PageView.builder(
             controller: _bannerController,
-            itemCount: count,
+            itemCount: banners.length,
             onPageChanged: (idx) => setState(() => _currentBannerPage = idx),
             itemBuilder: (context, index) {
-              final announcement = hasRealAnnouncements ? _announcements[index] : null;
-              final imageSrc = (announcement?.imageUrl != null && announcement!.imageUrl!.isNotEmpty)
-                  ? announcement.imageUrl!
-                  : _defaultBannerImages[0];
+              final announcement = banners[index];
+              final imageSrc = announcement.imageUrl!;
 
-              final rawTitle = announcement?.title ?? 'الكلية التقنية الهندسية';
-              final rawContent = (announcement?.displayContent.isNotEmpty == true)
-                  ? announcement!.displayContent
-                  : 'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)';
+              final rawTitle = announcement.title;
+              final rawContent = announcement.displayContent;
 
               final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
                   rawContent.contains('إعلان بوستر رسمي') ||
@@ -350,13 +379,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 title = 'الكلية التقنية الهندسية';
               }
 
-              final isPureBanner = announcement != null && (content.isEmpty || isBoilerplate);
+              final isPureBanner = content.isEmpty || isBoilerplate;
 
               return GestureDetector(
                 onTap: () {
-                  if (announcement != null) {
-                    _showAnnouncementDetails(announcement, imageSrc);
-                  }
+                  _showAnnouncementDetails(announcement, imageSrc);
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -369,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // الصورة الرسمية
+                        // الصورة الرسمية المرفوعة
                         AppNetworkImage(
                           imageUrl: imageSrc,
                           fit: BoxFit.cover,
@@ -440,12 +467,12 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ),
-        if (count > 1) ...[
+        if (banners.length > 1) ...[
           const SizedBox(height: 10),
           // مؤشرات النقاط عند وجود أكثر من بوستر
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(count, (i) {
+            children: List.generate(banners.length, (i) {
               final isActive = i == _currentBannerPage;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
@@ -461,6 +488,77 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بدون أي صور عشوائية)
+  Widget _buildDefaultUniversityBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF0F172A),
+            AppTheme.primary.withValues(alpha: 0.85),
+            const Color(0xFF0F172A),
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.cardShadow,
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+            ),
+            child: const Center(
+              child: Icon(Icons.school_rounded, color: AppTheme.accent, size: 26),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'الكلية التقنية الهندسية',
+                  style: GoogleFonts.cairo(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)',
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    color: AppTheme.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'بوابة المحاضرات والجداول الأكاديمية الرسمية',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
