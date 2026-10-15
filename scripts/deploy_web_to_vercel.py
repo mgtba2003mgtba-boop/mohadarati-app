@@ -59,7 +59,7 @@ elif token:
 # 6. Fetch / reset origin main to ensure clean sync
 print("[*] Staging and committing build/web...")
 subprocess.run(["git", "add", "-A"], cwd=BUILD_WEB, check=True)
-subprocess.run(["git", "commit", "-m", "deploy: update web build with admin group switcher and schedule separation"], cwd=BUILD_WEB)
+subprocess.run(["git", "commit", "-m", "deploy: update Computer Engineering official syllabus across 8 semesters and section privacy features"], cwd=BUILD_WEB)
 
 # 7. Push to mohadarati
 print("[*] Pushing to mohadarati main...")
