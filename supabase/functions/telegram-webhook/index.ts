@@ -509,12 +509,22 @@ Deno.serve(async (req)=>{
           const unlinkedMsg = `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` +
             `📍 <b>الكلية التقنية الهندسية</b>\n` +
             `━━━━━━━━━━━━━━━━━━━━━\n` +
-            `🤖 <b>نظام الحضور الذكي وتسجيل بصمة الوجه</b>\n\n` +
-            `⚠️ <b>حساب التيليجرام هذا غير مرتبط بعد بأي قيد أكاديمي.</b>\n\n` +
-            `لتفعيل استلام إشعارات الحضور وتسجيل بصمتك:\n` +
-            `✍️ <b>أرسل اسمك الرباعي كاملاً</b> أو رقمك الجامعي هنا في المحادثة.\n\n` +
-            `📲 <i>لتحميل تطبيق محاضراتي، أرسل:</i> /app`;
-          await sendTelegramMessage(botToken, chatId, unlinkedMsg);
+            `👋 <b>أهلاً وسهلاً بك في البوت الأكاديمي الرسمي</b> 🎓\n\n` +
+            `لتسجيل حسابك وتوثيق قيدك واستلام إشعارات الحضور والمحاضرات:\n` +
+            `✍️ <b>يرجى إرسال اسمك الرباعي كاملاً</b> هنا في المحادثة\n` +
+            `<i>(مثال: علي محمد حسن كاظم)</i>\n` +
+            `ليتم البحث عن قيدك الجامعي وربطه فوراً.\n\n` +
+            `💡 <i>أو يمكنك إرسال رقمك الجامعي إن كان متوفراً لديك.</i>`;
+          await sendTelegramMessage(botToken, chatId, unlinkedMsg, {
+            inline_keyboard: [
+              [
+                {
+                  text: '📲 تحميل وتثبيت تطبيق محاضراتي',
+                  callback_data: 'cmd:app'
+                }
+              ]
+            ]
+          });
         }
       }
       return new Response(JSON.stringify({
@@ -557,9 +567,17 @@ Deno.serve(async (req)=>{
             ]
           ]
         };
-        await sendTelegramMessage(botToken, chatId, helpMsg, keyboard);
       } else {
-        await sendTelegramMessage(botToken, chatId, `⚠️ <b>الحساب غير مرتبط</b>\n\nيرجى كتابة <b>اسمك الرباعي كاملاً</b> للبحث عن قيدك وربطه فوراً.\n\n📲 لتحميل التطبيق، أرسل: /app`);
+        await sendTelegramMessage(botToken, chatId, `👋 <b>أهلاً بك!</b>\n\nيرجى كتابة <b>اسمك الرباعي كاملاً</b> ✍️ هنا في المحادثة للبحث عن قيدك الأكاديمي وربط حسابك فوراً.\n<i>(مثال: علي محمد حسن كاظم)</i>`, {
+          inline_keyboard: [
+            [
+              {
+                text: '📲 تحميل وتثبيت تطبيق محاضراتي',
+                callback_data: 'cmd:app'
+              }
+            ]
+          ]
+        });
       }
       return new Response(JSON.stringify({
         ok: true
