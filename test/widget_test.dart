@@ -186,7 +186,7 @@ void main() {
       expect(medicalStage4.length, greaterThanOrEqualTo(6));
 
       final compStage3 = AppConstants.getCurriculumSubjects('هندسة تقنيات الحاسوب', 'المرحلة الثالثة');
-      expect(compStage3.any((s) => s.contains('هندسة البرمجيات')), isTrue);
+      expect(compStage3.any((s) => s.contains('انظمة التشغيل') || s.contains('الاتصالات الرقمية')), isTrue);
       expect(compStage3.length, greaterThanOrEqualTo(6));
 
       final cyberStage2 = AppConstants.getCurriculumSubjects('هندسة تقنيات الأمن السيبراني', 'المرحلة الثانية');
@@ -561,19 +561,19 @@ void main() {
     });
 
     test('اختبار قاعدة بيانات المواد المستخرجة من نظام البصمة (119 Biometric Subjects Extraction & Classification)', () {
-      // 1. فحص إجمالي عدد المواد في نظام البصمة الجامعي
+      // 1. فحص إجمالي عدد المواد في نظام البصمة الجامعي مع مقررات هندسة الحاسوب MTU المحدثة
       final all = BiometricSubjects.allSubjects;
-      expect(all.length, 119, reason: 'يجب أن تحتوي المنظومة على 119 مادة رسمية معتمدة من نظام البصمة');
+      expect(all.length, 128, reason: 'يجب أن تحتوي المنظومة على 128 مادة معتمدة بعد تحديث مقررات الحاسوب');
 
       // 2. فحص توزيع المواد حسب الأقسام
       final compSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الحاسوب');
       final cyberSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأمن السيبراني');
       final medSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأجهزة الطبية');
 
-      expect(compSubjects.length, 51, reason: 'هندسة الحاسوب تضم 51 مادة عبر المراحل الأربع');
+      expect(compSubjects.length, 60, reason: 'هندسة الحاسوب تضم 60 مادة بعد التحديث عبر المراحل الأربع');
       expect(cyberSubjects.length, 19, reason: 'الأمن السيبراني يضم 19 مادة رسمية');
       expect(medSubjects.length, 49, reason: 'الأجهزة الطبية تضم 49 مادة رسمية');
-      expect(compSubjects.length + cyberSubjects.length + medSubjects.length, 119);
+      expect(compSubjects.length + cyberSubjects.length + medSubjects.length, 128);
 
       // 3. فحص فلترة الكورس الدراسي (الفصل 1 والفصل 2)
       final compL1S1 = BiometricSubjects.getSubjects(

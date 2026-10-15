@@ -38,6 +38,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     final user = SupabaseService().currentUser;
+    _user = user;
     if (user != null && !user.isAdmin && user.section != null && user.section!.isNotEmpty) {
       _selectedScheduleSection = user.section!;
     }

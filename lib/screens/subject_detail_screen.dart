@@ -247,7 +247,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   Widget build(BuildContext context) {
     final subModel = BiometricSubjects.findSubject(
       widget.subjectName,
-      department: _effectiveDept,
+      department: _effectiveDepartment,
       stage: _effectiveStage,
     );
 

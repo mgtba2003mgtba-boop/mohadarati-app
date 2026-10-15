@@ -58,6 +58,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   @override
   void initState() {
     super.initState();
+    _user = SupabaseService().currentUser;
     _loadCourses();
   }
 
