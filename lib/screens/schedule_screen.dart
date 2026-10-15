@@ -30,10 +30,17 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   String _supervisorStage = 'ALL';
   String _supervisorSection = 'ALL';
 
+  // ── فلتر الشعبة السريع لعرض وفصل منشورات الكروبات ──────────
+  String _selectedScheduleSection = 'ALL';
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    final user = SupabaseService().currentUser;
+    if (user != null && !user.isAdmin && user.section != null && user.section!.isNotEmpty) {
+      _selectedScheduleSection = user.section!;
+    }
     _loadSchedules();
   }
 
@@ -52,7 +59,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       final isAdmin = _user!.isAdmin;
       final dept = isAdmin ? _supervisorDept : _user!.department;
       final stage = isAdmin ? _supervisorStage : _user!.stage;
-      final section = isAdmin ? _supervisorSection : _user!.section;
+      final section = isAdmin ? (_supervisorSection == 'ALL' ? null : _supervisorSection) : null;
 
       _schedules = await service.fetchSchedules(
         department: dept,
@@ -65,6 +72,24 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     if (mounted) {
       setState(() => _isLoading = false);
     }
+  }
+
+  List<ScheduleModel> _getFilteredSchedules(String type) {
+    return _schedules.where((s) {
+      if (s.type != type) return false;
+      if (_selectedScheduleSection == 'ALL') return true;
+      if (_selectedScheduleSection == 'UNIFIED') return s.isUnified;
+      return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.isUnified;
+    }).toList();
+  }
+
+  int _countSchedulesForSection(String type, String sectionKey) {
+    return _schedules.where((s) {
+      if (s.type != type) return false;
+      if (sectionKey == 'ALL') return true;
+      if (sectionKey == 'UNIFIED') return s.isUnified;
+      return s.section.toUpperCase() == sectionKey.toUpperCase();
+    }).length;
   }
 
   Future<void> _launchUrl(String? url) async {
@@ -814,25 +839,99 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   Widget _buildExamsScheduleTab() => _buildScheduleTabContent('exams');
 
   Widget _buildScheduleTabContent(String type) {
-    final schedules = _schedules.where((s) => s.type == type).toList();
+    final schedules = _getFilteredSchedules(type);
 
     return RefreshIndicator(
       onRefresh: _loadSchedules,
       color: AppTheme.primary,
-      child: schedules.isEmpty
-          ? SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: _buildEmptyScheduleState(isExam: type == 'exams'),
-              ),
-            )
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: schedules.length,
-              itemBuilder: (context, index) => _buildScheduleFileCard(schedules[index]),
+      child: Column(
+        children: [
+          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات
+          Container(
+            height: 38,
+            margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildScheduleSectionChip(type, 'ALL', 'الكل 🌐', _countSchedulesForSection(type, 'ALL')),
+                const SizedBox(width: 6),
+                _buildScheduleSectionChip(type, 'A', 'شعبة A', _countSchedulesForSection(type, 'A')),
+                const SizedBox(width: 6),
+                _buildScheduleSectionChip(type, 'B', 'شعبة B', _countSchedulesForSection(type, 'B')),
+                const SizedBox(width: 6),
+                _buildScheduleSectionChip(type, 'C', 'شعبة C', _countSchedulesForSection(type, 'C')),
+                const SizedBox(width: 6),
+                _buildScheduleSectionChip(type, 'D', 'شعبة D', _countSchedulesForSection(type, 'D')),
+                const SizedBox(width: 6),
+                _buildScheduleSectionChip(type, 'UNIFIED', 'موحد لجميع الشُعب 📋', _countSchedulesForSection(type, 'UNIFIED')),
+              ],
             ),
+          ),
+
+          Expanded(
+            child: schedules.isEmpty
+                ? SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: _buildEmptyScheduleState(isExam: type == 'exams'),
+                    ),
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                    itemCount: schedules.length,
+                    itemBuilder: (context, index) => _buildScheduleFileCard(schedules[index]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleSectionChip(String type, String sectionKey, String label, int count) {
+    final isSelected = _selectedScheduleSection == sectionKey;
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.cairo(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (s) => setState(() => _selectedScheduleSection = sectionKey),
+      selectedColor: const Color(0xFF0F172A),
+      backgroundColor: Colors.white,
+      labelStyle: GoogleFonts.cairo(
+        color: isSelected ? const Color(0xFF38BDF8) : AppTheme.textSecondary,
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF0F172A) : AppTheme.lightBorder,
+        ),
+      ),
     );
   }
 
@@ -959,14 +1058,30 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                             ),
                           ),
                           const SizedBox(width: 6),
-                          // شارة الشعبة
+                          // شارة الشعبة الملونة
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
-                              color: schedule.isUnified ? const Color(0xFFF1F5F9) : const Color(0xFFEFF6FF),
+                              color: schedule.isUnified
+                                  ? const Color(0xFFECFDF5)
+                                  : (schedule.section.toUpperCase() == 'A'
+                                      ? const Color(0xFFEFF6FF)
+                                      : (schedule.section.toUpperCase() == 'B'
+                                          ? const Color(0xFFFAF5FF)
+                                          : (schedule.section.toUpperCase() == 'C'
+                                              ? const Color(0xFFFFFBEB)
+                                              : const Color(0xFFF0FDFA)))),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: schedule.isUnified ? const Color(0xFFCBD5E1) : const Color(0xFF93C5FD),
+                                color: schedule.isUnified
+                                    ? const Color(0xFFA7F3D0)
+                                    : (schedule.section.toUpperCase() == 'A'
+                                        ? const Color(0xFFBFDBFE)
+                                        : (schedule.section.toUpperCase() == 'B'
+                                            ? const Color(0xFFE9D5FF)
+                                            : (schedule.section.toUpperCase() == 'C'
+                                                ? const Color(0xFFFDE68A)
+                                                : const Color(0xFF99F6E4)))),
                               ),
                             ),
                             child: Text(
@@ -974,7 +1089,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                               style: GoogleFonts.cairo(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: schedule.isUnified ? const Color(0xFF475569) : const Color(0xFF1D4ED8),
+                                color: schedule.isUnified
+                                    ? const Color(0xFF047857)
+                                    : (schedule.section.toUpperCase() == 'A'
+                                        ? const Color(0xFF1D4ED8)
+                                        : (schedule.section.toUpperCase() == 'B'
+                                            ? const Color(0xFF7E22CE)
+                                            : (schedule.section.toUpperCase() == 'C'
+                                                ? const Color(0xFFB45309)
+                                                : const Color(0xFF0F766E)))),
                               ),
                             ),
                           ),

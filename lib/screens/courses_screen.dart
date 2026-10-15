@@ -29,13 +29,39 @@ class _CoursesScreenState extends State<CoursesScreen> {
   String _searchQuery = '';
   final int _selectedSemester = 1; // الكورس الأول حصراً
 
+  // ── فلاتر المشرف العام للتحويل بين الأقسام والمراحل والكروبات ──
+  String _adminDept = 'ALL';
+  String _adminStage = 'ALL';
+  String _adminSection = 'ALL';
+
+  String get _effectiveDept {
+    if (_user?.isAdmin == true && _adminDept != 'ALL') {
+      return _adminDept;
+    }
+    return _user?.department ?? AppConstants.departments.first;
+  }
+
+  String get _effectiveStage {
+    if (_user?.isAdmin == true && _adminStage != 'ALL') {
+      return _adminStage;
+    }
+    return _user?.stage ?? AppConstants.stages.first;
+  }
+
+  String? get _effectiveSection {
+    if (_user?.isAdmin == true) {
+      return _adminSection == 'ALL' ? null : _adminSection;
+    }
+    return _user?.section;
+  }
+
   @override
   void initState() {
     super.initState();
     _loadCourses();
   }
 
-  Future<void> _loadCourses() async {
+  Future<void> _loadCourses({bool forceRefresh = false}) async {
     if (_coursesList.isEmpty && _lectures.isEmpty) {
       setState(() => _isLoading = true);
     }
@@ -45,16 +71,17 @@ class _CoursesScreenState extends State<CoursesScreen> {
     if (_user != null) {
       try {
         final results = await Future.wait([
-          service.fetchStudentAttendance(_user!.studentId),
+          service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh),
           service.fetchLectures(
-            department: _user!.department,
-            stage: _user!.stage,
-            section: _user!.isAdmin ? null : _user!.section,
+            department: _effectiveDept,
+            stage: _effectiveStage,
+            section: _effectiveSection,
             semester: 1,
+            forceRefresh: forceRefresh,
           ),
           service.fetchCourses(
-            department: _user!.department,
-            stage: _user!.stage,
+            department: _effectiveDept,
+            stage: _effectiveStage,
             semester: 1,
           ),
         ]);
@@ -78,8 +105,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
     if (_user == null) return [];
 
     final biometricList = BiometricSubjects.getSubjectNames(
-      department: _user!.department,
-      stage: _user!.stage,
+      department: _effectiveDept,
+      stage: _effectiveStage,
       semester: 1,
     );
 
@@ -168,6 +195,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
               color: AppTheme.primary,
               child: Column(
                 children: [
+                  if (_user?.isAdmin == true) _buildSupervisorBar(),
+
                   // شريط البحث المقتضب
                   Container(
                     color: Colors.white,
@@ -241,6 +270,190 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
   }
 
+  Widget _buildSupervisorBar() {
+    final isCustom = _adminDept != 'ALL' || _adminStage != 'ALL' || _adminSection != 'ALL';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF59E0B), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'تحويل الكروبات والأقسام (إشراف عام)',
+                          style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 0.6),
+                          ),
+                          child: Text(
+                            'المشرف العام',
+                            style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'استعراض مواد ومحاضرات أي كروب وقسم كما يراها طلابه',
+                      style: GoogleFonts.cairo(color: Colors.white70, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              if (isCustom)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _adminDept = 'ALL';
+                      _adminStage = 'ALL';
+                      _adminSection = 'ALL';
+                    });
+                    _loadCourses(forceRefresh: true);
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 14, color: Color(0xFFFBBF24)),
+                  label: Text(
+                    'إعادة ضبط',
+                    style: GoogleFonts.cairo(color: const Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: _buildSupervisorDropdown(
+                  label: 'القسم',
+                  value: _adminDept,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كافة الأقسام 🌐', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _adminDept = val);
+                      _loadCourses(forceRefresh: true);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'المرحلة',
+                  value: _adminStage,
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('كل المراحل 🎓', overflow: TextOverflow.ellipsis)),
+                    ...AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _adminStage = val);
+                      _loadCourses(forceRefresh: true);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                flex: 3,
+                child: _buildSupervisorDropdown(
+                  label: 'الشعبة',
+                  value: _adminSection,
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('كل الشُعب 👥', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _adminSection = val);
+                      _loadCourses(forceRefresh: true);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupervisorDropdown({
+    required String label,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: const Color(0xFF1E293B),
+          icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 18),
+          style: GoogleFonts.cairo(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
   Widget _buildSubjectCard({
     required String subjectName,
     required int lectureCount,
@@ -249,8 +462,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
   }) {
     final subModel = BiometricSubjects.findSubject(
       subjectName,
-      department: _user?.department,
-      stage: _user?.stage,
+      department: _effectiveDept,
+      stage: _effectiveStage,
     );
 
     return Container(
@@ -272,8 +485,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 builder: (_) => SubjectDetailScreen(
                   subjectName: subjectName,
                   attendanceStats: stats,
-                  department: _user?.department,
-                  stage: _user?.stage,
+                  department: _effectiveDept,
+                  stage: _effectiveStage,
+                  section: _adminSection,
                 ),
               ),
             ).then((_) => _loadCourses());

@@ -21,6 +21,7 @@ class SubjectDetailScreen extends StatefulWidget {
   final SubjectAttendanceStats? attendanceStats;
   final String? department;
   final String? stage;
+  final String? section;
 
   const SubjectDetailScreen({
     super.key,
@@ -28,6 +29,7 @@ class SubjectDetailScreen extends StatefulWidget {
     this.attendanceStats,
     this.department,
     this.stage,
+    this.section,
   });
 
   @override
@@ -45,6 +47,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   List<AttendanceRecordModel> _subjectAttendanceRecords = [];
 
   String _lectureTypeFilter = 'ALL'; // 'ALL', 'theory', 'practical'
+  String _selectedSectionFilter = 'ALL'; // 'ALL', 'A', 'B', 'C', 'D', 'UNIFIED'
   String _searchQuery = '';
 
   String get _effectiveDepartment =>
@@ -66,6 +69,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.section != null && widget.section!.isNotEmpty) {
+      _selectedSectionFilter = widget.section!;
+    }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -138,11 +144,36 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     return _subjectLectures.where((l) {
       final matchesType =
           _lectureTypeFilter == 'ALL' || l.type == _lectureTypeFilter;
+      final matchesSection = _selectedSectionFilter == 'ALL' ||
+          (_selectedSectionFilter == 'UNIFIED'
+              ? (l.section == 'ALL' || l.section.isEmpty)
+              : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
       final matchesSearch = _searchQuery.isEmpty ||
           l.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           l.uploaderName.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesType && matchesSearch;
+      return matchesType && matchesSection && matchesSearch;
     }).toList();
+  }
+
+  List<AnnouncementModel> get _filteredAnnouncements {
+    return _subjectAnnouncements.where((a) {
+      final matchesSection = _selectedSectionFilter == 'ALL' ||
+          (_selectedSectionFilter == 'UNIFIED'
+              ? (a.section == 'ALL' || a.section == null || a.section!.isEmpty)
+              : (a.section?.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL' || a.section == null));
+      final matchesSearch = _searchQuery.isEmpty ||
+          a.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          a.content.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesSection && matchesSearch;
+    }).toList();
+  }
+
+  int _countLecturesForSection(String sec) {
+    if (sec == 'ALL') return _subjectLectures.length;
+    if (sec == 'UNIFIED') {
+      return _subjectLectures.where((l) => l.section == 'ALL' || l.section.isEmpty).length;
+    }
+    return _subjectLectures.where((l) => l.section.toUpperCase() == sec.toUpperCase()).length;
   }
 
   Future<void> _launchUrlExternal(String? urlString, {required String errorMsg}) async {
@@ -471,6 +502,29 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ),
         ),
 
+        // شريط فلاتر الشُعب / الكروبات
+        Container(
+          height: 38,
+          margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _buildSectionFilterChip('ALL', 'الكل 🌐', _subjectLectures.length),
+              const SizedBox(width: 6),
+              _buildSectionFilterChip('A', 'شعبة A', _countLecturesForSection('A')),
+              const SizedBox(width: 6),
+              _buildSectionFilterChip('B', 'شعبة B', _countLecturesForSection('B')),
+              const SizedBox(width: 6),
+              _buildSectionFilterChip('C', 'شعبة C', _countLecturesForSection('C')),
+              const SizedBox(width: 6),
+              _buildSectionFilterChip('D', 'شعبة D', _countLecturesForSection('D')),
+              const SizedBox(width: 6),
+              _buildSectionFilterChip('UNIFIED', 'موحد 📋', _countLecturesForSection('UNIFIED')),
+            ],
+          ),
+        ),
+
         Expanded(
           child: _filteredLectures.isEmpty
               ? Center(
@@ -480,7 +534,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       const Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFFCBD5E1)),
                       const SizedBox(height: 10),
                       Text(
-                        'لا توجد محاضرات منشورة لهذه المادة حالياً',
+                        'لا توجد محاضرات منشورة لهذه الشعبة حالياً',
                         style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
                       ),
                       if (_canPublish) ...[
@@ -512,6 +566,109 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     );
   }
 
+  Widget _buildSectionFilterChip(String sectionKey, String label, int count) {
+    final isSelected = _selectedSectionFilter == sectionKey;
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.cairo(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (s) => setState(() => _selectedSectionFilter = sectionKey),
+      selectedColor: const Color(0xFF0F172A),
+      backgroundColor: Colors.white,
+      labelStyle: GoogleFonts.cairo(
+        color: isSelected ? const Color(0xFF38BDF8) : AppTheme.textSecondary,
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(9),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF0F172A) : AppTheme.lightBorder,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionBadge(String section) {
+    Color bg;
+    Color border;
+    Color text;
+    String label;
+
+    switch (section.toUpperCase()) {
+      case 'A':
+        bg = const Color(0xFFEFF6FF);
+        border = const Color(0xFFBFDBFE);
+        text = const Color(0xFF1D4ED8);
+        label = 'شعبة A';
+        break;
+      case 'B':
+        bg = const Color(0xFFFAF5FF);
+        border = const Color(0xFFE9D5FF);
+        text = const Color(0xFF7E22CE);
+        label = 'شعبة B';
+        break;
+      case 'C':
+        bg = const Color(0xFFFFFBEB);
+        border = const Color(0xFFFDE68A);
+        text = const Color(0xFFB45309);
+        label = 'شعبة C';
+        break;
+      case 'D':
+        bg = const Color(0xFFF0FDFA);
+        border = const Color(0xFF99F6E4);
+        text = const Color(0xFF0F766E);
+        label = 'شعبة D';
+        break;
+      case 'ALL':
+      default:
+        bg = const Color(0xFFECFDF5);
+        border = const Color(0xFFA7F3D0);
+        text = const Color(0xFF047857);
+        label = 'موحد للجميع';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.cairo(
+          fontSize: 9.5,
+          fontWeight: FontWeight.bold,
+          color: text,
+        ),
+      ),
+    );
+  }
+
   Widget _buildLectureCard(LectureModel lecture) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -528,22 +685,28 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: lecture.isPractical
-                      ? AppTheme.accent.withValues(alpha: 0.12)
-                      : AppTheme.primarySubtle,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  lecture.typeLabel,
-                  style: GoogleFonts.cairo(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: lecture.isPractical ? AppTheme.accent : AppTheme.primary,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: lecture.isPractical
+                          ? AppTheme.accent.withValues(alpha: 0.12)
+                          : AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      lecture.typeLabel,
+                      style: GoogleFonts.cairo(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: lecture.isPractical ? AppTheme.accent : AppTheme.primary,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  _buildSectionBadge(lecture.section),
+                ],
               ),
               Row(
                 children: [
@@ -568,6 +731,20 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             lecture.title,
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
+
+          if (lecture.uploaderName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.person_outline_rounded, size: 13, color: AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  'الناشر: ${lecture.uploaderName} ${lecture.uploaderRole == "admin" ? "(إشراف عام)" : "(شعبة ${lecture.section})"}',
+                  style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 2),
 
@@ -652,7 +829,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   // تبويب 2: تبليغات المادة الأكاديمية
   // ══════════════════════════════════════════════════════════════
   Widget _buildAnnouncementsTab() {
-    if (_subjectAnnouncements.isEmpty) {
+    final announcements = _filteredAnnouncements;
+    if (announcements.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -660,7 +838,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             const Icon(Icons.campaign_outlined, size: 48, color: Color(0xFFCBD5E1)),
             const SizedBox(height: 10),
             Text(
-              'لا توجد تبليغات خاصة بهذه المادة حالياً',
+              'لا توجد تبليغات خاصة بهذه الشعبة حالياً',
               style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
             ),
             if (_canPublish) ...[
@@ -683,9 +861,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _subjectAnnouncements.length,
+      itemCount: announcements.length,
       itemBuilder: (context, index) {
-        final item = _subjectAnnouncements[index];
+        final item = announcements[index];
         return InkWell(
           onTap: () {
             AppFullscreenModal.show(
