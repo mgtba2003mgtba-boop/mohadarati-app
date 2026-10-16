@@ -564,19 +564,19 @@ void main() {
     });
 
     test('اختبار قاعدة بيانات المواد المستخرجة من نظام البصمة (119 Biometric Subjects Extraction & Classification)', () {
-      // 1. فحص إجمالي عدد المواد في نظام البصمة الجامعي مع مقررات هندسة الحاسوب الرسمية الإجبارية
+      // 1. فحص إجمالي عدد المواد في نظام البصمة الجامعي مع مقررات هندسة الحاسوب الرسمية والاختيارية
       final all = BiometricSubjects.allSubjects;
-      expect(all.length, 115, reason: 'يجب أن تحتوي المنظومة على 115 مادة معتمدة بعد إزالة المقررات الاختيارية لحاسوب');
+      expect(all.length, 125, reason: 'يجب أن تحتوي المنظومة على 125 مادة معتمدة بعد استعادة المقررات الاختيارية لحاسوب');
 
       // 2. فحص توزيع المواد حسب الأقسام
       final compSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الحاسوب');
       final cyberSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأمن السيبراني');
       final medSubjects = BiometricSubjects.getSubjects(department: 'هندسة تقنيات الأجهزة الطبية');
 
-      expect(compSubjects.length, 47, reason: 'هندسة الحاسوب تضم 47 مادة رسمية إجبارية عبر المراحل الأربع');
+      expect(compSubjects.length, 57, reason: 'هندسة الحاسوب تضم 57 مادة رسمية بعد استعادة المقررات الاختيارية عبر المراحل الأربع');
       expect(cyberSubjects.length, 19, reason: 'الأمن السيبراني يضم 19 مادة رسمية');
       expect(medSubjects.length, 49, reason: 'الأجهزة الطبية تضم 49 مادة رسمية');
-      expect(compSubjects.length + cyberSubjects.length + medSubjects.length, 115);
+      expect(compSubjects.length + cyberSubjects.length + medSubjects.length, 125);
 
       // 3. فحص فلترة الكورس الدراسي (الفصل 1 والفصل 2)
       final compL1S1 = BiometricSubjects.getSubjects(
