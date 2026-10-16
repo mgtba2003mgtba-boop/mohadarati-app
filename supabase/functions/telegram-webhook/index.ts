@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQADAgADPrEAAlcvkEq_C7e8RTn6FAI';
+const APK_FILE_ID = 'BQADAgADc7EAAlcvkEr4UYPrrkl-ZgI';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -84,7 +84,7 @@ Deno.serve(async (req)=>{
           commands: [
             {
               command: 'start',
-              description: 'نظام الحضور الذكي وتسجيل البصمة'
+              description: 'نظام الحضور وتسجيل البصمة'
             },
             {
               command: 'app',
@@ -256,19 +256,7 @@ Deno.serve(async (req)=>{
           }
         });
       }
-      if (data === 'cmd:today' || data === 'action:today') {
-        const todayMsg = await getStudentTodaySchedule(chatId);
-        const keyboard = await getStudentScheduleInlineKeyboard(chatId);
-        await sendTelegramMessage(botToken, chatId, todayMsg, keyboard);
-        return new Response(JSON.stringify({
-          ok: true
-        }), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        });
-      }
+
       return new Response(JSON.stringify({
         ok: true
       }), {
@@ -393,20 +381,7 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    // 4. Command: /today, /schedule, or /table
-    if (text.startsWith('/today') || text.startsWith('/schedule') || text.startsWith('/status') || text.includes('جدول')) {
-      const todayMsg = await getStudentTodaySchedule(chatId);
-      const keyboard = await getStudentScheduleInlineKeyboard(chatId);
-      await sendTelegramMessage(botToken, chatId, todayMsg, keyboard);
-      return new Response(JSON.stringify({
-        ok: true
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
-    }
+
     // 5. Command: /start
     if (text.startsWith('/start')) {
       const parts = text.split(' ');
@@ -519,7 +494,7 @@ Deno.serve(async (req)=>{
         const student = await getStudentByChatId(chatId);
         if (student) {
           const welcomeMsg = `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` +
-            `🤖 <b>نظام تسجيل الحضور الذكي وبصمة الوجه</b>\n` +
+            `🤖 <b>نظام تسجيل الحضور وبصمة الوجه</b>\n` +
             `━━━━━━━━━━━━━━━━━━━━━\n` +
             `أهلاً بك يا <b>${student.name}</b> 🎓\n` +
             `• القسم: <b>${student.department}</b> — <b>${student.stage}</b>\n` +
@@ -563,7 +538,7 @@ Deno.serve(async (req)=>{
     if (text.startsWith('/help') || text.startsWith('/menu') || text === 'مساعدة' || text === 'أوامر' || text === 'اوامر') {
       const isLinked = await checkStudentLinked(chatId);
       if (isLinked) {
-        const helpMsg = `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` + `🤖 <b>دليل واختصارات البوت الأكاديمي</b>\n` + `━━━━━━━━━━━━━━━━━━━━━\n` + `• <code>/app</code> ➔ تحميل وتثبيت تطبيق محاضراتي للهاتف\n` + `• <code>/start</code> ➔ نظام الحضور الذكي وتسجيل البصمة\n` + `• <code>/id</code> ➔ نسخ المعرف الجامعي فوراً\n` + `• <code>/card</code> ➔ بطاقتي الأكاديمية والقيد\n` + `• <code>/today</code> ➔ جدول ومحاضرات اليوم`;
+        const helpMsg = `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` + `🤖 <b>دليل واختصارات البوت الأكاديمي</b>\n` + `━━━━━━━━━━━━━━━━━━━━━\n` + `• <code>/app</code> ➔ تحميل وتثبيت تطبيق محاضراتي للهاتف\n` + `• <code>/start</code> ➔ نظام الحضور وتسجيل البصمة\n` + `• <code>/id</code> ➔ نسخ المعرف الجامعي فوراً\n` + `• <code>/card</code> ➔ بطاقتي الأكاديمية والقيد`;
         const keyboard = {
           inline_keyboard: [
             [
@@ -580,12 +555,6 @@ Deno.serve(async (req)=>{
               {
                 text: '💳 بطاقتي الأكاديمية',
                 callback_data: 'cmd:card'
-              }
-            ],
-            [
-              {
-                text: '📅 جدول ومحاضرات اليوم',
-                callback_data: 'cmd:today'
               }
             ],
             [
@@ -692,7 +661,7 @@ Deno.serve(async (req)=>{
           await sendTelegramMessage(botToken, chatId, `⚠️ <b>لم يتم العثور على الاسم</b>\n` + `يرجى كتابة <b>اسمك الرباعي كاملاً</b> أو المعرف الجامعي.`);
         }
       } else {
-        await sendTelegramMessage(botToken, chatId, `💡 <b>حسابك مفعل وجاهز</b>\n\n` + `اختر الخدمة المطلوبة أو حمّل التطبيق:\n` + `• <code>/app</code> ➔ تحميل وتثبيت تطبيق محاضراتي (أندرويد وآيفون)\n` + `• <code>/start</code> ➔ نظام الحضور الذكي وتسجيل البصمة\n` + `• <code>/id</code> ➔ نسخ المعرف الجامعي فوراً\n` + `• <code>/card</code> ➔ بطاقتي الأكاديمية والقيد\n` + `• <code>/today</code> ➔ جدول محاضرات وسجل حضور اليوم`, {
+        await sendTelegramMessage(botToken, chatId, `💡 <b>حسابك مفعل وجاهز</b>\n\n` + `اختر الخدمة المطلوبة أو حمّل التطبيق:\n` + `• <code>/app</code> ➔ تحميل وتثبيت تطبيق محاضراتي (أندرويد وآيفون)\n` + `• <code>/start</code> ➔ نظام الحضور وتسجيل البصمة\n` + `• <code>/id</code> ➔ نسخ المعرف الجامعي فوراً\n` + `• <code>/card</code> ➔ بطاقتي الأكاديمية والقيد`, {
           inline_keyboard: [
             [
               {
@@ -712,8 +681,8 @@ Deno.serve(async (req)=>{
             ],
             [
               {
-                text: '📅 جدول ومحاضرات اليوم',
-                callback_data: 'cmd:today'
+                text: '💬 الدعم الفني والمساعدة',
+                url: 'https://t.me/ii6689'
               }
             ]
           ]
@@ -849,6 +818,9 @@ async function sendTelegramAnimation(botToken, chatId, animationUrlOrId, caption
 async function sendAndroidApkFile(botToken, chatId) {
   const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 <b>الإصدار الجديد:</b> v1.0.1\n` +
+    `📅 <b>تاريخ التحديث:</b> ${new Date().toLocaleDateString('ar-EG')}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
     `اضغط على الملف أعلاه لتنزيله ثم اختر <b>تثبيت (Install)</b>.`;
   await sendTelegramDocument(botToken, chatId, APK_FILE_ID, caption);
 }
@@ -856,13 +828,15 @@ async function sendAndroidInstallGuide(botToken, chatId) {
   await sendAndroidApkFile(botToken, chatId);
 }
 async function sendIosInstallGuide(botToken, chatId) {
-  const caption = `🍏 <b>تثبيت تطبيق محاضراتي للآيفون (iOS)</b>\n` +
+  const caption = `🍏 <b>تثبيت وتحديث تطبيق محاضراتي للآيفون (iOS)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 <b>الإصدار الجديد:</b> v1.0.1 (أحدث نسخة)\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `1️⃣ اضغط على الزر أدناه ثم اختر <b>(سماح / Allow)</b>.\n` +
     `2️⃣ افتح <b>الإعدادات (Settings)</b> ⚙️ على هاتفك.\n` +
     `3️⃣ اضغط على <b>(تم تنزيل ملف التعريف)</b> في الأعلى ثم <b>تثبيت (Install)</b>.\n` +
     `4️⃣ أدخل رمز قفل الشاشة (Passcode) الخاص بهاتفك لتأكيد التثبيت.\n\n` +
-    `🎉 <i>شاهد الحركة التوضيحية أعلاه لمعاينة الخطوات بنقرة واحدة!</i>`;
+    `✨ <i>ملاحظة: إذا كان التطبيق مثبتاً لديك مسبقاً، فسيتم تحديثه تلقائياً بمجرد فتحه!</i>`;
   const replyMarkup = {
     inline_keyboard: [
       [

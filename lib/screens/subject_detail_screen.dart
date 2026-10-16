@@ -765,7 +765,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     '${lecture.createdAt.year}/${lecture.createdAt.month.toString().padLeft(2, '0')}/${lecture.createdAt.day.toString().padLeft(2, '0')}',
                     style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
                   ),
-                  if (_canPublish && (_user?.studentId == lecture.uploaderId || _user?.isAdmin == true || _user?.name.contains('مجتبى') == true)) ...[
+                  if (_canPublish) ...[
                     const SizedBox(width: 8),
                     InkWell(
                       onTap: () => _confirmDeleteLecture(lecture),

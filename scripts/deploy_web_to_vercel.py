@@ -44,7 +44,7 @@ import time
 build_time = int(time.time())
 version_data = {
     "app_name": "nust_student_portal",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "build_number": str(build_time),
     "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 }

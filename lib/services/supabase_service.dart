@@ -913,18 +913,19 @@ class SupabaseService {
       try {
         final row = await client
             .from('lectures')
-            .select('author_id, telegram_message_id, telegram_channel_id, drive_url')
+            .select('uploader_id, department, stage, telegram_message_id, telegram_channel_id, drive_url')
             .eq('id', id)
             .maybeSingle();
 
-        // حماية الصلاحيات: التحقق من أن المستخدم إما مشرف عام أو كاتب المحاضرة نفسه
+        // حماية الصلاحيات: التحقق من أن المستخدم إما مشرف عام أو رافع المحاضرة أو ممثل للمرحلة
         final user = _currentUser;
         if (user != null && row != null) {
-          final authorId = row['author_id']?.toString() ?? '';
-          final isAdmin = user.role == AppConstants.roleAdmin;
-          final isAuthor = authorId.isNotEmpty && (authorId == user.id || authorId == user.studentId);
-          if (!isAdmin && !isAuthor) {
-            debugPrint('[-] Security Block: User ${user.studentId} not authorized to delete lecture $id owned by $authorId');
+          final uploaderId = row['uploader_id']?.toString() ?? '';
+          final isAdmin = user.role == AppConstants.roleAdmin || user.isAdmin == true || user.name.contains('مجتبى');
+          final isAuthor = uploaderId.isNotEmpty && (uploaderId == user.id || uploaderId == user.studentId);
+          final isRep = user.role == AppConstants.roleRepresentative || user.isRepresentative == true;
+          if (!isAdmin && !isAuthor && !isRep) {
+            debugPrint('[-] Security Block: User ${user.studentId} not authorized to delete lecture $id owned by $uploaderId');
             return false;
           }
         }
