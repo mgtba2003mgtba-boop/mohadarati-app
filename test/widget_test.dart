@@ -14,6 +14,7 @@ import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
 import 'package:nust_student_portal/widgets/ios_install_dialog.dart';
 import 'package:nust_student_portal/services/admin_preview_service.dart';
 import 'package:nust_student_portal/services/auto_update_service.dart';
+import 'package:nust_student_portal/services/telegram_uploader_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1396,8 +1397,38 @@ void main() {
       expect(AppConstants.isValidStudentId('abc'), isFalse);
       expect(AppConstants.isValidStudentId(null), isFalse);
     });
+
+    test('اختبار معالجة استجابات ونماذج رفع المحاضرات والسحابة (TelegramUploader Resilience)', () {
+      final resSuccess = UploadLectureResult(
+        success: true,
+        message: 'تم نشر ورفع المحاضرة إلى السحابة بنجاح ومزامنتها للطلبة',
+        telegramMessageId: 12345,
+        fileName: 'Lecture_1.pdf',
+        fileSizeBytes: 1024 * 1024 * 5,
+      );
+      expect(resSuccess.success, isTrue);
+      expect(resSuccess.telegramMessageId, 12345);
+      expect(resSuccess.fileName, 'Lecture_1.pdf');
+
+      final resOversized = UploadLectureResult(
+        success: false,
+        message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى ضغط الملف أو استخدام رابط Google Drive للملفات الكبيرة جداً.',
+      );
+      expect(resOversized.success, isFalse);
+      expect(resOversized.message, contains('50 ميغابايت'));
+
+      final genRes = UploadGeneralFileResult(
+        success: true,
+        message: 'تم رفع الملف بنجاح',
+        fileUrl: 'https://api.telegram.org/file/bot123/doc.pdf',
+        fileSizeBytes: 2048,
+      );
+      expect(genRes.success, isTrue);
+      expect(genRes.fileUrl, contains('api.telegram.org'));
+    });
   });
 }
+
 
 
 

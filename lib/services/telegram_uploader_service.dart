@@ -117,6 +117,78 @@ class TelegramUploaderService {
     return 0;
   }
 
+  /// تنسيق حجم الملف للعرض البشري
+  String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميغابايت';
+    } else {
+      return '${(bytes / 1024).toStringAsFixed(0)} كيلوبايت';
+    }
+  }
+
+  /// إرسال مستند إلى تيليجرام مع إعادة المحاولة التلقائية عند تذبذب الاتصال (Exponential Backoff Auto-Retry)
+  Future<http.Response?> _sendDocumentWithRetry({
+    required Uri uri,
+    required String chatId,
+    required String caption,
+    required Uint8List fileBytes,
+    required String fileName,
+    int maxAttempts = 3,
+    void Function(String status, double? progress)? onProgress,
+  }) async {
+    http.Response? lastResponse;
+    dynamic lastError;
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        if (attempt > 1) {
+          onProgress?.call('تذبذب في شبكة الاتصال، إعادة المحاولة تلقائياً ($attempt/$maxAttempts)...', 0.4);
+          debugPrint('[~] Retrying Telegram upload attempt $attempt of $maxAttempts after backoff...');
+          await Future.delayed(Duration(seconds: (attempt - 1) * 2));
+        } else {
+          onProgress?.call('جاري رفع الملف إلى السحابة المباشرة...', 0.3);
+        }
+
+        final request = http.MultipartRequest('POST', uri);
+        request.fields['chat_id'] = chatId;
+        request.fields['caption'] = caption;
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'document',
+            fileBytes,
+            filename: fileName,
+          ),
+        );
+
+        final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
+        final response = await http.Response.fromStream(streamedResponse);
+        lastResponse = response;
+
+        if (response.statusCode == 200) {
+          return response;
+        }
+
+        // أخطاء غير قابلة للإعادة (مثل ملف كبير جداً أو توكن غير صحيح)
+        if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 403 || response.statusCode == 404) {
+          debugPrint('[-] Telegram non-retryable response (${response.statusCode}): ${response.body}');
+          return response;
+        }
+
+        debugPrint('[-] Telegram returned status ${response.statusCode} on attempt $attempt, retrying...');
+      } catch (err) {
+        lastError = err;
+        debugPrint('[-] Telegram socket/network exception on attempt $attempt: $err');
+        if (attempt == maxAttempts) {
+          rethrow;
+        }
+      }
+    }
+
+    if (lastResponse != null) return lastResponse;
+    if (lastError != null) throw lastError;
+    return null;
+  }
+
   /// جلب رابط مباشر جديد للملف في حال الحاجة لتحديث الرابط
   Future<String?> resolveFileUrl(String fileId) async {
     try {
@@ -141,8 +213,10 @@ class TelegramUploaderService {
     required PlatformFile file,
     String? caption,
     String fileType = 'general', // 'schedule' أو 'banner' أو 'general'
+    void Function(String status, double? progress)? onProgress,
   }) async {
     try {
+      onProgress?.call('جاري قراءة وتجهيز الملف...', 0.1);
       final Uint8List fileBytes = await _getFileBytes(file);
       if (fileBytes.isEmpty) {
         return UploadGeneralFileResult(
@@ -171,21 +245,17 @@ class TelegramUploaderService {
       final channelId = AppConstants.lecturesChannelId;
       final uri = Uri.parse('https://api.telegram.org/bot$botToken/sendDocument');
 
-      final request = http.MultipartRequest('POST', uri);
-      request.fields['chat_id'] = channelId.toString();
-      request.fields['caption'] = fullCaption;
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'document',
-          fileBytes,
-          filename: file.name,
-        ),
+      final response = await _sendDocumentWithRetry(
+        uri: uri,
+        chatId: channelId.toString(),
+        caption: fullCaption,
+        fileBytes: fileBytes,
+        fileName: file.name,
+        maxAttempts: 3,
+        onProgress: onProgress,
       );
 
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
+      if (response != null && response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['ok'] == true && data['result'] != null) {
           final result = data['result'];
@@ -230,6 +300,8 @@ class TelegramUploaderService {
 
           directUrl ??= '';
 
+          onProgress?.call('تم رفع الملف بنجاح!', 1.0);
+
           return UploadGeneralFileResult(
             success: true,
             message: 'تم رفع الملف إلى سحابة تيليجرام بنجاح',
@@ -242,15 +314,24 @@ class TelegramUploaderService {
         }
       }
 
+      final statusCode = response?.statusCode ?? 500;
+      final body = response?.body ?? '';
+      String friendlyMessage = 'فشل الرفع من سحابة تيليجرام ($statusCode)';
+      if (statusCode == 400 && body.contains('file is too big')) {
+        friendlyMessage = 'حجم الملف يتجاوز الحد المسموح به في تيليجرام (50 ميغابايت).';
+      } else if (body.isNotEmpty) {
+        friendlyMessage = '$friendlyMessage: $body';
+      }
+
       return UploadGeneralFileResult(
         success: false,
-        message: 'فشل الرفع من سحابة تيليجرام (${response.statusCode}): ${response.body}',
+        message: friendlyMessage,
       );
     } catch (e) {
       debugPrint('[-] Telegram cloud general file upload error: $e');
       return UploadGeneralFileResult(
         success: false,
-        message: 'حدث خطأ في الاتصال بسحابة تيليجرام: $e',
+        message: 'انقطع الاتصال بالسحابة أثناء الرفع بعد عدة محاولات تلقائية. يرجى التأكد من استقرار شبكة الإنترنت وإعادة المحاولة.',
       );
     }
   }
@@ -319,8 +400,10 @@ class TelegramUploaderService {
     required String uploaderId,
     required String uploaderName,
     required String uploaderRole,
+    void Function(String status, double? progress)? onProgress,
   }) async {
     try {
+      onProgress?.call('جاري قراءة وتجهيز بيانات ملف المحاضرة...', 0.1);
       final Uint8List fileBytes = await _getFileBytes(file);
       if (fileBytes.isEmpty) {
         return UploadLectureResult(
@@ -332,7 +415,7 @@ class TelegramUploaderService {
       if (fileBytes.length > 50 * 1024 * 1024) {
         return UploadLectureResult(
           success: false,
-          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى استخدام خيار رابط Google Drive للملفات الكبيرة جداً.',
+          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى ضغط الملف أو استخدام رابط Google Drive للملفات الكبيرة جداً.',
         );
       }
 
@@ -351,26 +434,24 @@ class TelegramUploaderService {
       captionLines.add('👤 نُشر بواسطة: $uploaderName ($uploaderRole)');
       final caption = captionLines.join('\n');
 
-      // 2. الرفع المباشر عبر Telegram Bot API
+      // 2. الرفع المباشر عبر Telegram Bot API مع إعادة المحاولة التلقائية عند تذبذب الشبكة
       final botToken = AppConstants.lecturesBotToken;
       final channelId = AppConstants.lecturesChannelId;
       final uri = Uri.parse('https://api.telegram.org/bot$botToken/sendDocument');
 
-      final request = http.MultipartRequest('POST', uri);
-      request.fields['chat_id'] = channelId.toString();
-      request.fields['caption'] = caption;
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'document',
-          fileBytes,
-          filename: file.name,
-        ),
+      onProgress?.call('جاري رفع المحاضرة (${_formatBytes(fileBytes.length)}) إلى السحابة...', 0.25);
+
+      final response = await _sendDocumentWithRetry(
+        uri: uri,
+        chatId: channelId.toString(),
+        caption: caption,
+        fileBytes: fileBytes,
+        fileName: file.name,
+        maxAttempts: 3,
+        onProgress: onProgress,
       );
 
-      final streamedResponse = await request.send().timeout(const Duration(minutes: 10));
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
+      if (response != null && response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data['ok'] == true && data['result'] != null) {
           final result = data['result'];
@@ -392,6 +473,8 @@ class TelegramUploaderService {
             }
           }
 
+          onProgress?.call('تم رفع الملف بنجاح! جاري معالجة المعرّف السحابي...', 0.75);
+
           // 3. جلب مسار التحميل المباشر السحابي الدائم
           String? directUrl;
           if (fileId != null) {
@@ -409,6 +492,8 @@ class TelegramUploaderService {
               debugPrint('[-] Error getting lecture file path: $e');
             }
           }
+
+          onProgress?.call('جاري حفظ بيانات المحاضرة ومزامنتها للطلبة...', 0.9);
 
           // 4. حفظ بيانات المحاضرة سحابياً في جدول Supabase مباشرة
           final lecturePayload = {
@@ -434,14 +519,24 @@ class TelegramUploaderService {
             'duration_seconds': 0,
           };
 
-          final dbOk = await SupabaseService().createLecture(LectureModel.fromJson(lecturePayload));
+          bool dbOk = await SupabaseService().createLecture(LectureModel.fromJson(lecturePayload));
           if (!dbOk) {
             try {
               await SupabaseService().client.from('lectures').insert(lecturePayload);
+              dbOk = true;
             } catch (dbErr) {
               debugPrint('[-] Direct db insert error: $dbErr');
             }
           }
+
+          if (!dbOk) {
+            return UploadLectureResult(
+              success: false,
+              message: 'تم رفع الملف بنجاح إلى السحابة، ولكن تعذر حفظ بيانات المحاضرة في قاعدة البيانات. يرجى المحاولة مرة أخرى.',
+            );
+          }
+
+          onProgress?.call('تم نشر المحاضرة ومزامنتها بنجاح!', 1.0);
 
           return UploadLectureResult(
             success: true,
@@ -453,15 +548,26 @@ class TelegramUploaderService {
         }
       }
 
+      final statusCode = response?.statusCode ?? 500;
+      final body = response?.body ?? '';
+      String friendlyMessage = 'فشل الرفع من سحابة تيليجرام ($statusCode)';
+      if (statusCode == 400 && body.contains('file is too big')) {
+        friendlyMessage = 'حجم الملف يتجاوز الحد المسموح به في تيليجرام (50 ميغابايت). يرجى ضغط الملف أو استخدام رابط درايف.';
+      } else if (statusCode == 429) {
+        friendlyMessage = 'تم تجاوز معدل الطلبات المسموح به مؤقتاً، يرجى الانتظار دقيقة والمحاولة مجدداً.';
+      } else if (body.isNotEmpty) {
+        friendlyMessage = '$friendlyMessage: $body';
+      }
+
       return UploadLectureResult(
         success: false,
-        message: 'فشل الرفع من سحابة تيليجرام (${response.statusCode}): ${response.body}',
+        message: friendlyMessage,
       );
     } catch (e) {
       debugPrint('[-] Upload lecture cloud error: $e');
       return UploadLectureResult(
         success: false,
-        message: 'حدث خطأ في الاتصال بالسحابة: $e',
+        message: 'انقطع الاتصال بالسحابة أثناء الرفع بعد عدة محاولات تلقائية. يرجى التأكد من استقرار شبكة الإنترنت وإعادة المحاولة.',
       );
     }
   }

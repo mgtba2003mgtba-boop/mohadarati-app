@@ -61,6 +61,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late TabController _tabController;
   AppUserModel? _currentUser;
   bool _isLoading = false;
+  String _uploadStatusMessage = '';
+  double? _uploadProgress;
 
   // ── متحكمات استمارة نشر المحاضرة ──────────────────────────────
   final _lectureTitleController = TextEditingController();
@@ -359,6 +361,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (file != null) {
         final size = await TelegramUploaderService().getFileSize(file);
+        if (size > 50 * 1024 * 1024) {
+          _showSnackbar(
+            'تنبيه: حجم الملف المختار (${_formatFileSize(size)}) يتجاوز الحد الأقصى للرفع المباشر (50 ميغابايت). يرجى ضغط الملف أو تقليل حجمه.',
+            isError: true,
+          );
+        }
         setState(() {
           _isPickingFile = false;
           _selectedFile = file;
@@ -409,7 +417,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (_selectedFileSize > 50 * 1024 * 1024) {
+      _showSnackbar(
+        'حجم الملف المختار (${_formatFileSize(_selectedFileSize)}) يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى تقليل حجم الملف أو استخدام ملف آخر.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _uploadStatusMessage = 'جاري التحضير ورفع المحاضرة إلى السحابة...';
+      _uploadProgress = 0.1;
+    });
 
     final result = await TelegramUploaderService().uploadLecture(
       file: _selectedFile!,
@@ -424,10 +444,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
       uploaderName: _currentUser?.name ?? 'ممثل الشعبة',
       uploaderRole: _currentUser?.role ?? 'representative',
+      onProgress: (status, progress) {
+        if (mounted) {
+          setState(() {
+            _uploadStatusMessage = status;
+            _uploadProgress = progress;
+          });
+        }
+      },
     );
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = false;
+      _uploadStatusMessage = '';
+      _uploadProgress = null;
+    });
 
     if (result.success) {
       setState(() => _selectedFile = null);
@@ -1036,15 +1068,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppTheme.success.withValues(alpha: 0.15),
+                                color: _selectedFileSize > 50 * 1024 * 1024
+                                    ? AppTheme.danger.withValues(alpha: 0.2)
+                                    : AppTheme.success.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'الحجم: ${_formatFileSize(_selectedFileSize)}',
+                                _selectedFileSize > 50 * 1024 * 1024
+                                    ? 'الحجم: ${_formatFileSize(_selectedFileSize)} (يتجاوز 50MB)'
+                                    : 'الحجم: ${_formatFileSize(_selectedFileSize)}',
                                 style: GoogleFonts.cairo(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: AppTheme.success,
+                                  color: _selectedFileSize > 50 * 1024 * 1024 ? AppTheme.danger : AppTheme.success,
                                 ),
                               ),
                             ),
@@ -1266,6 +1302,67 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 24),
 
+          // ── بطاقة تقدم الرفع المباشر عند بدء العملية ──
+          if (_isLoading) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryLight),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _uploadStatusMessage.isNotEmpty
+                              ? _uploadStatusMessage
+                              : 'جاري رفع المحاضرة إلى سحابة المنظومة ومزامنتها...',
+                          style: GoogleFonts.cairo(
+                            color: AppTheme.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (_uploadProgress != null)
+                        Text(
+                          '${(_uploadProgress! * 100).toInt()}%',
+                          style: GoogleFonts.cairo(
+                            color: AppTheme.primaryLight,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_uploadProgress != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: _uploadProgress,
+                        backgroundColor: Colors.white10,
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
           // ── زر النشر والرفع ──
           ElevatedButton.icon(
             onPressed: _isLoading ? null : _submitLecture,
@@ -1280,7 +1377,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
             label: Text(
               _isLoading
-                  ? 'جاري رفع المحاضرة إلى سحابة الكلية والمزامنة...'
+                  ? (_uploadStatusMessage.isNotEmpty ? _uploadStatusMessage : 'جاري الرفع والمزامنة...')
                   : (_uploadDirectFile
                       ? 'رفع ونشر المحاضرة إلى المنظومة'
                       : 'حفظ ونشر المحاضرة إلى البوابة'),
@@ -2026,6 +2123,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ],
       ),
     );
+  }
+
   /// ودجت موحد لعرض حالة القوائم الفارغة (DRY Empty State Component)
   Widget _buildEmptyStateCard(String message) {
     return Container(
