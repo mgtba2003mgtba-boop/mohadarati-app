@@ -93,6 +93,18 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     return false;
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && _isPdf) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _openViewer(_embeddedPreviewUrl);
+        }
+      });
+    }
+  }
+
   bool get _isDrive {
     return widget.rawUrl.contains('drive.google.com');
   }
@@ -103,8 +115,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
 
     // 1. ملفات PDF: فتحها عبر عارض PDF.js المدمج المحلي (بدون Google Docs وبدون تنزيل)
     if (_isPdf) {
-      final proxied = AppConstants.resolveImageUrl(clean);
-      return 'pdf_viewer.html?file=${Uri.encodeComponent(proxied)}';
+      final proxied = kIsWeb
+          ? AppConstants.resolveImageUrl(clean)
+          : 'https://mohadarati.vercel.app/api/proxy?url=${Uri.encodeComponent(clean)}';
+      final base = kIsWeb ? 'pdf_viewer.html' : 'https://mohadarati.vercel.app/pdf_viewer.html';
+      return '$base?file=${Uri.encodeComponent(proxied)}';
     }
 
     // 2. صور (في حال تم استدعاء الـ IFrame)
@@ -147,6 +162,20 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           SnackBar(content: Text('تعذر فتح الرابط: $e'), backgroundColor: AppTheme.danger),
         );
       }
+    }
+  }
+
+  Future<void> _openViewer(String embedUrl) async {
+    final uri = Uri.parse(embedUrl.trim());
+    try {
+      final can = await canLaunchUrl(uri);
+      if (can) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await _launchExternal(widget.rawUrl);
+      }
+    } catch (_) {
+      await _launchExternal(widget.rawUrl);
     }
   }
 
@@ -294,10 +323,135 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
 
   /// عارض المستندات والـ PDF المدمج دون أي تحميل قسري
   Widget _buildDocumentViewer(String embedUrl) {
-    return SizedBox.expand(
-      child: buildWebIFrame(
-        url: embedUrl,
-        title: widget.title,
+    if (kIsWeb) {
+      return SizedBox.expand(
+        child: buildWebIFrame(
+          url: embedUrl,
+          title: widget.title,
+        ),
+      );
+    }
+
+    // على أنظمة الهواتف (Android & iOS)
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF334155)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4), width: 2),
+                ),
+                child: Icon(
+                  _isPdf ? Icons.picture_as_pdf_rounded : Icons.description_rounded,
+                  color: AppTheme.accent,
+                  size: 38,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  height: 1.3,
+                ),
+              ),
+              if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  widget.subtitle!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    color: const Color(0xFF94A3B8),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+
+              // الزر الأساسي: فتح وقراءة المحاضرة بملء الشاشة
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openViewer(embedUrl),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.remove_red_eye_rounded, size: 20),
+                  label: Text(
+                    'معاينة وقراءة المحاضرة الآن',
+                    style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // خيار فتح عبر قارئ الـ PDF الخاص بالهاتف
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _launchExternal(widget.rawUrl),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFCBD5E1),
+                    side: const BorderSide(color: Color(0xFF475569)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.menu_book_rounded, size: 18, color: AppTheme.accent),
+                  label: Text(
+                    'فتح في قارئ الـ PDF الخاص بالهاتف',
+                    style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // زر التنزيل والحفظ
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () => _launchExternal(_downloadTargetUrl),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF94A3B8),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: Text(
+                    'تنزيل وحفظ نسخة على الجهاز',
+                    style: GoogleFonts.cairo(fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
