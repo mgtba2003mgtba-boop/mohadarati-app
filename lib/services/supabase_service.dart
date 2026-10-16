@@ -1115,7 +1115,7 @@ class SupabaseService {
     // دمج المقررات المضافة والمسجلة محلياً
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = 'custom_courses_${department}_$normStage';
+      final key = _getCustomCoursesStorageKey(department, normStage);
       final cachedJson = prefs.getString(key);
       if (cachedJson != null && cachedJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(cachedJson);
@@ -1130,6 +1130,9 @@ class SupabaseService {
 
     return base;
   }
+
+  static String _getCustomCoursesStorageKey(String department, String normStage) =>
+      'custom_courses_${department}_$normStage';
 
   /// ── إضافة مقرر دراسي جديد (للممثلين والمشرفين) ───────────────────────────
   Future<bool> addCourse({
@@ -1162,7 +1165,7 @@ class SupabaseService {
       if (!current.contains(cleanName)) {
         current.add(cleanName);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
+        await prefs.setString(_getCustomCoursesStorageKey(department, normStage), jsonEncode(current));
       }
       return true;
     } catch (e) {
@@ -1212,7 +1215,7 @@ class SupabaseService {
       current.remove(cleanOld);
       if (!current.contains(cleanNew)) current.add(cleanNew);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
+      await prefs.setString(_getCustomCoursesStorageKey(department, normStage), jsonEncode(current));
 
       return true;
     } catch (e) {
@@ -1251,7 +1254,7 @@ class SupabaseService {
       final current = await fetchCourses(department: department, stage: normStage);
       current.remove(cleanName);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('custom_courses_${department}_$normStage', jsonEncode(current));
+      await prefs.setString(_getCustomCoursesStorageKey(department, normStage), jsonEncode(current));
 
       return true;
     } catch (e) {

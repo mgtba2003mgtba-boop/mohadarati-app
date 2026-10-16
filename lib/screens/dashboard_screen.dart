@@ -2026,6 +2026,49 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ],
       ),
     );
+  /// ودجت موحد لعرض حالة القوائم الفارغة (DRY Empty State Component)
+  Widget _buildEmptyStateCard(String message) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.darkBorder),
+      ),
+      child: Center(
+        child: Text(
+          message,
+          style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  /// ودجت موحد لأزرار التوسع التدريجي (DRY Load More Component)
+  Widget _buildLoadMoreButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.accent,
+            side: const BorderSide(color: AppTheme.accent),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          icon: const Icon(Icons.expand_more_rounded),
+          label: Text(
+            label,
+            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          onPressed: onPressed,
+        ),
+      ),
+    );
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -2492,45 +2535,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           if (_isLoadingDashboard)
             const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppTheme.accent)))
           else if (filtered.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkBorder),
-              ),
-              child: Center(
-                child: Text(
-                  'لا توجد عمليات نشر مسجلة تطابق الفلاتر المحددة',
-                  style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
-                ),
-              ),
-            )
+            _buildEmptyStateCard('لا توجد عمليات نشر مسجلة تطابق الفلاتر المحددة')
           else ...[
             ...filtered.take(_activityDisplayLimit).map((item) => _buildActivityCard(item)),
             if (filtered.length > _activityDisplayLimit)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Center(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accent,
-                      side: const BorderSide(color: AppTheme.accent),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.expand_more_rounded),
-                    label: Text(
-                      'عرض المزيد (${filtered.length - _activityDisplayLimit} نشاط إضافي)',
-                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _activityDisplayLimit += 50;
-                      });
-                    },
-                  ),
-                ),
+              _buildLoadMoreButton(
+                label: 'عرض المزيد (${filtered.length - _activityDisplayLimit} نشاط إضافي)',
+                onPressed: () => setState(() => _activityDisplayLimit += 50),
               ),
           ],
         ],
@@ -3247,45 +3258,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           const SizedBox(height: 14),
 
           if (filtered.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkBorder),
-              ),
-              child: Center(
-                child: Text(
-                  'لم يتم العثور على طلاب أو ممثلين مطابقين للبحث',
-                  style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
-                ),
-              ),
-            )
+            _buildEmptyStateCard('لم يتم العثور على طلاب أو ممثلين مطابقين للبحث')
           else ...[
             ...filtered.take(_directoryDisplayLimit).map((user) => _buildRepCard(user)),
             if (filtered.length > _directoryDisplayLimit)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Center(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accent,
-                      side: const BorderSide(color: AppTheme.accent),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.expand_more_rounded),
-                    label: Text(
-                      'عرض المزيد (${filtered.length - _directoryDisplayLimit} طالب إضافي)',
-                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _directoryDisplayLimit += 50;
-                      });
-                    },
-                  ),
-                ),
+              _buildLoadMoreButton(
+                label: 'عرض المزيد (${filtered.length - _directoryDisplayLimit} طالب إضافي)',
+                onPressed: () => setState(() => _directoryDisplayLimit += 50),
               ),
           ],
         ],
@@ -4040,45 +4019,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           const SizedBox(height: 14),
 
           if (filtered.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(36),
-              decoration: BoxDecoration(
-                color: AppTheme.darkCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.darkBorder),
-              ),
-              child: Center(
-                child: Text(
-                  'لا توجد عناصر منشورة تطابق الفلاتر المحددة',
-                  style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 13),
-                ),
-              ),
-            )
+            _buildEmptyStateCard('لا توجد عناصر منشورة تطابق الفلاتر المحددة')
           else ...[
             ...filtered.take(_contentDisplayLimit).map((item) => _buildUnifiedContentCard(item)),
             if (filtered.length > _contentDisplayLimit)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Center(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accent,
-                      side: const BorderSide(color: AppTheme.accent),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.expand_more_rounded),
-                    label: Text(
-                      'عرض المزيد (${filtered.length - _contentDisplayLimit} منشور إضافي)',
-                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _contentDisplayLimit += 50;
-                      });
-                    },
-                  ),
-                ),
+              _buildLoadMoreButton(
+                label: 'عرض المزيد (${filtered.length - _contentDisplayLimit} منشور إضافي)',
+                onPressed: () => setState(() => _contentDisplayLimit += 50),
               ),
           ],
         ],
