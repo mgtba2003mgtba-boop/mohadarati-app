@@ -1106,11 +1106,29 @@ class SupabaseService {
   }) async {
     final targetSemester = semester ?? 1;
     final normStage = AppConstants.normalizeStage(stage);
-    return BiometricSubjects.getSubjectNames(
+    final base = BiometricSubjects.getSubjectNames(
       department: department,
       stage: normStage,
       semester: targetSemester,
     );
+
+    // دمج المقررات المضافة والمسجلة محلياً
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'custom_courses_${department}_$normStage';
+      final cachedJson = prefs.getString(key);
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(cachedJson);
+        for (final item in decoded) {
+          final s = item.toString().trim();
+          if (s.isNotEmpty && !base.contains(s)) {
+            base.add(s);
+          }
+        }
+      }
+    } catch (_) {}
+
+    return base;
   }
 
   /// ── إضافة مقرر دراسي جديد (للممثلين والمشرفين) ───────────────────────────
@@ -1248,7 +1266,8 @@ class SupabaseService {
       final res = await client
           .from('app_users')
           .select('*')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .limit(5000);
 
       return (res as List).map((item) => AppUserModel.fromJson(item)).toList();
     } catch (e) {

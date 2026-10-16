@@ -590,6 +590,7 @@ Deno.serve(async (req)=>{
             ]
           ]
         };
+        await sendTelegramMessage(botToken, chatId, helpMsg, keyboard);
       } else {
         await sendTelegramMessage(botToken, chatId, `👋 <b>أهلاً بك!</b>\n\nيرجى كتابة <b>اسمك الرباعي كاملاً</b> ✍️ هنا في المحادثة للبحث عن قيدك الأكاديمي وربط حسابك فوراً.\n<i>(مثال: علي محمد حسن كاظم)</i>`, {
           inline_keyboard: [

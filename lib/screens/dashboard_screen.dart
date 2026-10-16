@@ -1505,7 +1505,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (_currentUser == null) return false;
       return l.uploaderId == _currentUser!.studentId ||
           (l.department == _currentUser!.department &&
-              l.stage == _currentUser!.stage &&
+              AppConstants.normalizeStage(l.stage) == AppConstants.normalizeStage(_currentUser!.stage) &&
               (l.section == _currentUser!.section || l.section == 'ALL'));
     }).toList();
 
@@ -1763,7 +1763,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (_currentUser == null) return false;
       return a.authorId == _currentUser!.studentId ||
           (a.department == _currentUser!.department &&
-              a.stage == _currentUser!.stage &&
+              AppConstants.normalizeStage(a.stage) == AppConstants.normalizeStage(_currentUser!.stage) &&
               (a.section == _currentUser!.section || a.section == 'ALL' || a.section.isEmpty));
     }).toList();
 
@@ -2031,7 +2031,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildActivityRadarTab() {
     final filtered = _activities.where((item) {
       final matchDept = _activityDeptFilter == 'ALL' || item.department == _activityDeptFilter;
-      final matchStage = _activityStageFilter == 'ALL' || item.stage == _activityStageFilter;
+      final matchStage = _activityStageFilter == 'ALL' ||
+          AppConstants.normalizeStage(item.stage) == AppConstants.normalizeStage(_activityStageFilter);
       final matchType = _activityTypeFilter == 'ALL' || item.type == _activityTypeFilter;
       final q = _activitySearchQuery.trim().toLowerCase();
       final matchSearch = q.isEmpty ||
@@ -2333,7 +2334,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 const SizedBox(height: 12),
                 Row(
                   children: AppConstants.stages.map((stage) {
-                    final stageCount = _allUsers.where((u) => u.stage.contains(stage) || stage.contains(u.stage)).length;
+                    final stageCount = _allUsers.where((u) =>
+                        AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(stage)).length;
                     return Expanded(
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -2775,7 +2777,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
 
       final matchDept = _repDeptFilter == 'ALL' || user.department.contains(_repDeptFilter) || _repDeptFilter.contains(user.department);
-      final matchStage = _userDirectoryStageFilter == 'ALL' || user.stage.contains(_userDirectoryStageFilter) || _userDirectoryStageFilter.contains(user.stage);
+      final matchStage = _userDirectoryStageFilter == 'ALL' ||
+          AppConstants.normalizeStage(user.stage) == AppConstants.normalizeStage(_userDirectoryStageFilter);
       final q = _repSearchQuery.trim().toLowerCase();
       final matchSearch = q.isEmpty ||
           user.name.toLowerCase().contains(q) ||
@@ -2902,7 +2905,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             final repCount = _allUsers.where((u) =>
                               u.isRepresentative &&
                               u.department == _selectedRepDept &&
-                              u.stage == _selectedRepStage &&
+                              AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(_selectedRepStage) &&
                               u.section == sec
                             ).length;
 
@@ -2938,7 +2941,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     final currentReps = _allUsers.where((u) =>
                       u.isRepresentative &&
                       u.department == _selectedRepDept &&
-                      u.stage == _selectedRepStage &&
+                      AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(_selectedRepStage) &&
                       u.section == _selectedRepSection
                     ).toList();
 

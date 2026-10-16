@@ -1300,6 +1300,89 @@ void main() {
       // مستخدم آخر لا يحق له حذف منشورات غيره
       expect(canDelete(otherUser, lectureAuthorId), false);
     });
+
+    test('اختبار مطابقة وتوزيع الطلاب والممثلين حسب المراحل الموحدة (Dashboard Stage Matching)', () {
+      final users = [
+        AppUserModel(
+          id: 'u-1',
+          studentId: 'ST-101',
+          name: 'علي حسن',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'السنة الثانية', // صيغة نظام البصمة القديم
+          role: AppConstants.roleRepresentative,
+          section: 'A',
+        ),
+        AppUserModel(
+          id: 'u-2',
+          studentId: 'ST-102',
+          name: 'محمد جاسم',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'المرحلة 2', // صيغة رقمية
+          role: AppConstants.roleStudent,
+          section: 'A',
+        ),
+        AppUserModel(
+          id: 'u-3',
+          studentId: 'ST-103',
+          name: 'كرار حيدر',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'المرحلة الثانية', // الصيغة الرسمية
+          role: AppConstants.roleStudent,
+          section: 'B',
+        ),
+        AppUserModel(
+          id: 'u-4',
+          studentId: 'ST-104',
+          name: 'حسين علي',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'السنة الثالثة',
+          role: AppConstants.roleStudent,
+          section: 'A',
+        ),
+      ];
+
+      // فلتر المرحلة الثانية
+      const filterStage = 'المرحلة الثانية';
+      final matchingStage2 = users.where((u) =>
+          AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(filterStage)).toList();
+
+      // يجب أن يطابق الطلاب الثلاثة في المرحلة الثانية مهما كان شكل التسمية
+      expect(matchingStage2.length, 3);
+      expect(matchingStage2.map((u) => u.name), containsAll(['علي حسن', 'محمد جاسم', 'كرار حيدر']));
+
+      // التحقق من احتساب ممثلي شعبة A في المرحلة الثانية
+      final repCountSecA = users.where((u) =>
+          u.isRepresentative &&
+          AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(filterStage) &&
+          u.section == 'A'
+      ).length;
+      expect(repCountSecA, 1);
+    });
+
+    test('اختبار دمج المقررات المضافة مع المقررات الرسمية للبصمة (Courses Merging & Deduplication)', () {
+      final baseSubjects = BiometricSubjects.getSubjectNames(
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثانية',
+        semester: 1,
+      );
+
+      final customCourses = ['الأمن السيبراني المتقدم', 'مقرر إضافي للشعبة', baseSubjects.first];
+      final mergedList = List<String>.from(baseSubjects);
+
+      for (final item in customCourses) {
+        final clean = item.trim();
+        if (clean.isNotEmpty && !mergedList.contains(clean)) {
+          mergedList.add(clean);
+        }
+      }
+
+      // يجب عدم تكرار المادة الموجودة أصلاً
+      expect(mergedList.where((s) => s == baseSubjects.first).length, 1);
+      // يجب إضافة المواد الجديدة بنجاح
+      expect(mergedList, contains('الأمن السيبراني المتقدم'));
+      expect(mergedList, contains('مقرر إضافي للشعبة'));
+      expect(mergedList.length, baseSubjects.length + 2);
+    });
   });
 }
 
