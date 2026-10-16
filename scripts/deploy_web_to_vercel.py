@@ -23,12 +23,20 @@ if os.path.exists(api_dst):
 shutil.copytree(api_src, api_dst)
 print("[+] Copied api/ folder")
 
-# 3. Ensure mobileconfig and media
-for f in ["mohadarati.mobileconfig", "ios_install_guide.gif", "ios_install_guide.mp4"]:
+# 3. Ensure static web files, mobileconfig, pdf_viewer, and media
+for f in ["mohadarati.mobileconfig", "ios_install_guide.gif", "ios_install_guide.mp4", "pdf_viewer.html", "favicon.png", "manifest.json"]:
     src_f = os.path.join(WEB_SRC, f)
     if os.path.exists(src_f):
         shutil.copy2(src_f, os.path.join(BUILD_WEB, f))
         print(f"[+] Copied {f}")
+
+icons_src = os.path.join(WEB_SRC, "icons")
+icons_dst = os.path.join(BUILD_WEB, "icons")
+if os.path.exists(icons_src):
+    if os.path.exists(icons_dst):
+        shutil.rmtree(icons_dst)
+    shutil.copytree(icons_src, icons_dst)
+    print("[+] Copied icons/ folder")
 
 # 4. Generate dynamic version.json and update index.html
 import json

@@ -84,6 +84,10 @@ class AppConstants {
   static const String lecturesBotUsername = 'NUST_ETC_ATT_LEC_BOT';
   static const int lecturesChannelId = -1003875986734;
 
+  // الدعم الفني المباشر
+  static const String supportTelegramUsername = 'ii6689';
+  static const String supportTelegramUrl = 'https://t.me/ii6689';
+
   /// ── حماية وتشفير رموز الدخول (Cryptographic PIN Hashing) ─────────
   static String hashPin(String pin) {
     final clean = pin.trim();

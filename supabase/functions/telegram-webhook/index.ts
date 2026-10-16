@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQADAgADgq4AAlcvkEqjIl9WIICMCgI';
+const APK_FILE_ID = 'BQADAgAD8bAAAlcvkEpkZokHSBOgmQI';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -587,6 +587,12 @@ Deno.serve(async (req)=>{
                 text: '📅 جدول ومحاضرات اليوم',
                 callback_data: 'cmd:today'
               }
+            ],
+            [
+              {
+                text: '💬 الدعم الفني والمساعدة',
+                url: 'https://t.me/ii6689'
+              }
             ]
           ]
         };
@@ -598,6 +604,12 @@ Deno.serve(async (req)=>{
               {
                 text: '📲 تحميل وتثبيت تطبيق محاضراتي',
                 callback_data: 'cmd:app'
+              }
+            ],
+            [
+              {
+                text: '💬 الدعم الفني والمساعدة',
+                url: 'https://t.me/ii6689'
               }
             ]
           ]
@@ -612,6 +624,19 @@ Deno.serve(async (req)=>{
         }
       });
     }
+
+    // 7. Command: /support
+    if (text.startsWith('/support') || text === 'دعم' || text === 'الدعم الفني') {
+      await sendTelegramMessage(botToken, chatId, `👨‍💻 <b>الدعم الفني والمساعدة المباشرة</b>\n\nلأي استفسار أو مشكلة تقنية، تواصل مباشرة مع المطور والمشرف:\n👉 <b>@ii6689</b>`, {
+        inline_keyboard: [
+          [{ text: '💬 تواصل مع الدعم الفني', url: 'https://t.me/ii6689' }]
+        ]
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // 4. Text Message: Try to link by Exact Name or Student ID
     if (text.length >= 2) {
       const isAlreadyLinked = await checkStudentLinked(chatId);

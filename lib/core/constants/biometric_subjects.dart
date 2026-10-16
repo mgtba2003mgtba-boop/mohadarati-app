@@ -924,6 +924,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1101',
+      units: 7,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1102',
@@ -933,6 +935,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1102',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1103',
@@ -942,6 +946,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1103',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1104',
@@ -951,6 +957,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1104',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1105',
@@ -960,6 +968,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1105',
+      units: 2,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1106',
@@ -969,6 +979,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1106',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S1_MIET1107',
@@ -978,6 +990,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 1,
+      code: 'MIET1107',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1201',
@@ -987,6 +1001,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1201',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1202',
@@ -996,6 +1012,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1202',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1203',
@@ -1005,6 +1023,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1203',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1204',
@@ -1014,6 +1034,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1204',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1205',
@@ -1023,6 +1045,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1205',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L1_S2_MIET1206',
@@ -1032,6 +1056,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_1',
       stageName: 'المرحلة الأولى',
       semester: 2,
+      code: 'MIET1206',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2101',
@@ -1041,6 +1067,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2101',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2102',
@@ -1050,6 +1078,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2102',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2103',
@@ -1059,6 +1089,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2103',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2104',
@@ -1068,6 +1100,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2104',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2105',
@@ -1077,6 +1111,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2105',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S1_MIET2106',
@@ -1086,6 +1122,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 1,
+      code: 'MIET2106',
+      units: 2,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2201',
@@ -1095,6 +1133,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2201',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2202',
@@ -1104,6 +1144,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2202',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2203',
@@ -1113,6 +1155,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2203',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2204',
@@ -1122,6 +1166,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2204',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2205',
@@ -1131,6 +1177,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2205',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L2_S2_MIET2206',
@@ -1140,6 +1188,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_2',
       stageName: 'المرحلة الثانية',
       semester: 2,
+      code: 'MIET2206',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3101',
@@ -1149,6 +1199,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3101',
+      units: 7,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3102',
@@ -1158,6 +1210,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3102',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3103',
@@ -1167,6 +1221,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3103',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3104',
@@ -1176,6 +1232,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3104',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3105',
@@ -1185,6 +1243,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3105',
+      units: 4,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S1_MIET3106',
@@ -1194,6 +1254,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 1,
+      code: 'MIET3106',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3201',
@@ -1203,6 +1265,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3201',
+      units: 7,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3202',
@@ -1212,6 +1276,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3202',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3203',
@@ -1221,6 +1287,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3203',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3204',
@@ -1230,6 +1298,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3204',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3205',
@@ -1239,6 +1309,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3205',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L3_S2_MIET3206',
@@ -1248,6 +1320,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_3',
       stageName: 'المرحلة الثالثة',
       semester: 2,
+      code: 'MIET3206',
+      units: 3,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4101',
@@ -1257,6 +1331,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4101',
+      units: 7,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4102',
@@ -1266,6 +1342,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4102',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4103',
@@ -1275,6 +1353,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4103',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4104',
@@ -1284,6 +1364,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4104',
+      units: 5,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4105',
@@ -1293,6 +1375,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4105',
+      units: 4,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S1_MIET4106',
@@ -1302,6 +1386,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 1,
+      code: 'MIET4106',
+      units: 4,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4201',
@@ -1311,6 +1397,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4201',
+      units: 7,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4202',
@@ -1320,6 +1408,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4202',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4203',
@@ -1329,6 +1419,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4203',
+      units: 6,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4205',
@@ -1338,6 +1430,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4205',
+      units: 4,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4207',
@@ -1347,6 +1441,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4207',
+      units: 4,
     ),
     SubjectModel(
       id: 'SUB_MED_L4_S2_MIET4204',
@@ -1356,6 +1452,8 @@ class BiometricSubjects {
       stageId: 'MED_STAGE_4',
       stageName: 'المرحلة الرابعة',
       semester: 2,
+      code: 'MIET4204',
+      units: 3,
     ),
   ];
 

@@ -39,6 +39,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
+  Future<void> _openSupportTelegram() async {
+    final uri = Uri.parse(AppConstants.supportTelegramUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -295,15 +304,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Icon(Icons.support_agent_rounded, color: AppTheme.accent, size: 20),
                     ),
                     title: Text(
-                      'الدعم والمساعدة',
+                      'الدعم والمساعدة الفنية',
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      'الاستفسارات والمساعدة الفنية',
+                      '@${AppConstants.supportTelegramUsername} • تواصل مباشر',
                       style: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 11),
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
-                    onTap: _openTelegramBot,
+                    onTap: _openSupportTelegram,
                   ),
                 ],
               ),
