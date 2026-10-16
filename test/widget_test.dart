@@ -1383,6 +1383,19 @@ void main() {
       expect(mergedList, contains('مقرر إضافي للشعبة'));
       expect(mergedList.length, baseSubjects.length + 2);
     });
+
+    test('اختبار التحقق من صحة الرقم والمعرف الجامعي (Student ID Validation TDD Cycle)', () {
+      // 1. معرفات نظام البصمة الرسمية ST-...
+      expect(AppConstants.isValidStudentId('ST-NUST-001630760-413'), isTrue);
+      expect(AppConstants.isValidStudentId('st-12345'), isTrue);
+      // 2. الأرقام الجامعية الرقمية (5 خانات فما فوق)
+      expect(AppConstants.isValidStudentId('1125097'), isTrue);
+      // 3. المدخلات غير الصالحة أو الفارغة
+      expect(AppConstants.isValidStudentId(''), isFalse);
+      expect(AppConstants.isValidStudentId('   '), isFalse);
+      expect(AppConstants.isValidStudentId('abc'), isFalse);
+      expect(AppConstants.isValidStudentId(null), isFalse);
+    });
   });
 }
 

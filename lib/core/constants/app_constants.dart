@@ -159,6 +159,14 @@ class AppConstants {
     }
   }
 
+  /// فحص والتحقق من صحة المعرف الجامعي للطالب (ST-... أو أرقام جامعية)
+  static bool isValidStudentId(String? raw) {
+    if (raw == null) return false;
+    final clean = raw.trim();
+    if (clean.isEmpty) return false;
+    return RegExp(r'^(ST-[A-Z0-9-]+|[0-9]{5,})$', caseSensitive: false).hasMatch(clean);
+  }
+
   // ── الشُعب الدراسية ───────────────────────────────────────────────
   static const List<String> sections = ['A', 'B', 'C', 'D'];
 
