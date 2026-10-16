@@ -913,7 +913,7 @@ class SupabaseService {
       try {
         final row = await client
             .from('lectures')
-            .select('author_id, telegram_message_id, telegram_channel_id')
+            .select('author_id, telegram_message_id, telegram_channel_id, drive_url')
             .eq('id', id)
             .maybeSingle();
 
@@ -929,8 +929,19 @@ class SupabaseService {
           }
         }
 
-        if (row != null && row['telegram_message_id'] != null) {
-          final msgId = int.tryParse(row['telegram_message_id'].toString());
+        if (row != null) {
+          int? msgId;
+          if (row['telegram_message_id'] != null) {
+            msgId = int.tryParse(row['telegram_message_id'].toString());
+          }
+          if (msgId == null || msgId <= 0) {
+            final driveUrl = row['drive_url']?.toString() ?? '';
+            final match = RegExp(r'/api/(?:file|lecture)/(\d+)').firstMatch(driveUrl);
+            if (match != null) {
+              msgId = int.tryParse(match.group(1) ?? '');
+            }
+          }
+
           final chId = int.tryParse(row['telegram_channel_id']?.toString() ?? '');
           if (msgId != null && msgId > 0) {
             await TelegramUploaderService().deleteMessageFromTelegram(
