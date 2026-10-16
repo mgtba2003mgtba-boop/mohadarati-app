@@ -135,6 +135,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // ── فلاتر دليل الطلاب والممثلين ──
   String _userDirectoryRoleFilter = 'ALL'; // 'ALL', 'REPS', 'STUDENTS'
   String _userDirectoryStageFilter = 'ALL';
+  int _directoryDisplayLimit = 50;
+  int _activityDisplayLimit = 50;
+  int _contentDisplayLimit = 50;
 
   // ── فلاتر مركز إدارة وحذف المحتوى ──
   String _contentFilterType = 'ALL'; // 'ALL', 'lecture', 'announcement', 'banner', 'schedule'
@@ -2503,8 +2506,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             )
-          else
-            ...filtered.map((item) => _buildActivityCard(item)),
+          else ...[
+            ...filtered.take(_activityDisplayLimit).map((item) => _buildActivityCard(item)),
+            if (filtered.length > _activityDisplayLimit)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.accent,
+                      side: const BorderSide(color: AppTheme.accent),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text(
+                      'عرض المزيد (${filtered.length - _activityDisplayLimit} نشاط إضافي)',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _activityDisplayLimit += 50;
+                      });
+                    },
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -3233,8 +3261,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             )
-          else
-            ...filtered.map((user) => _buildRepCard(user)),
+          else ...[
+            ...filtered.take(_directoryDisplayLimit).map((user) => _buildRepCard(user)),
+            if (filtered.length > _directoryDisplayLimit)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.accent,
+                      side: const BorderSide(color: AppTheme.accent),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text(
+                      'عرض المزيد (${filtered.length - _directoryDisplayLimit} طالب إضافي)',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _directoryDisplayLimit += 50;
+                      });
+                    },
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -4001,8 +4054,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             )
-          else
-            ...filtered.map((item) => _buildUnifiedContentCard(item)),
+          else ...[
+            ...filtered.take(_contentDisplayLimit).map((item) => _buildUnifiedContentCard(item)),
+            if (filtered.length > _contentDisplayLimit)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.accent,
+                      side: const BorderSide(color: AppTheme.accent),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text(
+                      'عرض المزيد (${filtered.length - _contentDisplayLimit} منشور إضافي)',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _contentDisplayLimit += 50;
+                      });
+                    },
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
