@@ -42,8 +42,45 @@ async function checkAndHealWebhook() {
   }
 }
 
+// Recurring interval
+async function checkAndHealCommands() {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMyCommands`);
+    const data = await res.json();
+    if (data.ok && (!data.result || data.result.length === 0)) {
+      console.warn(`[⚠️ ALERT] Bot commands missing! Re-registering commands & menu button...`);
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commands: [
+            { command: 'start', description: 'القائمة الرئيسية ونظام البصمة' },
+            { command: 'app', description: 'تحميل وتثبيت تطبيق محاضراتي' },
+            { command: 'card', description: 'بطاقتي الأكاديمية والقيد' },
+            { command: 'id', description: 'نسخ المعرف الجامعي فوراً' },
+            { command: 'support', description: 'الدعم الفني والمساعدة' }
+          ]
+        })
+      });
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setChatMenuButton`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menu_button: { type: 'commands' } })
+      });
+      console.log(`[✅ HEALED] Bot commands and Menu Button successfully restored!`);
+    }
+  } catch (err) {
+    console.error('[-] Command watchdog network error:', err.message);
+  }
+}
+
 // Initial check
 checkAndHealWebhook();
+checkAndHealCommands();
 
 // Recurring interval
-setInterval(checkAndHealWebhook, POLL_INTERVAL_MS);
+setInterval(() => {
+  checkAndHealWebhook();
+  checkAndHealCommands();
+}, POLL_INTERVAL_MS);
+

@@ -108,13 +108,34 @@ Deno.serve(async (req)=>{
           commands: [
             {
               command: 'start',
-              description: 'نظام الحضور وتسجيل البصمة'
+              description: 'القائمة الرئيسية ونظام البصمة'
             },
             {
               command: 'app',
               description: 'تحميل وتثبيت تطبيق محاضراتي'
+            },
+            {
+              command: 'card',
+              description: 'بطاقتي الأكاديمية والقيد'
+            },
+            {
+              command: 'id',
+              description: 'نسخ المعرف الجامعي فوراً'
+            },
+            {
+              command: 'support',
+              description: 'الدعم الفني والمساعدة'
             }
           ]
+        })
+      });
+      await fetch(`${TELEGRAM_API}${botToken}/setChatMenuButton`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          menu_button: { type: 'commands' }
         })
       });
       const data = await res.json();
@@ -524,9 +545,34 @@ Deno.serve(async (req)=>{
             `• القسم: <b>${student.department}</b> — <b>${student.stage}</b>\n` +
             `• المعرف الأكاديمي: <code>${student.id}</code>\n\n` +
             `✅ <b>حسابك مرتبط وبصمتك موثقة بنجاح.</b>\n` +
-            `ستصلك إشعارات تسجيل الحضور في القاعات والمختبرات تلقائياً.\n\n` +
-            `📲 <i>لتحميل وتثبيت تطبيق محاضراتي، أرسل:</i> /app`;
-          await sendTelegramMessage(botToken, chatId, welcomeMsg);
+            `ستصلك إشعارات تسجيل الحضور في القاعات والمختبرات تلقائياً.`;
+          const keyboard = {
+            inline_keyboard: [
+              [
+                {
+                  text: '📲 تحميل وتثبيت تطبيق محاضراتي',
+                  callback_data: 'cmd:app'
+                }
+              ],
+              [
+                {
+                  text: '🔢 نسخ المعرف الجامعي',
+                  callback_data: 'cmd:id'
+                },
+                {
+                  text: '💳 بطاقتي الأكاديمية',
+                  callback_data: 'cmd:card'
+                }
+              ],
+              [
+                {
+                  text: '💬 الدعم الفني والمساعدة',
+                  url: 'https://t.me/ii6689'
+                }
+              ]
+            ]
+          };
+          await sendTelegramMessage(botToken, chatId, welcomeMsg, keyboard);
         } else {
           const unlinkedMsg = `🏛️ <b>الجامعة الوطنية للعلوم والتكنولوجيا</b>\n` +
             `📍 <b>الكلية التقنية الهندسية</b>\n` +
