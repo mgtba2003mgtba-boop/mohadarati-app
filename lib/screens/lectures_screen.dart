@@ -43,7 +43,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
     if (_user != null) {
       _selectedDept = _user!.isAdmin ? 'ALL' : _user!.department;
       _selectedStage = _user!.isAdmin ? 'ALL' : _user!.stage;
-      _selectedSection = _user!.isAdmin ? 'ALL' : _user!.section;
+      _selectedSection = _user!.isAdmin ? 'ALL' : (_user!.section ?? 'ALL');
     }
 
     _loadLectures();
@@ -80,42 +80,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
           l.section.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesType && matchesSearch;
     }).toList();
-  }
-
-  /// فتح رابط المحاضرة المباشر على Google Drive
-  Future<void> _openGoogleDrive(String url) async {
-    final cleanUrl = url.trim();
-    if (cleanUrl.isEmpty) return;
-
-    final uri = Uri.parse(cleanUrl);
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح الرابط. يمكنك نسخه يدوياً.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ في الرابط: $e')),
-        );
-      }
-    }
-  }
-
-  /// نسخ رابط Google Drive
-  void _copyDriveLink(String url) {
-    Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم نسخ رابط Google Drive إلى الحافظة بنجاح'),
-        duration: Duration(seconds: 2),
-      ),
-    );
   }
 
   /// فتح أو بث المحاضرة مباشرة عبر مشغل الفيديو أو السحابة
@@ -342,29 +306,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
     );
   }
 
-  Widget _buildSemesterToggle(int semester, String label) {
-    final isSelected = _selectedSemester == semester;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) {
-          setState(() => _selectedSemester = semester);
-          _loadLectures();
-        }
-      },
-      selectedColor: AppTheme.primary,
-      backgroundColor: AppTheme.darkCard,
-      labelStyle: GoogleFonts.cairo(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-      ),
-      side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.darkBorder),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    );
-  }
-
   Widget _buildTypeChip(String label, String typeKey) {
     final isSelected = _selectedType == typeKey;
     return ChoiceChip(
@@ -439,10 +380,10 @@ class _LecturesScreenState extends State<LecturesScreen> {
             style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8)),
           ),
 
-          if (lecture.displayDescription != null && lecture.displayDescription!.isNotEmpty) ...[
+          if (lecture.displayDescription.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              lecture.displayDescription!,
+              lecture.displayDescription,
               style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
             ),
           ],

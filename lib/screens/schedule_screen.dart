@@ -26,11 +26,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   AppUserModel? _user;
   List<ScheduleModel> _schedules = [];
 
-  // ── فلاتر المشرف العام لمراقبة جداول كافة الأقسام والشُعب ─────────
-  String _supervisorDept = 'ALL';
-  String _supervisorStage = 'ALL';
-  String _supervisorSection = 'ALL';
-
   // ── فلتر الشعبة السريع لعرض وفصل منشورات الكروبات ──────────
   String _selectedScheduleSection = 'ALL';
 
@@ -145,99 +140,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     return AppConstants.resolveImageUrl(url);
   }
 
-  void _openFullscreenViewer(String imageUrl, String title) {
-    final resolvedUrl = _resolveUrl(imageUrl);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: const Color(0xFF0F172A),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF1E293B),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-              tooltip: 'إغلاق',
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              title,
-              style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.download_rounded, color: Colors.white),
-                tooltip: 'تنزيل',
-                onPressed: () => _launchUrl(resolvedUrl),
-              ),
-            ],
-          ),
-          body: SizedBox.expand(
-            child: InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 6.0,
-              child: Center(
-                child: Image.network(
-                  resolvedUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
-                          const SizedBox(height: 14),
-                          Text('جاري فتح الصورة...', style: GoogleFonts.cairo(color: Colors.white70, fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 54),
-                          const SizedBox(height: 14),
-                          Text(
-                            'تعذر تحميل الصورة داخل المعاينة',
-                            style: GoogleFonts.cairo(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 18),
-                          ElevatedButton.icon(
-                            onPressed: () => _launchUrl(resolvedUrl),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.open_in_browser_rounded, size: 18, color: Colors.white),
-                            label: Text('فتح في المتصفح / تنزيل مباشر', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showUploadScheduleDialog() {
     final titleController = TextEditingController(text: 'جدول المحاضرات الأسبوعي');
     final urlController = TextEditingController();
     String type = _tabController.index == 0 ? 'lectures' : 'exams';
     PlatformFile? selectedFile;
-    int selectedFileSize = 0;
     bool isPicking = false;
     bool isUploading = false;
     final isAdmin = _user?.isAdmin == true;
@@ -387,10 +294,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           setDlgState(() => isPicking = true);
                           final f = await TelegramUploaderService().pickImageOrPdfFile();
                           if (f != null) {
-                            final size = await TelegramUploaderService().getFileSize(f);
                             setDlgState(() {
                               selectedFile = f;
-                              selectedFileSize = size;
                               isPicking = false;
                               if (titleController.text.isEmpty) {
                                 final clean = f.name.contains('.') ? f.name.substring(0, f.name.lastIndexOf('.')) : f.name;

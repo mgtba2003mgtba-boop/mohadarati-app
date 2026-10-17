@@ -8,7 +8,6 @@ import 'package:nust_student_portal/models/app_user_model.dart';
 import 'package:nust_student_portal/services/attendance_service.dart';
 import 'package:nust_student_portal/core/constants/app_constants.dart';
 import 'package:nust_student_portal/core/constants/biometric_subjects.dart';
-import 'package:nust_student_portal/models/subject_model.dart';
 import 'package:nust_student_portal/models/schedule_model.dart';
 import 'package:nust_student_portal/widgets/app_media_preview_modal.dart';
 import 'package:nust_student_portal/widgets/ios_install_dialog.dart';

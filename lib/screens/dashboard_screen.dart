@@ -71,7 +71,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final _lectureDescController = TextEditingController();
   String _selectedLectureDept = AppConstants.departments.first;
   String _selectedLectureStage = AppConstants.stages.first;
-  String _selectedLectureSection = 'ALL';
   int _selectedLectureSemester = 1;
   String _selectedLectureType = 'theory'; // 'theory' | 'practical'
 
@@ -118,7 +117,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── قائمة المستخدمين والترقيات ونشاط الممثلين ────────────────
   List<AppUserModel> _allUsers = [];
-  String _userSearchQuery = '';
 
   bool _isLoadingDashboard = false;
   List<LectureModel> _allLectures = [];
@@ -131,7 +129,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _activitySearchQuery = '';
 
   String _repDeptFilter = 'ALL';
-  String _repStageFilter = 'ALL';
   String _repSearchQuery = '';
 
   // ── فلاتر دليل الطلاب والممثلين ──
@@ -345,13 +342,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     } catch (e) {
       debugPrint('[-] Error loading dashboard data: $e');
       if (mounted) setState(() => _isLoadingDashboard = false);
-    }
-  }
-
-  Future<void> _loadAllUsers() async {
-    final users = await SupabaseService().fetchAllUsers();
-    if (mounted) {
-      setState(() => _allUsers = users);
     }
   }
 
@@ -3867,21 +3857,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _loadDashboardData();
       } else {
         _showSnackbar('حدث خطأ أثناء سحب التكليف', isError: true);
-      }
-    }
-  }
-
-  Future<void> _launchUrlExternal(String? urlString, {required String errorMsg}) async {
-    if (urlString == null || urlString.isEmpty) return;
-    try {
-      final uri = Uri.parse(urlString.trim());
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && mounted) {
-        _showSnackbar(errorMsg, isError: true);
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnackbar('$errorMsg: $e', isError: true);
       }
     }
   }

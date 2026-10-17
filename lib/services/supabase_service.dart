@@ -978,7 +978,7 @@ class SupabaseService {
           .eq('department', department)
           .filter('stage', 'in', '(${aliases.map((a) => '"$a"').join(",")})');
 
-      if (res is List && res.isNotEmpty) {
+      if (res.isNotEmpty) {
         final Set<String> found = {};
         for (final item in res) {
           final sec = item['section']?.toString().trim().toUpperCase();
@@ -1020,9 +1020,7 @@ class SupabaseService {
       }
 
       final res = await q.order('name', ascending: true).limit(limit);
-      if (res is List) {
-        return res.map((item) => StudentModel.fromJson(item)).toList();
-      }
+      return res.map((item) => StudentModel.fromJson(item)).toList();
     } catch (e) {
       debugPrint('[-] Error fetching biometric students for section: $e');
     }
@@ -1096,7 +1094,7 @@ class SupabaseService {
   }) async {
     try {
       final res = await _attendanceClient.from('subjects').select('*');
-      if (res is List && res.isNotEmpty) {
+      if (res.isNotEmpty) {
         // بيانات البصمة الحية متاحة
       }
     } catch (e) {

@@ -197,16 +197,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       if (isAdmin) {
         matchesSection = _selectedSectionFilter == 'ALL' ||
             (_selectedSectionFilter == 'UNIFIED'
-                ? (a.section == 'ALL' || a.section == null || a.section!.isEmpty)
-                : (a.section?.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL' || a.section == null));
+                ? (a.section == 'ALL' || a.section.isEmpty)
+                : (a.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL'));
       } else {
         // للطالب أو الممثل: تظهر فقط تبليغات شعبته والتبليغات العامة الموحدة، وأي تبليغ نشره هو بنفسه
         final bool isAuthor = _user != null && (_user!.studentId == a.authorId);
         matchesSection = isAuthor ||
             a.section == 'ALL' ||
-            a.section == null ||
-            a.section!.isEmpty ||
-            (userSec.isNotEmpty && a.section!.toUpperCase() == userSec.toUpperCase());
+            a.section.isEmpty ||
+            (userSec.isNotEmpty && a.section.toUpperCase() == userSec.toUpperCase());
       }
 
       final matchesSearch = _searchQuery.isEmpty ||
@@ -282,13 +281,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         );
       }
     }
-  }
-
-  void _copyToClipboard(String text, String message) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-    );
   }
 
   @override
@@ -783,7 +775,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
 
-          if (_user?.isAdmin == true && (lecture.uploaderName.isNotEmpty || lecture.uploaderRole != null)) ...[
+          if (_user?.isAdmin == true && (lecture.uploaderName.isNotEmpty || lecture.uploaderRole.isNotEmpty)) ...[
             const SizedBox(height: 4),
             Row(
               children: [

@@ -10,7 +10,6 @@ import '../models/announcement_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
 import '../services/attendance_service.dart';
-import '../widgets/study_book_animation.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_network_image.dart';
@@ -18,7 +17,6 @@ import 'courses_screen.dart';
 import 'schedule_screen.dart';
 import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
-import 'announcements_screen.dart';
 import '../services/admin_preview_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,10 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
 
   AppUserModel? _user;
-  OverallAttendanceSummary? _attendanceSummary;
   List<AnnouncementModel> _announcements = [];
   List<LectureModel> _lectures = [];
-  List<String> _coursesList = [];
 
   // متحكمات كاروسيل الإعلانات بالصور المتحركة
   late final PageController _bannerController;
@@ -137,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final effectiveStage = _effectiveStage;
         final effectiveSection = _effectiveSection;
 
-        // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار بنسبة 70%
+        // جلب متوازي لكافة البيانات دفعة واحدة لتقليص زمن الانتظار
         final results = await Future.wait([
           service.fetchAnnouncements(
             department: effectiveDept,
@@ -145,7 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
             section: effectiveSection,
             forceRefresh: forceRefresh,
           ),
-          service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh),
           service.fetchLectures(
             department: effectiveDept,
             stage: effectiveStage,
@@ -153,18 +148,10 @@ class _HomeScreenState extends State<HomeScreen> {
             semester: 1,
             forceRefresh: forceRefresh,
           ),
-          service.fetchCourses(
-            department: effectiveDept,
-            stage: effectiveStage,
-            semester: 1,
-          ),
         ]);
 
         _announcements = results[0] as List<AnnouncementModel>;
-        final records = results[1] as List<AttendanceRecordModel>;
-        _attendanceSummary = AttendanceService.processAttendanceRecords(records);
-        _lectures = results[2] as List<LectureModel>;
-        _coursesList = results[3] as List<String>;
+        _lectures = results[1] as List<LectureModel>;
 
         // بدء تحريك كاروسيل الإعلانات الرسمية فقط
         _startBannerTimer(_carouselBanners.length);
@@ -255,11 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Text('يرجى تسجيل الدخول', style: GoogleFonts.cairo(color: AppTheme.textPrimary)),
       );
     }
-
-    final isMujtabaAdmin = _user != null &&
-        (_user!.studentId == 'ST-NUST-001630760-413' ||
-            _user!.name.contains('مجتبى') ||
-            _user!.isAdmin);
 
     return SafeArea(
       child: RefreshIndicator(

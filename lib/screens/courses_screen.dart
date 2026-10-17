@@ -89,13 +89,13 @@ class _CoursesScreenState extends State<CoursesScreen> {
             department: _effectiveDept,
             stage: _effectiveStage,
             section: _effectiveSection,
-            semester: 1,
+            semester: _selectedSemester,
             forceRefresh: forceRefresh,
           ),
           service.fetchCourses(
             department: _effectiveDept,
             stage: _effectiveStage,
-            semester: 1,
+            semester: _selectedSemester,
           ),
         ]);
 
@@ -133,7 +133,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canManage = _user?.canManageCourses == true || _user?.isRepresentative == true || _user?.isAdmin == true;
     final canPublish = _user?.canManageLectures == true || _user?.isAdmin == true;
     final subjects = _subjectNames;
 

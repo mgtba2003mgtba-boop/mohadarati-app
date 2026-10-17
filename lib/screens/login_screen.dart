@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
-import '../models/student_model.dart';
 import '../services/supabase_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_loading_overlay.dart';
