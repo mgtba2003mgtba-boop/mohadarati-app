@@ -204,12 +204,12 @@ class AppConstants {
   static String getRoleLabel(String role) {
     switch (role) {
       case roleAdmin:
-        return 'مشرف عام 🛡️';
+        return 'مشرف عام';
       case roleRepresentative:
-        return 'ممثل الشعبة ⭐';
+        return 'ممثل الشعبة';
       case roleStudent:
       default:
-        return 'طالب 🎓';
+        return 'طالب';
     }
   }
 

@@ -129,18 +129,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _user!.name,
                     style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primarySubtle,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _user!.roleLabel,
-                      style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -431,7 +419,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                isCustom ? 'مفعلة الآن ⚡' : 'المشرف العام',
+                                isCustom ? 'مفعلة الآن' : 'المشرف العام',
                                 style: GoogleFonts.cairo(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
