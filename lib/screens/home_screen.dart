@@ -17,9 +17,8 @@ import 'courses_screen.dart';
 import 'schedule_screen.dart';
 import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
-import 'announcements_screen.dart';
-import '../widgets/telegram_announcement_card.dart';
 import '../services/admin_preview_service.dart';
+import '../services/app_notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -62,16 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  List<AnnouncementModel> get _recentFeedAnnouncements {
-    return _announcements.where((a) {
-      final isSchedule = a.content.contains('[SCHEDULE_TIMETABLE]') ||
-          a.subjectName == 'SCHEDULE';
-      final isCourse = a.content.contains('[COURSE_REGISTRY') ||
-          a.subjectName == 'COURSE';
-      return !isSchedule && !isCourse;
-    }).toList();
-  }
-
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
@@ -98,7 +87,17 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _bannerController = PageController(viewportFraction: 0.92);
     AdminPreviewService().addListener(_onAdminPreviewChanged);
-    _loadData();
+    _loadData().then((_) {
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(const Duration(milliseconds: 1400), () {
+            if (mounted) {
+              AppNotificationService.instance.promptPermissionIfNeeded(context);
+            }
+          });
+        });
+      }
+    });
   }
 
   void _onAdminPreviewChanged() {
@@ -300,63 +299,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
-                      ).then((_) => _loadData());
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.lightBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              const Icon(Icons.campaign_rounded, color: Color(0xFF2AABEE), size: 22),
-                              if (_recentFeedAnnouncements.isNotEmpty)
-                                Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'التبليغات',
-                            style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -365,13 +307,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildAnnouncementsMovingCarousel(),
               const SizedBox(height: 18),
 
-              // بطاقات الوصول السريع (المقررات، التبليغات، الجدول)
+              // بطاقات الوصول السريع (المقررات والجدول)
               _buildQuickActionCards(),
               const SizedBox(height: 20),
-
-              // أحدث التبليغات الأكاديمية بنمط قنوات تيليجرام والتفاعلات
-              _buildRecentAnnouncementsSection(),
-              const SizedBox(height: 18),
 
               // أحدث المحاضرات المضافة حديثاً
               _buildRecentLecturesSection(),
@@ -612,43 +550,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAnnouncementDetails(AnnouncementModel announcement, String imageUrl) {
-    showModalBottomSheet(
+    AppFullscreenModal.show(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.only(top: 12, bottom: 24),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              TelegramAnnouncementCard(
-                announcement: announcement,
-                currentUser: _user,
-                onReactionToggled: (emoji) => _toggleHomeReaction(announcement, emoji),
-              ),
-            ],
+      title: announcement.title,
+      subtitle: '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
+      icon: Icons.campaign_rounded,
+      imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+      contentText: announcement.displayContent,
+      accentColor: AppTheme.primary,
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          child: Text('إغلاق', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
         ),
-      ),
+      ],
     );
   }
 
-  /// بطاقات الوصول السريع (المقررات، التبليغات، الجدول)
+  /// بطاقات الوصول السريع للمقررات والجدول
   Widget _buildQuickActionCards() {
     return Row(
       children: [
@@ -657,138 +580,94 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => setState(() => _currentIndex = 1),
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.lightBorder),
                 boxShadow: AppTheme.cardShadow,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
                   AppIconBadge.indigo(
                     icon: Icons.menu_book_rounded,
-                    size: 36,
-                    iconSize: 18,
+                    size: 40,
+                    iconSize: 20,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'المقررات',
-                    style: GoogleFonts.cairo(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'المقررات',
+                          style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          '${_subjectNames.length} مادة دراسية',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    '${_subjectNames.length} مادة',
-                    style: GoogleFonts.cairo(
-                      fontSize: 10,
-                      color: AppTheme.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
-              ).then((_) => _loadData());
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2AABEE).withValues(alpha: 0.3)),
-                boxShadow: AppTheme.cardShadow,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.campaign_rounded, color: Color(0xFF2AABEE), size: 18),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'التبليغات',
-                    style: GoogleFonts.cairo(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    '${_recentFeedAnnouncements.length} تبليغ',
-                    style: GoogleFonts.cairo(
-                      fontSize: 10,
-                      color: const Color(0xFF0284C7),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         Expanded(
           child: InkWell(
             onTap: () => setState(() => _currentIndex = 2),
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.lightBorder),
                 boxShadow: AppTheme.cardShadow,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
                   AppIconBadge.amber(
                     icon: Icons.calendar_month_rounded,
-                    size: 36,
-                    iconSize: 18,
+                    size: 40,
+                    iconSize: 20,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'الجدول',
-                    style: GoogleFonts.cairo(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الجدول',
+                          style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'المواعيد والامتحانات',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    'الأسبوعي',
-                    style: GoogleFonts.cairo(
-                      fontSize: 10,
-                      color: AppTheme.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -797,112 +676,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
-  }
-
-  /// أحدث التبليغات الأكاديمية بنمط قنوات تيليجرام والتفاعلات المباشرة
-  Widget _buildRecentAnnouncementsSection() {
-    final list = _recentFeedAnnouncements.take(3).toList();
-    if (list.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.campaign_rounded, color: Color(0xFF2AABEE), size: 22),
-                const SizedBox(width: 8),
-                Text(
-                  'أحدث التبليغات الأكاديمية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
-                ).then((_) => _loadData());
-              },
-              child: Row(
-                children: [
-                  Text(
-                    'عرض الكل',
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2AABEE),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_back_ios_new_rounded, size: 11, color: Color(0xFF2AABEE)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...list.map((ann) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TelegramAnnouncementCard(
-            key: ValueKey('home_ann_${ann.id}'),
-            announcement: ann,
-            currentUser: _user,
-            onReactionToggled: (emoji) => _toggleHomeReaction(ann, emoji),
-          ),
-        )),
-      ],
-    );
-  }
-
-  Future<void> _toggleHomeReaction(AnnouncementModel item, String emoji) async {
-    if (_user == null) return;
-
-    final currentKey = _user!.studentId.isNotEmpty ? _user!.studentId : _user!.id;
-    final reactionsMap = Map<String, AnnouncementReaction>.from(item.reactions);
-
-    if (reactionsMap.containsKey(currentKey) && reactionsMap[currentKey]!.reaction == emoji) {
-      reactionsMap.remove(currentKey);
-    } else {
-      reactionsMap[currentKey] = AnnouncementReaction(
-        studentId: currentKey,
-        studentName: _user!.name,
-        department: _user!.department,
-        stage: _user!.stage,
-        section: _user!.section ?? '',
-        reaction: emoji,
-        createdAt: DateTime.now(),
-      );
-    }
-
-    final updated = item.copyWithReactions(reactionsMap);
-    setState(() {
-      final idx = _announcements.indexWhere((a) => a.id == item.id);
-      if (idx != -1) {
-        _announcements[idx] = updated;
-      }
-    });
-
-    final synced = await SupabaseService().toggleAnnouncementReaction(
-      announcementId: item.id,
-      emoji: emoji,
-      user: _user!,
-    );
-    if (synced != null && mounted) {
-      setState(() {
-        final idx = _announcements.indexWhere((a) => a.id == item.id);
-        if (idx != -1) {
-          _announcements[idx] = synced;
-        }
-      });
-    }
   }
 
   /// أحدث المحاضرات المضافة حديثاً

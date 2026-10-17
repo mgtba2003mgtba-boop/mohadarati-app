@@ -14,6 +14,7 @@ import 'package:nust_student_portal/widgets/ios_install_dialog.dart';
 import 'package:nust_student_portal/services/admin_preview_service.dart';
 import 'package:nust_student_portal/services/auto_update_service.dart';
 import 'package:nust_student_portal/services/telegram_uploader_service.dart';
+import 'package:nust_student_portal/services/app_notification_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1497,6 +1498,35 @@ void main() {
       expect(list.any((r) => r.studentName == 'أحمد علي حسن' && r.section == 'A'), true);
       expect(list.any((r) => r.studentName == 'سارة محمد جاسم' && r.section == 'B'), true);
       expect(list.any((r) => r.studentName == 'كرار حيدر جبار' && r.section == 'C'), true);
+    });
+
+    test('اختبار خدمة الإشعارات والتنبيهات المباشرة للآيفون والأندرويد (AppNotificationService & Live Alerts)', () async {
+      final notifAnn = AppNotificationItem(
+        id: 'ann-101',
+        title: '📢 تبليغ رسمي جديد',
+        message: 'تم تحديد موعد الامتحان الفصلي لمادة الأجهزة الطبية',
+        type: AppNotificationType.announcement,
+        targetId: 'ann-101',
+      );
+
+      expect(notifAnn.id, 'ann-101');
+      expect(notifAnn.title, contains('تبليغ رسمي'));
+      expect(notifAnn.type, AppNotificationType.announcement);
+
+      final notifLec = AppNotificationItem(
+        id: 'lec-202',
+        title: '📚 محاضرة: إلكترونيات طبية',
+        message: 'المحاضرة الخامسة - الدوائر المتكاملة',
+        type: AppNotificationType.lecture,
+        targetId: 'lec-202',
+      );
+
+      expect(notifLec.id, 'lec-202');
+      expect(notifLec.title, contains('محاضرة'));
+      expect(notifLec.type, AppNotificationType.lecture);
+
+      final service = AppNotificationService.instance;
+      expect(service, isNotNull);
     });
   });
 }

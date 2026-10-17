@@ -75,6 +75,80 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
     );
   }
 
+  /// نافذة منبثقة عائمة لاختيار التفاعل بنمط قنوات تيليجرام
+  void _showReactionPicker(BuildContext context) {
+    final currentStudentId = widget.currentUser?.studentId ?? widget.currentUser?.id ?? '';
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      builder: (ctx) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              tween: Tween(begin: 0.65, end: 1.0),
+              builder: (context, scale, child) {
+                return Transform.scale(
+                  scale: scale,
+                  child: child,
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 22,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _availableReactions.map((emoji) {
+                    final hasReacted = widget.announcement.hasUserReacted(currentStudentId, emoji);
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        if (widget.onReactionToggled != null) {
+                          widget.onReactionToggled!(emoji);
+                        }
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: hasReacted ? const Color(0xFFEFF6FF) : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: hasReacted
+                              ? Border.all(color: const Color(0xFF2AABEE), width: 1.6)
+                              : null,
+                        ),
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 26),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// نافذة فحص المتفاعلين مع التبليغ (حصرية تماماً للمشرف العام مجتبى عواد)
   void _showReactorsInspector(BuildContext context) {
     showModalBottomSheet(
@@ -98,10 +172,6 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
     final currentStudentId = widget.currentUser?.studentId ?? widget.currentUser?.id;
     final counts = announcement.reactionCounts;
     final totalReactions = announcement.totalReactionsCount;
-
-    Color categoryColor = const Color(0xFF2AABEE); // تيليجرام أزرق
-    if (announcement.category == 'urgent') categoryColor = AppTheme.danger;
-    if (announcement.category == 'exam') categoryColor = const Color(0xFFD97706);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -274,7 +344,8 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
 
                 // 3. فقاعة نص التبليغ (Telegram Bubble Content)
                 InkWell(
-                  onTap: () => _showAnnouncementModal(context),
+                  onTap: () => _showReactionPicker(context),
+                  onLongPress: () => _showAnnouncementModal(context),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     width: double.infinity,
@@ -315,166 +386,144 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                   ),
                 ],
 
-                // 5. وسوم وتصنيفات التبليغ (Hashtags)
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '#${AppConstants.announcementCategories[announcement.category] ?? "إعلان"}',
-                        style: GoogleFonts.cairo(fontSize: 10, color: categoryColor, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    if (announcement.subjectName != null &&
-                        announcement.subjectName!.isNotEmpty &&
-                        announcement.subjectName != 'عام')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '#${announcement.subjectName}',
-                          style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    if (announcement.department != 'ALL')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '#${announcement.department}',
-                          style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                  ],
-                ),
+                // 5. شريط التفاعلات الأكاديمية بنمط قنوات تيليجرام
+                Builder(
+                  builder: (context) {
+                    final activeReactions = _availableReactions.where((emoji) => (counts[emoji] ?? 0) > 0).toList();
+                    if (activeReactions.isEmpty && !(_isMujtabaAdmin && totalReactions > 0)) {
+                      return const SizedBox.shrink();
+                    }
 
-                const SizedBox(height: 14),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                const SizedBox(height: 10),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  // عرض التفاعلات النشطة فقط التي حصلت على نقرات count > 0
+                                  ...activeReactions.map((emoji) {
+                                    final count = counts[emoji] ?? 0;
+                                    final hasReacted = announcement.hasUserReacted(currentStudentId, emoji);
 
-                // 6. شريط التفاعلات الأكاديمية بنمط قنوات تيليجرام
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          // عرض باقة الإيموجي الخمسة
-                          ..._availableReactions.map((emoji) {
-                            final count = counts[emoji] ?? 0;
-                            final hasReacted = announcement.hasUserReacted(currentStudentId, emoji);
+                                    return InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        if (widget.onReactionToggled != null) {
+                                          widget.onReactionToggled!(emoji);
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                                        decoration: BoxDecoration(
+                                          color: hasReacted
+                                              ? const Color(0xFFEFF6FF)
+                                              : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: hasReacted
+                                                ? const Color(0xFF2AABEE)
+                                                : const Color(0xFFE2E8F0),
+                                            width: hasReacted ? 1.4 : 1.0,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              emoji,
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '$count',
+                                              style: GoogleFonts.cairo(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: hasReacted ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
 
-                            // إظهار الحبة فقط إذا كان هناك عدد، أو إتاحة الزر للتفاعل
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () {
-                                if (widget.onReactionToggled != null) {
-                                  widget.onReactionToggled!(emoji);
-                                }
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: hasReacted
-                                      ? const Color(0xFFEFF6FF)
-                                      : (count > 0 ? const Color(0xFFF8FAFC) : Colors.transparent),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: hasReacted
-                                        ? const Color(0xFF2AABEE)
-                                        : (count > 0 ? const Color(0xFFE2E8F0) : const Color(0xFFE2E8F0)),
-                                    width: hasReacted ? 1.4 : 1.0,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Transform.scale(
-                                      scale: hasReacted ? 1.15 : 1.0,
-                                      child: Text(
-                                        emoji,
-                                        style: const TextStyle(fontSize: 14),
+                                  // زر إضافة تفاعل إضافي
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () => _showReactionPicker(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_reaction_outlined,
+                                        size: 15,
+                                        color: Color(0xFF64748B),
                                       ),
                                     ),
-                                    if (count > 0) ...[
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // زر كشف المتفاعلين (حصر للمشرف العام مجتبى عواد فقط 👁️)
+                            if (_isMujtabaAdmin && totalReactions > 0) ...[
+                              const SizedBox(width: 8),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => _showReactorsInspector(context),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF4F46E5), Color(0xFF3730A3)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '$count',
+                                        'المتفاعلون ($totalReactions)',
                                         style: GoogleFonts.cairo(
-                                          fontSize: 11,
+                                          fontSize: 10,
                                           fontWeight: FontWeight.bold,
-                                          color: hasReacted ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
-                    // 7. زر كشف المتفاعلين (حصر للمشرف العام مجتبى عواد فقط 👁️)
-                    if (_isMujtabaAdmin && totalReactions > 0) ...[
-                      const SizedBox(width: 8),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () => _showReactorsInspector(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4F46E5), Color(0xFF3730A3)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
-                              const SizedBox(width: 4),
-                              Text(
-                                'المتفاعلون ($totalReactions)',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

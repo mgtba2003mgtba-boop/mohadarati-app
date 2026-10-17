@@ -277,6 +277,65 @@
     })();
   </script>
 
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- نظام الإشعارات والتنبيهات المباشرة للآيفون والأندرويد (Web Push Bridge) -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <script>
+    window.requestAppNotificationPermission = async function() {
+      if (!('Notification' in window)) {
+        console.warn('Notifications not supported in this environment');
+        return false;
+      }
+      try {
+        const permission = await Notification.requestPermission();
+        return permission === 'granted';
+      } catch (err) {
+        console.error('Error requesting notification permission:', err);
+        return false;
+      }
+    };
+
+    window.getNotificationPermissionStatus = function() {
+      if (!('Notification' in window)) return 'unsupported';
+      return Notification.permission;
+    };
+
+    window.showNativeNotification = function(title, body, tag, url) {
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      try {
+        const options = {
+          body: body || '',
+          icon: '/icons/Icon-192.png',
+          badge: '/icons/Icon-192.png',
+          tag: tag || ('nust_' + Date.now()),
+          renotify: true,
+          vibrate: [200, 100, 200]
+        };
+        const notif = new Notification(title, options);
+        notif.onclick = function() {
+          window.focus();
+          if (url && window.location.hash !== url) {
+            window.location.href = url;
+          }
+          notif.close();
+        };
+      } catch (e) {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(function(reg) {
+            reg.showNotification(title, {
+              body: body || '',
+              icon: '/icons/Icon-192.png',
+              badge: '/icons/Icon-192.png',
+              tag: tag || ('nust_' + Date.now())
+            });
+          }).catch(function(_) {});
+        }
+      }
+    };
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

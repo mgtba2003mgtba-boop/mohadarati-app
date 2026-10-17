@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/auto_update_service.dart';
+import 'services/app_notification_service.dart';
+import 'widgets/in_app_notification_overlay.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -13,6 +15,9 @@ void main() async {
 
   // تفعيل خدمة التحديث التلقائي الإجباري للآيفون والمتصفح
   AutoUpdateService().initialize();
+
+  // تفعيل خدمة الإشعارات والتنبيهات المباشرة للآيفون والأندرويد
+  AppNotificationService.instance.initialize();
 
   runApp(const NustStudentPortalApp());
 }
@@ -39,6 +44,12 @@ class NustStudentPortalApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+
+      builder: (context, child) {
+        return InAppNotificationOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
 
       home: const SplashScreen(),
     );
