@@ -210,7 +210,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 children: [
                   // شريط البحث المقتضب
                   Container(
-                    color: Colors.white,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(bottom: BorderSide(color: Color(0xFFE0E7FF), width: 1)),
+                    ),
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: TextField(
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
@@ -218,7 +221,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       decoration: InputDecoration(
                         hintText: 'بحث في المواد...',
                         hintStyle: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.violet, size: 20),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
@@ -293,13 +296,23 @@ class _CoursesScreenState extends State<CoursesScreen> {
       stage: _effectiveStage,
     );
 
+    final isViolet = index % 2 == 0;
+    final accentColor = isViolet ? const Color(0xFF8B5CF6) : const Color(0xFF0EA5E9);
+    final borderColor = isViolet ? const Color(0xFFDDD6FE) : const Color(0xFFBAE6FD);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.lightBorder),
-        boxShadow: AppTheme.cardShadow,
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -323,11 +336,17 @@ class _CoursesScreenState extends State<CoursesScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                AppIconBadge.indigo(
-                  icon: Icons.menu_book_rounded,
-                  size: 48,
-                  iconSize: 24,
-                ),
+                isViolet
+                    ? AppIconBadge.violet(
+                        icon: Icons.menu_book_rounded,
+                        size: 48,
+                        iconSize: 24,
+                      )
+                    : AppIconBadge.sky(
+                        icon: Icons.menu_book_rounded,
+                        size: 48,
+                        iconSize: 24,
+                      ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -352,15 +371,16 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: isViolet ? const Color(0xFFF5F3FF) : const Color(0xFFF0F9FF),
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: borderColor, width: 0.8),
                               ),
                               child: Text(
                                 subModel!.code!,
                                 style: GoogleFonts.cairo(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF38BDF8),
+                                  color: isViolet ? const Color(0xFF7C3AED) : const Color(0xFF0284C7),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -400,14 +420,14 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           Icon(
                             Icons.video_library_rounded,
                             size: 14,
-                            color: lectureCount > 0 ? AppTheme.accent : AppTheme.textMuted,
+                            color: lectureCount > 0 ? accentColor : AppTheme.textMuted,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             lectureCount > 0 ? '$lectureCount محاضرات' : 'المقرر متاح',
                             style: GoogleFonts.cairo(
                               fontSize: 11,
-                              color: lectureCount > 0 ? AppTheme.accent : AppTheme.textMuted,
+                              color: lectureCount > 0 ? accentColor : AppTheme.textMuted,
                               fontWeight: lectureCount > 0 ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
@@ -416,7 +436,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF94A3B8)),
+                Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: accentColor),
               ],
             ),
           ),

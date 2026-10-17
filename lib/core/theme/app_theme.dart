@@ -3,19 +3,47 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// ثيم وهوية التطبيق الأكاديمية - نمط عصري أنيق ومضيء (Light Modern Academic)
 class AppTheme {
-  // الألوان الرئيسية الفاتحة والفاخرة
-  static const Color primary = Color(0xFF4F46E5); // نيلي أكاديمي ملكي زاهي (Royal Indigo)
+  // الألوان الرئيسية الفاتحة والفاخرة (Tech Indigo & Slate-Blue Palette)
+  static const Color primary = Color(0xFF4F46E5); // نيلي تقني ملكي زاهي (Royal Indigo)
   static const Color primaryDark = Color(0xFF3730A3);
-  static const Color primaryLight = Color(0xFF6366F1); // إنديجو ناعم
+  static const Color primaryLight = Color(0xFF6366F1); // إنديجو ناعم متألق
   static const Color primarySubtle = Color(0xFFEEF2FF); // خلفية إنديجو فائقة النعومة
   static const Color accent = Color(0xFF0EA5E9); // سيان / أزرق سماوي حيوي (Vibrant Sky)
   static const Color accentSubtle = Color(0xFFE0F2FE);
 
-  // ألوان الخلفيات للوضع الفاتح الأنيق (Light Mode)
-  static const Color lightBg = Color(0xFFF8FAFC); // رمادي رخامي ناعم مريح للعين (Slate-50)
+  // ألوان البنفسجي والسماوي التقني الزاهية (Tech Violet & Cyan Accents)
+  static const Color violet = Color(0xFF8B5CF6); // بنفسجي كهربي زاهي
+  static const Color violetLight = Color(0xFFA78BFA);
+  static const Color violetDark = Color(0xFF7C3AED);
+  static const Color violetSubtle = Color(0xFFF5F3FF); // خلفية بنفسجية ناعمة
+  static const Color sky = Color(0xFF0EA5E9);
+  static const Color skyDark = Color(0xFF0284C7);
+  static const Color skySubtle = Color(0xFFF0F9FF);
+
+  // التدرجات اللونية الحيوية المعتمدة للبطاقات والأيقونات
+  static const LinearGradient violetGradient = LinearGradient(
+    colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient skyGradient = LinearGradient(
+    colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient indigoGradient = LinearGradient(
+    colors: [Color(0xFF6366F1), Color(0xFF4338CA)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // ألوان الخلفيات للوضع النهاري الملون الناعم (Soft Tinted Light Mode)
+  static const Color lightBg = Color(0xFFF1F5FD); // خلفية نيلية هادئة مريحة للعين بدلاً من الأبيض الجاف
   static const Color lightCard = Color(0xFFFFFFFF); // أبيض ناصع للبطاقات (Pure White)
-  static const Color lightSurface = Color(0xFFF1F5F9); // سطح رمادي خفيف للتحديد (Slate-100)
-  static const Color lightBorder = Color(0xFFE2E8F0); // حدود ناعمة وأنيقة (Slate-200)
+  static const Color lightSurface = Color(0xFFEBF1FD); // سطح ناعم للتحديد
+  static const Color lightBorder = Color(0xFFE0E7FF); // حدود ناعمة بلمسة نيلية راقية
 
   // توافق مع الأسماء السابقة لضمان عدم حدوث كسر بالواجهات
   static const Color darkBg = lightBg;
@@ -38,11 +66,11 @@ class AppTheme {
   static const Color info = Color(0xFF0284C7); // أزرق معلوماتي ناصع
   static const Color infoSubtle = Color(0xFFF0F9FF);
 
-  // ظلال ناعمة راقية للبطاقات
+  // ظلال ناعمة راقية للبطاقات بهالة نيلية خافتة
   static List<BoxShadow> get cardShadow => [
         BoxShadow(
-          color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-          blurRadius: 12,
+          color: const Color(0xFF4F46E5).withValues(alpha: 0.05),
+          blurRadius: 14,
           spreadRadius: 0,
           offset: const Offset(0, 4),
         ),
@@ -56,7 +84,7 @@ class AppTheme {
 
   static List<BoxShadow> get primaryGlow => [
         BoxShadow(
-          color: primary.withValues(alpha: 0.25),
+          color: primaryLight.withValues(alpha: 0.28),
           blurRadius: 16,
           spreadRadius: 0,
           offset: const Offset(0, 6),
@@ -156,7 +184,7 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: primary,
+        selectedItemColor: primaryLight,
         unselectedItemColor: Color(0xFF94A3B8),
         selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
         unselectedLabelStyle: TextStyle(fontSize: 11),
