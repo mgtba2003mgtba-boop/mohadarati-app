@@ -9,7 +9,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 import base64
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or base64.b64decode(b"ODc2MDAxNzUzMjpBQUdQaVZCYTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==").decode('utf-8')
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or base64.b64decode(b"ODc2MDAxNzUzMjpBQUhjb2NvYkQxLU1jTVpYcV9Yc2VMUmZqRHNQUWhZbUsxQQ==").decode('utf-8')
 ADMIN_CHAT_ID = "7048397159"
 
 SUPABASE_URL = "https://rlupqsmqwvidmwrvqrcc.supabase.co"

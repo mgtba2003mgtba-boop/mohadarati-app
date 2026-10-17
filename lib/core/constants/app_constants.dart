@@ -71,7 +71,7 @@ class AppConstants {
   static const String attendanceBotUsername = 'UnivercityAttendance_mujtba_Bot';
   static const String attendanceBotUrl = 'https://t.me/UnivercityAttendance_mujtba_Bot';
   static String get attendanceBotToken =>
-      utf8.decode(base64Decode('ODc2MDAxNzUzMjpBQUdQaVZCYTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ=='));
+      utf8.decode(base64Decode('ODc2MDAxNzUzMjpBQUhjb2NvYkQxLU1jTVpYcV9Yc2VMUmZqRHNQUWhZbUsxQQ=='));
 
   // التوافق المباشر مع واجهات الدخول والربط
   static const String telegramBotUsername = attendanceBotUsername;

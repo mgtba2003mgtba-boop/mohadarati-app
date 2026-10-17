@@ -32,7 +32,7 @@ import base64
 API_ID = int(os.environ.get("TELEGRAM_API_ID", 2040))
 API_HASH = os.environ.get("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627")
 BOT_TOKEN = os.environ.get("LECTURES_BOT_TOKEN") or base64.b64decode(b"ODgxNjI4MTIyMDpBQUZBZHVkZGVlN044bUQtVU5nUUlnZlExeWlGYUdiZEhVOA==").decode('utf-8')
-ATTENDANCE_BOT_TOKEN = os.environ.get("ATTENDANCE_BOT_TOKEN") or base64.b64decode(b"ODc2MDAxNzUzMjpBQUdQaVZCYTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==").decode('utf-8')
+ATTENDANCE_BOT_TOKEN = os.environ.get("ATTENDANCE_BOT_TOKEN") or base64.b64decode(b"ODc2MDAxNzUzMjpBQUhjb2NvYkQxLU1jTVpYcV9Yc2VMUmZqRHNQUWhZbUsxQQ==").decode('utf-8')
 CHANNEL_ID = int(os.environ.get("TELEGRAM_CHANNEL_ID", -1003875986734))
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://mrubdzgcjofjwirkdfwo.supabase.co")

@@ -27,7 +27,7 @@ Deno.serve(async (req)=>{
     });
   }
   try {
-    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || atob('ODc2MDAxNzUzMjpBQUdQaVZCQTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==');
+    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || atob('ODc2MDAxNzUzMjpBQUhjb2NvYkQxLU1jTVpYcV9Yc2VMUmZqRHNQUWhZbUsxQQ==');
     const body = await req.json();
 
     // ── 1. Direct API Invocation (محمي بتصريح أمني صارم لمنع العبث بالبوت) ─────

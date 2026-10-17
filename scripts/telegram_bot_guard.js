@@ -1,5 +1,5 @@
 // ── NUST Attendance Telegram Bot Security Guard (Webhook Watchdog & Auto-Healer) ──
-const rawToken = process.env.TELEGRAM_BOT_TOKEN || Buffer.from('ODc2MDAxNzUzMjpBQUdQaVZCQTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==', 'base64').toString('utf8');
+const rawToken = process.env.TELEGRAM_BOT_TOKEN || Buffer.from('ODc2MDAxNzUzMjpBQUhjb2NvYkQxLU1jTVpYcV9Yc2VMUmZqRHNQUWhZbUsxQQ==', 'base64').toString('utf8');
 const BOT_TOKEN = rawToken.trim();
 const OFFICIAL_WEBHOOK_URL = 'https://rlupqsmqwvidmwrvqrcc.supabase.co/functions/v1/telegram-webhook';
 const SECRET_TOKEN = 'NUST_Attendance_SecToken_2026_988147';
