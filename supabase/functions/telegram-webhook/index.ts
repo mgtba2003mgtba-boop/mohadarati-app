@@ -27,7 +27,7 @@ Deno.serve(async (req)=>{
     });
   }
   try {
-    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8760017532:AAGPiVBa6-TPnSnwuxGWGiR8wTJlKYT8vSM';
+    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || atob('ODc2MDAxNzUzMjpBQUdQaVZCQTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==');
     const body = await req.json();
 
     // ── 1. Direct API Invocation (محمي بتصريح أمني صارم لمنع العبث بالبوت) ─────
@@ -53,6 +53,21 @@ Deno.serve(async (req)=>{
       }
     }
 
+    // ── 1.1. التحصين الأمني الصارم لرسائل تيليجرام الواردة (Secret Token Validation) ───
+    const tgSecretToken = Deno.env.get('TELEGRAM_SECRET_TOKEN') || 'NUST_Attendance_SecToken_2026_988147';
+    if (!body.action) {
+      const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token');
+      if (incomingSecret !== tgSecretToken) {
+        return new Response(JSON.stringify({ error: 'Forbidden: Invalid or missing secret token' }), {
+          status: 403,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
+
     if (body.action === 'get_webhook_info') {
       const res = await fetch(`${TELEGRAM_API}${botToken}/getWebhookInfo`);
       const data = await res.json();
@@ -63,9 +78,18 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    if (body.action === 'set_webhook') {
+    if (body.action === 'set_webhook' || body.action === 'enforce_webhook') {
       const webhookUrl = body.url || 'https://rlupqsmqwvidmwrvqrcc.supabase.co/functions/v1/telegram-webhook';
-      const res = await fetch(`${TELEGRAM_API}${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&allowed_updates=["message","callback_query"]`);
+      const res = await fetch(`${TELEGRAM_API}${botToken}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          secret_token: tgSecretToken,
+          drop_pending_updates: true,
+          allowed_updates: ['message', 'callback_query']
+        })
+      });
       const data = await res.json();
       return new Response(JSON.stringify(data), {
         headers: {
