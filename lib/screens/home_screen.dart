@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
@@ -10,7 +11,6 @@ import '../models/announcement_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
 import '../services/attendance_service.dart';
-import '../widgets/study_book_animation.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_network_image.dart';
@@ -18,7 +18,6 @@ import 'courses_screen.dart';
 import 'schedule_screen.dart';
 import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
-import 'announcements_screen.dart';
 import '../services/admin_preview_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -88,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _bannerController = PageController(viewportFraction: 0.92);
+    _bannerController = PageController(viewportFraction: 0.93);
     AdminPreviewService().addListener(_onAdminPreviewChanged);
     _loadData();
   }
@@ -329,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بانر الإعلانات والبوسترات الرسمية بصور حقيقية (ممنوع أي صور عشوائية)
+  /// بانر الإعلانات والبوسترات الرسمية بنسبة 16:9 وتصميم فخم تفاعلي
   Widget _buildAnnouncementsMovingCarousel() {
     final banners = _carouselBanners;
 
@@ -341,125 +340,211 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // حاوية الكاروسيل المنظمة والمرتبة مباشرة
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
-            controller: _bannerController,
-            itemCount: banners.length,
-            onPageChanged: (idx) => setState(() => _currentBannerPage = idx),
-            itemBuilder: (context, index) {
-              final announcement = banners[index];
-              final imageSrc = announcement.imageUrl!;
+        // حاوية الكاروسيل بنسبة 16:9 الديناميكية لجميع مقاسات الشاشات
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 250),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: PageView.builder(
+                controller: _bannerController,
+                itemCount: banners.length,
+                onPageChanged: (idx) => setState(() => _currentBannerPage = idx),
+                itemBuilder: (context, index) {
+                  final announcement = banners[index];
+                  final imageSrc = announcement.imageUrl!;
 
-              final rawTitle = announcement.title;
-              final rawContent = announcement.displayContent;
+                  final rawTitle = announcement.title;
+                  final rawContent = announcement.displayContent;
 
-              final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
-                  rawContent.contains('إعلان بوستر رسمي') ||
-                  rawContent.contains('بوستر رسمي');
-              final content = isBoilerplate
-                  ? ''
-                  : rawContent
-                      .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                  final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
+                      rawContent.contains('إعلان بوستر رسمي') ||
+                      rawContent.contains('بوستر رسمي');
+                  final content = isBoilerplate
+                      ? ''
+                      : rawContent
+                          .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                          .replaceAll('إعلان وبوستر رسمي', '')
+                          .replaceAll('إعلان بوستر رسمي', '')
+                          .trim();
+
+                  String title = rawTitle
                       .replaceAll('إعلان وبوستر رسمي', '')
                       .replaceAll('إعلان بوستر رسمي', '')
                       .trim();
+                  if (RegExp(r'^\d+$').hasMatch(title)) {
+                    title = 'الكلية التقنية الهندسية';
+                  }
 
-              String title = rawTitle
-                  .replaceAll('إعلان وبوستر رسمي', '')
-                  .replaceAll('إعلان بوستر رسمي', '')
-                  .trim();
-              if (RegExp(r'^\d+$').hasMatch(title)) {
-                title = 'الكلية التقنية الهندسية';
-              }
+                  final isPureBanner = content.isEmpty || isBoilerplate;
 
-              final isPureBanner = content.isEmpty || isBoilerplate;
-
-              return GestureDetector(
-                onTap: () {
-                  _showAnnouncementDetails(announcement, imageSrc);
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // الصورة الرسمية المرفوعة
-                        AppNetworkImage(
-                          imageUrl: imageSrc,
-                          fit: BoxFit.cover,
-                          errorWidget: Container(
-                            color: AppTheme.primary,
-                            child: const Center(
-                              child: Icon(Icons.image_outlined, color: Colors.white54, size: 40),
-                            ),
+                  return GestureDetector(
+                    onTap: () {
+                      _showAnnouncementDetails(announcement, imageSrc);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 14,
+                            offset: const Offset(0, 5),
                           ),
-                        ),
-
-                        // تدرج لوني لطيف وأنيق لجعل المحتوى مقروءاً بنقاء
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.black.withValues(alpha: 0.8),
-                                Colors.black.withValues(alpha: 0.15),
-                                Colors.transparent,
-                              ],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            ),
-                          ),
-                        ),
-
-                        // تفاصيل البوستر / الإعلان فقط
-                        Positioned(
-                          bottom: 12,
-                          right: 14,
-                          left: 14,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                title,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // الصورة الرسمية المرفوعة
+                            AppNetworkImage(
+                              imageUrl: imageSrc,
+                              fit: BoxFit.cover,
+                              errorWidget: Container(
+                                color: AppTheme.primary,
+                                child: const Center(
+                                  child: Icon(Icons.image_outlined, color: Colors.white54, size: 40),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              if (!isPureBanner && content.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  content,
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 11,
-                                    color: const Color(0xFFE2E8F0),
-                                    shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                            ),
+
+                            // تدرج لوني سينمائي ناعم لإبراز تفاصيل الصورة والبطاقة
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.75),
+                                    Colors.black.withValues(alpha: 0.15),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.0, 0.45, 0.85],
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
                                 ),
-                              ],
-                            ],
-                          ),
+                              ),
+                            ),
+
+                            // تفاصيل البوستر / الإعلان بنظام بطاقة زجاجية عائمة أنيقة (Floating Glassmorphism Pill Card)
+                            Positioned(
+                              bottom: 10,
+                              right: 10,
+                              left: 10,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0B1120).withValues(alpha: 0.78),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.16),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // شريط التصنيف والتاريخ
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primary.withValues(alpha: 0.85),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.white.withValues(alpha: 0.2),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.campaign_rounded, size: 12, color: Colors.white),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'إعلان رسمي',
+                                                    style: GoogleFonts.cairo(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.calendar_today_rounded,
+                                                  size: 11,
+                                                  color: Colors.white.withValues(alpha: 0.75),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
+                                                  style: GoogleFonts.cairo(
+                                                    fontSize: 10.5,
+                                                    color: Colors.white.withValues(alpha: 0.85),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 5),
+                                        // عنوان البوستر
+                                        Text(
+                                          title,
+                                          style: GoogleFonts.cairo(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            height: 1.25,
+                                            shadows: const [
+                                              Shadow(blurRadius: 4, color: Colors.black87),
+                                            ],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        // التفاصيل إن وجدت
+                                        if (!isPureBanner && content.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            content,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 11,
+                                              color: const Color(0xFFCBD5E1),
+                                              height: 1.25,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
         ),
         if (banners.length > 1) ...[
@@ -472,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: isActive ? 20 : 6,
+                width: isActive ? 22 : 6,
                 height: 6,
                 decoration: BoxDecoration(
                   color: isActive ? AppTheme.primary : const Color(0xFFCBD5E1),
@@ -486,73 +571,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بدون أي صور عشوائية)
+  /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بنسبة 16:9 وتصميم فخم)
   Widget _buildDefaultUniversityBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF0F172A),
-            AppTheme.primary.withValues(alpha: 0.85),
-            const Color(0xFF0F172A),
-          ],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 250),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
-              color: AppTheme.accent.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF0A1128),
+                  Color(0xFF16233B),
+                  Color(0xFF0F172A),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppTheme.cardShadow,
+              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35), width: 1.2),
             ),
-            child: const Center(
-              child: Icon(Icons.school_rounded, color: AppTheme.accent, size: 26),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // أشكال ديكورية ناعمة بالخلفية
+                  Positioned(
+                    top: -35,
+                    right: -35,
+                    child: Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.accent.withValues(alpha: 0.08),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: -40,
+                    left: -20,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                      ),
+                    ),
+                  ),
+                  // المحتوى الأكاديمي المتناسق
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppTheme.accent.withValues(alpha: 0.5), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.verified_rounded, size: 13, color: AppTheme.accent),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'البوابة الأكاديمية الرسمية',
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.accent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.school_rounded, color: AppTheme.accent, size: 24),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'الكلية التقنية الهندسية',
+                              style: GoogleFonts.cairo(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)',
+                              style: GoogleFonts.cairo(
+                                fontSize: 12,
+                                color: AppTheme.accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'بوابة المحاضرات والجداول وقوائم الحضور الأكاديمية',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'الكلية التقنية الهندسية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)',
-                  style: GoogleFonts.cairo(
-                    fontSize: 11,
-                    color: AppTheme.accent,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'بوابة المحاضرات والجداول الأكاديمية الرسمية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 10,
-                    color: const Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
