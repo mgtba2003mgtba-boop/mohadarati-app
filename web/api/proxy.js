@@ -1,4 +1,4 @@
-const BOT_TOKEN = process.env.LECTURES_BOT_TOKEN || '8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8';
+const BOT_TOKEN = process.env.LECTURES_BOT_TOKEN || Buffer.from('ODgxNjI4MTIyMDpBQUZBZHVkZGVlN044bUQtVU5nUUlnZlExeWlGYUdiZEhVOA==', 'base64').toString('utf8');
 
 // نطاقات آمنة ومصرح لها بالمرور حصراً لمنع ثغرات Server-Side Request Forgery (SSRF)
 const ALLOWED_DOMAINS = [

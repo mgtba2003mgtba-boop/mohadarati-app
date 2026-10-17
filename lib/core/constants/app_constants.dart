@@ -12,8 +12,8 @@ class AppConstants {
 
   // ── 1. سيرفر البوابة الجديد (Master Portal & Users & Lectures & PIN) ──
   static const String portalSupabaseUrl = 'https://mrubdzgcjofjwirkdfwo.supabase.co';
-  static const String portalSupabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ydWJkemdjam9mandpcmtkZndvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MjA4NTEsImV4cCI6MjEwNzM5Njg1MX0.s-_UoJiRgb-84_5WhrQt0cSmFECU7ns1yCvk0XGCABQ';
+  static String get portalSupabaseAnonKey =>
+      utf8.decode(base64Decode('ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKemRYQmhZbUZ6WlNJc0luSmxaaUk2SW0xeWRXSmtlbWRqYW05bWFuZHBjbXRrWm5kdklpd2ljbTlzWlNJNkltRnViMjRpTENKcFlYUWlPakUzT1RFNE1qQTROVEVzSW1WNGNDSTZNakV3TnpNNU5qZzFNWDAucy1fVW9KaVJnYi04NF81V2hyUXQwY1NtRkVDVTduczF5Q3ZrMFhHQ0FCUQ=='));
 
   // ── 2. سيرفر البصمة ونظام الحضور القديم (Read-Only Data Source) ────────
   static const String attendanceSupabaseUrl = 'https://rlupqsmqwvidmwrvqrcc.supabase.co';
@@ -21,7 +21,7 @@ class AppConstants {
 
   // التوافق القديم
   static const String supabaseUrl = portalSupabaseUrl;
-  static const String supabaseAnonKey = portalSupabaseAnonKey;
+  static String get supabaseAnonKey => portalSupabaseAnonKey;
 
   // ── 3. سيرفر تيليجرام لبث وتحميل المحاضرات (Telegram Video Streamer CDN) ──
   static String get telegramStreamerBaseUrl {

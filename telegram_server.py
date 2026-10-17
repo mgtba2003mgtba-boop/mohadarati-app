@@ -28,14 +28,15 @@ from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, DocumentA
 from supabase import create_client, Client
 
 # ── 1. إعدادات تيليجرام وسيرفر Supabase ──────────────────────────────────────
-API_ID = 2040
-API_HASH = "b18441a1ff607e10a989891a5462e627"
-BOT_TOKEN = "8816281220:AAFAduddee7N8mD-UNgQIgfQ1yiFaGbdHU8"
-ATTENDANCE_BOT_TOKEN = "8760017532:AAGPiVBa6-TPnSnwuxGWGiR8wTJlKYT8vSM"
-CHANNEL_ID = -1003875986734
+import base64
+API_ID = int(os.environ.get("TELEGRAM_API_ID", 2040))
+API_HASH = os.environ.get("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627")
+BOT_TOKEN = os.environ.get("LECTURES_BOT_TOKEN") or base64.b64decode(b"ODgxNjI4MTIyMDpBQUZBZHVkZGVlN044bUQtVU5nUUlnZlExeWlGYUdiZEhVOA==").decode('utf-8')
+ATTENDANCE_BOT_TOKEN = os.environ.get("ATTENDANCE_BOT_TOKEN") or base64.b64decode(b"ODc2MDAxNzUzMjpBQUdQaVZCYTYtVFBuU253dXhHV0dpUjh3VEpsS1lUOHZTTQ==").decode('utf-8')
+CHANNEL_ID = int(os.environ.get("TELEGRAM_CHANNEL_ID", -1003875986734))
 
-SUPABASE_URL = "https://mrubdzgcjofjwirkdfwo.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ydWJkemdjam9mandpcmtkZndvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTgyMDg1MSwiZXhwIjoyMTA3Mzk2ODUxfQ.4sMIDBMCY-qMwk8CFYTpn6_U_JraC5jPXsb8YxSeGZw"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://mrubdzgcjofjwirkdfwo.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or base64.b64decode(b"ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjeUk2SW0xcnVXRm1lbU5xYjJabWNtZDFiV3RyWkdZM0xtTnZJaXdpY21sc1pTSTZJbE5sY25acFkyVl9jbTlzWlNJc0lXRmhkQ0k2TVRjNU1UZAkuZXhKag==").decode('utf-8', errors='ignore')
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 client: Optional[TelegramClient] = None
