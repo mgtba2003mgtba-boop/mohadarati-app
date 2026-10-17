@@ -582,7 +582,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         centerTitle: false,
         title: Row(
           children: [
-            AppIconBadge.sky(
+            AppIconBadge.amber(
               icon: Icons.calendar_month_rounded,
               size: 40,
               iconSize: 22,
@@ -610,7 +610,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         actions: [
           if (canPublish)
             IconButton(
-              icon: const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.skyDark),
+              icon: const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.primary),
               tooltip: 'رفع جدول',
               onPressed: _showUploadScheduleDialog,
             ),
@@ -633,7 +633,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             ),
             child: TabBar(
               controller: _tabController,
-              labelColor: AppTheme.skyDark,
+              labelColor: AppTheme.primary,
               unselectedLabelColor: const Color(0xFF64748B),
               indicator: BoxDecoration(
                 color: Colors.white,

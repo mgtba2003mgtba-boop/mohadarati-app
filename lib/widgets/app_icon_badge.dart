@@ -26,46 +26,6 @@ class AppIconBadge extends StatelessWidget {
     this.showShadow = true,
   });
 
-  /// نمط مسبق: بنفسجي كهربي زاهي وتقني (Tech Violet)
-  factory AppIconBadge.violet({
-    required IconData icon,
-    double size = 44,
-    double iconSize = 22,
-  }) {
-    return AppIconBadge(
-      icon: icon,
-      size: size,
-      iconSize: iconSize,
-      gradient: const LinearGradient(
-        colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      iconColor: Colors.white,
-      showBorder: false,
-    );
-  }
-
-  /// نمط مسبق: سيان سماوي متألق (Tech Cyan)
-  factory AppIconBadge.cyan({
-    required IconData icon,
-    double size = 44,
-    double iconSize = 22,
-  }) {
-    return AppIconBadge(
-      icon: icon,
-      size: size,
-      iconSize: iconSize,
-      gradient: const LinearGradient(
-        colors: [Color(0xFF06B6D4), Color(0xFF0EA5E9)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      iconColor: Colors.white,
-      showBorder: false,
-    );
-  }
-
   /// نمط مسبق: أزرق نيلي أكاديمي ملكي
   factory AppIconBadge.indigo({
     required IconData icon,

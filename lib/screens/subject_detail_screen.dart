@@ -353,9 +353,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppTheme.violetDark,
+          labelColor: AppTheme.primary,
           unselectedLabelColor: const Color(0xFF94A3B8),
-          indicatorColor: AppTheme.violet,
+          indicatorColor: AppTheme.primary,
           labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
           tabs: [
             Tab(
@@ -377,7 +377,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ? (_tabController.index == 0
               ? FloatingActionButton.extended(
                   onPressed: () => _showPublishSheet(initialMode: 'lecture'),
-                  backgroundColor: AppTheme.violet,
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 4,
                   icon: const Icon(Icons.upload_file_rounded, size: 20),
@@ -388,8 +388,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 )
               : FloatingActionButton.extended(
                   onPressed: () => _showPublishSheet(initialMode: 'announcement'),
-                  backgroundColor: AppTheme.skyDark,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppTheme.accent,
+                  foregroundColor: Colors.black,
                   elevation: 4,
                   icon: const Icon(Icons.campaign_rounded, size: 20),
                   label: Text(

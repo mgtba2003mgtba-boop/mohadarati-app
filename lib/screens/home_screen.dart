@@ -211,12 +211,9 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: const Border(
-            top: BorderSide(color: Color(0xFFE0E7FF), width: 1.2),
-          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4F46E5).withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 16,
               offset: const Offset(0, -2),
             ),
@@ -225,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           backgroundColor: Colors.white,
-          selectedItemColor: AppTheme.primaryLight,
+          selectedItemColor: AppTheme.primary,
           unselectedItemColor: const Color(0xFF94A3B8),
           elevation: 0,
           onTap: (index) => setState(() => _currentIndex = index),
@@ -280,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      AppIconBadge.violet(
+                      AppIconBadge.indigo(
                         icon: Icons.account_balance_rounded,
                         size: 42,
                         iconSize: 22,
@@ -597,7 +594,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بطاقات الوصول السريع للمقررات والجدول (نمط فيوليت وسكاي المتناسق)
+  /// بطاقات الوصول السريع للمقررات والجدول
   Widget _buildQuickActionCards() {
     return Row(
       children: [
@@ -610,21 +607,15 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFDDD6FE), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: Border.all(color: AppTheme.lightBorder),
+                boxShadow: AppTheme.cardShadow,
               ),
               child: Row(
                 children: [
-                  AppIconBadge.violet(
+                  AppIconBadge.indigo(
                     icon: Icons.menu_book_rounded,
-                    size: 42,
-                    iconSize: 21,
+                    size: 40,
+                    iconSize: 20,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -643,8 +634,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           '${_subjectNames.length} مادة دراسية',
                           style: GoogleFonts.cairo(
                             fontSize: 11,
-                            color: const Color(0xFF7C3AED),
-                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -667,21 +657,15 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: Border.all(color: AppTheme.lightBorder),
+                boxShadow: AppTheme.cardShadow,
               ),
               child: Row(
                 children: [
-                  AppIconBadge.sky(
+                  AppIconBadge.amber(
                     icon: Icons.calendar_month_rounded,
-                    size: 42,
-                    iconSize: 21,
+                    size: 40,
+                    iconSize: 20,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -700,8 +684,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           'المواعيد والامتحانات',
                           style: GoogleFonts.cairo(
                             fontSize: 11,
-                            color: const Color(0xFF0284C7),
-                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -805,10 +788,6 @@ class _HomeScreenState extends State<HomeScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final lec = recentLectures[index];
-              final isViolet = index % 2 == 0;
-              final accentColor = isViolet ? const Color(0xFF8B5CF6) : const Color(0xFF0EA5E9);
-              final borderColor = isViolet ? const Color(0xFFDDD6FE) : const Color(0xFFBAE6FD);
-
               return InkWell(
                 onTap: () {
                   Navigator.push(
@@ -829,27 +808,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor, width: 1.1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    border: Border.all(color: AppTheme.lightBorder),
+                    boxShadow: AppTheme.cardShadow,
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isViolet ? const Color(0xFFF5F3FF) : const Color(0xFFF0F9FF),
+                          color: AppTheme.primarySubtle,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor, width: 0.8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.description_outlined,
-                          color: isViolet ? const Color(0xFF7C3AED) : const Color(0xFF0284C7),
+                          color: AppTheme.primary,
                           size: 20,
                         ),
                       ),
@@ -880,10 +852,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Icon(
+                      const Icon(
                         Icons.arrow_forward_ios_rounded,
                         size: 14,
-                        color: accentColor,
+                        color: Color(0xFF94A3B8),
                       ),
                     ],
                   ),
