@@ -271,12 +271,6 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: Color(0xFF2AABEE),
-                                size: 16,
-                              ),
                             ],
                           ),
                           const SizedBox(height: 1),
