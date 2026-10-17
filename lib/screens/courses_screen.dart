@@ -261,13 +261,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                   .toList();
                               final hasAttendance = statsList != null && statsList.isNotEmpty;
                               final stats = hasAttendance ? statsList.first : null;
-                              final lecCount = _lectures
-                                  .where((l) => l.subjectName.trim().toLowerCase() == subName.toLowerCase())
-                                  .length;
-
                               return _buildSubjectCard(
                                 subjectName: subName,
-                                lectureCount: lecCount,
                                 stats: stats,
                                 index: index,
                               );
@@ -282,7 +277,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   Widget _buildSubjectCard({
     required String subjectName,
-    required int lectureCount,
     required SubjectAttendanceStats? stats,
     required int index,
   }) {
@@ -367,10 +361,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          if (subModel?.units != null) ...[
+                      if (subModel?.units != null) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
                               decoration: BoxDecoration(
@@ -394,24 +388,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
                           ],
-                          Icon(
-                            Icons.video_library_rounded,
-                            size: 14,
-                            color: lectureCount > 0 ? AppTheme.accent : AppTheme.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            lectureCount > 0 ? '$lectureCount محاضرات' : 'المقرر متاح',
-                            style: GoogleFonts.cairo(
-                              fontSize: 11,
-                              color: lectureCount > 0 ? AppTheme.accent : AppTheme.textMuted,
-                              fontWeight: lectureCount > 0 ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
