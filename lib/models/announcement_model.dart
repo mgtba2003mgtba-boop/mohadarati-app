@@ -1,3 +1,56 @@
+import 'dart:convert';
+
+/// نموذج تفاعل الطالب الأكاديمي مع التبليغ
+class AnnouncementReaction {
+  final String studentId;
+  final String studentName;
+  final String department;
+  final String stage;
+  final String section;
+  final String reaction; // e.g. '👍', '❤️', '👏', '💡', '🔥'
+  final DateTime createdAt;
+
+  AnnouncementReaction({
+    required this.studentId,
+    required this.studentName,
+    this.department = '',
+    this.stage = '',
+    this.section = '',
+    required this.reaction,
+    required this.createdAt,
+  });
+
+  factory AnnouncementReaction.fromJson(Map<String, dynamic> json) {
+    DateTime time = DateTime.now();
+    if (json['time'] != null) {
+      try {
+        time = DateTime.parse(json['time'].toString());
+      } catch (_) {}
+    }
+    return AnnouncementReaction(
+      studentId: json['id']?.toString() ?? '',
+      studentName: json['name']?.toString() ?? 'طالب',
+      department: json['dept']?.toString() ?? '',
+      stage: json['stg']?.toString() ?? '',
+      section: json['sec']?.toString() ?? '',
+      reaction: json['r']?.toString() ?? '👍',
+      createdAt: time,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': studentId,
+      'name': studentName,
+      'dept': department,
+      'stg': stage,
+      'sec': section,
+      'r': reaction,
+      'time': createdAt.toIso8601String(),
+    };
+  }
+}
+
 class AnnouncementModel {
   final String id;
   final String title;
@@ -40,6 +93,85 @@ class AnnouncementModel {
     return null;
   }
 
+  /// خريطة التفاعلات المسجلة مع هذا التبليغ مفهرسة بمعرف الطالب
+  Map<String, AnnouncementReaction> get reactions {
+    final match = RegExp(r'\[REACTIONS:([^\]]+)\]').firstMatch(content);
+    if (match != null) {
+      try {
+        final decoded = jsonDecode(match.group(1)!);
+        if (decoded is Map) {
+          final res = <String, AnnouncementReaction>{};
+          decoded.forEach((key, val) {
+            if (val is Map<String, dynamic>) {
+              res[key.toString()] = AnnouncementReaction.fromJson(val);
+            } else if (val is Map) {
+              res[key.toString()] = AnnouncementReaction.fromJson(Map<String, dynamic>.from(val));
+            }
+          });
+          return res;
+        }
+      } catch (_) {}
+    }
+    return const {};
+  }
+
+  /// قائمة كافة المتفاعلين (للمشرف العام حصراً)
+  List<AnnouncementReaction> get reactionsList => reactions.values.toList();
+
+  /// إجمالي عدد التفاعلات
+  int get totalReactionsCount => reactions.length;
+
+  /// إحصائية العدادات لكل إيموجي (تظهر لجميع الطلاب بهوية مجهولة)
+  Map<String, int> get reactionCounts {
+    final counts = <String, int>{};
+    for (final r in reactions.values) {
+      counts[r.reaction] = (counts[r.reaction] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// الإيموجي الذي تفاعل به مستخدم معين إن وجد
+  String? getUserReaction(String? studentId) {
+    if (studentId == null || studentId.isEmpty) return null;
+    return reactions[studentId]?.reaction;
+  }
+
+  /// هل تفاعل الطالب بهذا الإيموجي تحديداً
+  bool hasUserReacted(String? studentId, String emoji) {
+    if (studentId == null || studentId.isEmpty) return false;
+    return reactions[studentId]?.reaction == emoji;
+  }
+
+  /// تضمين أو تحديث وسم التفاعلات في نص المحتوى
+  static String embedReactions(String originalContent, Map<String, AnnouncementReaction> newReactions) {
+    final clean = originalContent.replaceAll(RegExp(r'\s*\[REACTIONS:[^\]]+\]'), '').trim();
+    if (newReactions.isEmpty) return clean;
+    final map = <String, dynamic>{};
+    newReactions.forEach((k, v) => map[k] = v.toJson());
+    final encoded = jsonEncode(map);
+    return '$clean [REACTIONS:$encoded]';
+  }
+
+  /// إنشاء نسخة محدثة بتفاعلات جديدة
+  AnnouncementModel copyWithReactions(Map<String, AnnouncementReaction> newReactions) {
+    return AnnouncementModel(
+      id: id,
+      title: title,
+      content: embedReactions(content, newReactions),
+      authorId: authorId,
+      authorName: authorName,
+      authorRole: authorRole,
+      department: department,
+      stage: stage,
+      section: section,
+      category: category,
+      isPinned: isPinned,
+      imageUrl: imageUrl,
+      subjectName: subjectName,
+      createdAt: createdAt,
+    );
+  }
+
   /// المحتوى النظيف للعرض بدون وسوم تيليجرام والنظام الداخلية
   String get displayContent {
     return content
@@ -47,6 +179,7 @@ class AnnouncementModel {
         .replaceAll('[SCHEDULE_TIMETABLE]', '')
         .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[SECTION:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[REACTIONS:[^\]]+\]'), '')
         .trim();
   }
 

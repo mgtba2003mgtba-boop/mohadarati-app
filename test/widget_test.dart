@@ -1425,6 +1425,79 @@ void main() {
       expect(genRes.success, isTrue);
       expect(genRes.fileUrl, contains('api.telegram.org'));
     });
+
+    test('اختبار نظام التفاعلات الأكاديمية وسرية هوية الطلاب في التبليغات (Anonymous Reactions & Inspector)', () {
+      final now = DateTime.now();
+      final announcement = AnnouncementModel(
+        id: 'ann-react-1',
+        title: 'تبليغ هام بخصوص الامتحانات',
+        content: 'يرجى مراجعة القاعات الامتحانية قبل نصف ساعة من الموعد',
+        authorId: 'ST-NUST-001630760-413',
+        authorName: 'مجتبى عواد حسن كاظم',
+        authorRole: 'admin',
+        createdAt: now,
+      );
+
+      // في البداية لا توجد تفاعلات
+      expect(announcement.totalReactionsCount, 0);
+      expect(announcement.reactionCounts.isEmpty, true);
+
+      // محاكاة تفاعل 3 طلاب مختلفين بهويات مجهولة
+      final reactionsMap = {
+        'ST-001': AnnouncementReaction(
+          studentId: 'ST-001',
+          studentName: 'أحمد علي حسن',
+          department: 'هندسة تقنيات الأجهزة الطبية',
+          stage: 'المرحلة الرابعة',
+          section: 'A',
+          reaction: '👍',
+          createdAt: now,
+        ),
+        'ST-002': AnnouncementReaction(
+          studentId: 'ST-002',
+          studentName: 'سارة محمد جاسم',
+          department: 'هندسة تقنيات الأجهزة الطبية',
+          stage: 'المرحلة الرابعة',
+          section: 'B',
+          reaction: '👍',
+          createdAt: now,
+        ),
+        'ST-003': AnnouncementReaction(
+          studentId: 'ST-003',
+          studentName: 'كرار حيدر جبار',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'المرحلة الثالثة',
+          section: 'C',
+          reaction: '❤️',
+          createdAt: now,
+        ),
+      };
+
+      final updated = announcement.copyWithReactions(reactionsMap);
+
+      // 1. فحص إحصائيات العدادات المجهولة المتاحة لجميع الطلاب
+      expect(updated.totalReactionsCount, 3);
+      expect(updated.reactionCounts['👍'], 2);
+      expect(updated.reactionCounts['❤️'], 1);
+      expect(updated.reactionCounts['🔥'], isNull);
+
+      // 2. فحص نظافة نص العرض displayContent وعدم ظهور وسوم التفاعلات البرمجية
+      expect(updated.displayContent, equals('يرجى مراجعة القاعات الامتحانية قبل نصف ساعة من الموعد'));
+      expect(updated.displayContent.contains('[REACTIONS:'), false);
+
+      // 3. فحص تفاعل الطالب المحدد
+      expect(updated.hasUserReacted('ST-001', '👍'), true);
+      expect(updated.hasUserReacted('ST-001', '❤️'), false);
+      expect(updated.getUserReaction('ST-003'), '❤️');
+      expect(updated.getUserReaction('ST-999'), isNull);
+
+      // 4. فحص سجل المتفاعلين المتاح حصراً للمشرف العام
+      final list = updated.reactionsList;
+      expect(list.length, 3);
+      expect(list.any((r) => r.studentName == 'أحمد علي حسن' && r.section == 'A'), true);
+      expect(list.any((r) => r.studentName == 'سارة محمد جاسم' && r.section == 'B'), true);
+      expect(list.any((r) => r.studentName == 'كرار حيدر جبار' && r.section == 'C'), true);
+    });
   });
 }
 

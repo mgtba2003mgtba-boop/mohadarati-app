@@ -6,6 +6,7 @@ import '../models/app_user_model.dart';
 import '../models/announcement_model.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
+import '../widgets/telegram_announcement_card.dart';
 import 'dashboard_screen.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -218,7 +219,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // قائمة الإعلانات
+                  // قائمة الإعلانات بنمط قنوات تيليجرام والتفاعلات الأكاديمية
                   Expanded(
                     child: _filteredList.isEmpty
                         ? Center(
@@ -228,10 +229,17 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                             ),
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             itemCount: _filteredList.length,
                             itemBuilder: (context, index) {
-                              return _buildAnnouncementCard(_filteredList[index]);
+                              final item = _filteredList[index];
+                              return TelegramAnnouncementCard(
+                                key: ValueKey('ann_${item.id}'),
+                                announcement: item,
+                                currentUser: _user,
+                                onReactionToggled: (emoji) => _toggleReaction(item, emoji),
+                                onDelete: () => _confirmDeleteAnnouncement(item),
+                              );
                             },
                           ),
                   ),
@@ -239,6 +247,51 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _toggleReaction(AnnouncementModel item, String emoji) async {
+    if (_user == null) return;
+
+    // 1. تحديث فوري وسريع للواجهة (Optimistic UI)
+    final currentKey = _user!.studentId.isNotEmpty ? _user!.studentId : _user!.id;
+    final reactionsMap = Map<String, AnnouncementReaction>.from(item.reactions);
+
+    if (reactionsMap.containsKey(currentKey) && reactionsMap[currentKey]!.reaction == emoji) {
+      reactionsMap.remove(currentKey);
+    } else {
+      reactionsMap[currentKey] = AnnouncementReaction(
+        studentId: currentKey,
+        studentName: _user!.name,
+        department: _user!.department,
+        stage: _user!.stage,
+        section: _user!.section ?? '',
+        reaction: emoji,
+        createdAt: DateTime.now(),
+      );
+    }
+
+    final updated = item.copyWithReactions(reactionsMap);
+    setState(() {
+      final idx = _announcements.indexWhere((a) => a.id == item.id);
+      if (idx != -1) {
+        _announcements[idx] = updated;
+      }
+    });
+
+    // 2. مزامنة سحابية هادئة في الخلفية
+    final synced = await SupabaseService().toggleAnnouncementReaction(
+      announcementId: item.id,
+      emoji: emoji,
+      user: _user!,
+    );
+    if (synced != null && mounted) {
+      setState(() {
+        final idx = _announcements.indexWhere((a) => a.id == item.id);
+        if (idx != -1) {
+          _announcements[idx] = synced;
+        }
+      });
+    }
   }
 
   Widget _buildFilterChip(String label, String categoryKey) {
@@ -446,170 +499,6 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           onChanged: onChanged,
         ),
       ),
-    );
-  }
-
-  Widget _buildAnnouncementCard(AnnouncementModel announcement) {
-    Color categoryColor = AppTheme.primary;
-    if (announcement.category == 'urgent') categoryColor = AppTheme.danger;
-    if (announcement.category == 'exam') categoryColor = AppTheme.warning;
-
-    return InkWell(
-      onTap: () => _showAnnouncementDetails(announcement),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: announcement.isPinned ? AppTheme.primary.withValues(alpha: 0.6) : AppTheme.lightBorder,
-            width: announcement.isPinned ? 1.5 : 1.0,
-          ),
-          boxShadow: AppTheme.cardShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: categoryColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    AppConstants.announcementCategories[announcement.category] ?? 'إعلان',
-                    style: GoogleFonts.cairo(fontSize: 10, color: categoryColor, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (announcement.section != 'ALL') ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF93C5FD), width: 0.8),
-                    ),
-                    child: Text(
-                      'شعبة ${announcement.section}',
-                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-                if (_user?.isAdmin == true && (announcement.department != 'ALL' || announcement.stage != 'ALL')) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
-                    ),
-                    child: Text(
-                      '${announcement.department} • ${announcement.stage}',
-                      style: GoogleFonts.cairo(fontSize: 9, color: const Color(0xFF475569), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Text(
-                  '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
-                  style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
-                ),
-                if (_user?.isAdmin == true) ...[
-                  const SizedBox(width: 6),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: 'حذف التبليغ (صلاحية المشرف)',
-                    onPressed: () => _confirmDeleteAnnouncement(announcement),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            Text(
-              announcement.title,
-              style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-            ),
-            const SizedBox(height: 6),
-
-            Text(
-              announcement.displayContent,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (announcement.subjectName != null && announcement.subjectName!.isNotEmpty && announcement.subjectName != 'عام')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primarySubtle,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      announcement.subjectName!,
-                      style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-                Text(
-                  'معاينة التبليغ ←',
-                  style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAnnouncementDetails(AnnouncementModel announcement) {
-    AppFullscreenModal.show(
-      context: context,
-      title: announcement.title,
-      subtitle: '${announcement.createdAt.year}/${announcement.createdAt.month.toString().padLeft(2, '0')}/${announcement.createdAt.day.toString().padLeft(2, '0')}',
-      icon: Icons.campaign_rounded,
-      imageUrl: announcement.imageUrl,
-      contentText: announcement.displayContent,
-      accentColor: AppTheme.primary,
-      actions: [
-        if (_user?.isAdmin == true)
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _confirmDeleteAnnouncement(announcement);
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.redAccent,
-              side: const BorderSide(color: Colors.redAccent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.delete_rounded, size: 18),
-            label: Text('حذف المنشور', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-          ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text('إغلاق', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-        ),
-      ],
     );
   }
 }

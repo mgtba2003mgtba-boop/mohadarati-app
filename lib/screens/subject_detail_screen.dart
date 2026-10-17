@@ -15,6 +15,7 @@ import '../services/telegram_uploader_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
+import '../widgets/telegram_announcement_card.dart';
 import '../services/admin_preview_service.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
@@ -893,111 +894,62 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: announcements.length,
       itemBuilder: (context, index) {
         final item = announcements[index];
-        return InkWell(
-          onTap: () {
-            AppFullscreenModal.show(
-              context: context,
-              title: item.title,
-              subtitle: '${item.createdAt.year}/${item.createdAt.month.toString().padLeft(2, '0')}/${item.createdAt.day.toString().padLeft(2, '0')}',
-              icon: Icons.campaign_rounded,
-              contentText: item.displayContent,
-              accentColor: AppTheme.primary,
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text('إغلاق', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: item.isPinned ? AppTheme.accent.withValues(alpha: 0.6) : AppTheme.lightBorder,
-                width: item.isPinned ? 1.5 : 1,
-              ),
-              boxShadow: AppTheme.cardShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    AppIconBadge.subtle(
-                      icon: Icons.campaign_rounded,
-                      size: 34,
-                      iconSize: 18,
-                      color: AppTheme.primary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item.displayContent,
-                  style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primarySubtle,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'تبليغ رسمي',
-                        style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          '${item.createdAt.year}-${item.createdAt.month.toString().padLeft(2, '0')}-${item.createdAt.day.toString().padLeft(2, '0')}',
-                          style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
-                        ),
-                        if (_canPublish && (_user?.studentId == item.authorId || _user?.isAdmin == true || _user?.name.contains('مجتبى') == true)) ...[
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () => _confirmDeleteAnnouncement(item),
-                            child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.danger),
-                          ),
-                        ],
-                        const SizedBox(width: 6),
-                        const Icon(Icons.open_in_full_rounded, size: 14, color: AppTheme.primary),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        return TelegramAnnouncementCard(
+          key: ValueKey('subj_ann_${item.id}'),
+          announcement: item,
+          currentUser: _user,
+          onReactionToggled: (emoji) => _toggleReaction(item, emoji),
+          onDelete: () => _confirmDeleteAnnouncement(item),
         );
       },
     );
+  }
+
+  Future<void> _toggleReaction(AnnouncementModel item, String emoji) async {
+    if (_user == null) return;
+
+    final currentKey = _user!.studentId.isNotEmpty ? _user!.studentId : _user!.id;
+    final reactionsMap = Map<String, AnnouncementReaction>.from(item.reactions);
+
+    if (reactionsMap.containsKey(currentKey) && reactionsMap[currentKey]!.reaction == emoji) {
+      reactionsMap.remove(currentKey);
+    } else {
+      reactionsMap[currentKey] = AnnouncementReaction(
+        studentId: currentKey,
+        studentName: _user!.name,
+        department: _user!.department,
+        stage: _user!.stage,
+        section: _user!.section ?? '',
+        reaction: emoji,
+        createdAt: DateTime.now(),
+      );
+    }
+
+    final updated = item.copyWithReactions(reactionsMap);
+    setState(() {
+      final idx = _subjectAnnouncements.indexWhere((a) => a.id == item.id);
+      if (idx != -1) {
+        _subjectAnnouncements[idx] = updated;
+      }
+    });
+
+    final synced = await SupabaseService().toggleAnnouncementReaction(
+      announcementId: item.id,
+      emoji: emoji,
+      user: _user!,
+    );
+    if (synced != null && mounted) {
+      setState(() {
+        final idx = _subjectAnnouncements.indexWhere((a) => a.id == item.id);
+        if (idx != -1) {
+          _subjectAnnouncements[idx] = synced;
+        }
+      });
+    }
   }
 
   // ══════════════════════════════════════════════════════════════

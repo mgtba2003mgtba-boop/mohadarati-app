@@ -582,6 +582,59 @@ class SupabaseService {
     }
   }
 
+  /// ── تبديل أو تسجيل تفاعل الطالب على التبليغ (أكاديمي ومجهول الهوية) ──────────
+  Future<AnnouncementModel?> toggleAnnouncementReaction({
+    required String announcementId,
+    required String emoji,
+    required AppUserModel user,
+  }) async {
+    try {
+      // 1. استرجاع المحتوى الحالي للتبليغ
+      final row = await client
+          .from('announcements')
+          .select('*')
+          .eq('id', announcementId)
+          .maybeSingle();
+
+      if (row == null) return null;
+
+      final current = AnnouncementModel.fromJson(row);
+      final reactionsMap = Map<String, AnnouncementReaction>.from(current.reactions);
+
+      final studentKey = user.studentId.isNotEmpty ? user.studentId : user.id;
+
+      // 2. فحص التفاعل الحالي للطالب: إذا كان نفس الإيموجي -> إلغاء التفاعل
+      if (reactionsMap.containsKey(studentKey) && reactionsMap[studentKey]!.reaction == emoji) {
+        reactionsMap.remove(studentKey);
+      } else {
+        reactionsMap[studentKey] = AnnouncementReaction(
+          studentId: studentKey,
+          studentName: user.name,
+          department: user.department,
+          stage: user.stage,
+          section: user.section ?? '',
+          reaction: emoji,
+          createdAt: DateTime.now(),
+        );
+      }
+
+      final updatedContent = AnnouncementModel.embedReactions(current.content, reactionsMap);
+
+      // 3. تحديث السجل في قاعدة بيانات Supabase
+      await client
+          .from('announcements')
+          .update({'content': updatedContent})
+          .eq('id', announcementId);
+
+      invalidateCachePattern('announcements_');
+
+      return current.copyWithReactions(reactionsMap);
+    } catch (e) {
+      debugPrint('[-] Error toggling announcement reaction: $e');
+      return null;
+    }
+  }
+
   /// ── حذف إعلان / بوستر / جدول (مع فحص هوية الكاتب وحذف تيليجرام وتفريغ الكاش) ───
   Future<bool> deleteAnnouncement(String id) async {
     try {
