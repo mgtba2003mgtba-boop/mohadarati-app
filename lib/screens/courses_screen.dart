@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/biometric_subjects.dart';
@@ -202,11 +203,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
           : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : RefreshIndicator(
-              onRefresh: _loadCourses,
-              color: AppTheme.primary,
-              child: Column(
-                children: [
+          : Column(
+              children: [
                   // شريط البحث المقتضب
                   Container(
                     color: Colors.white,
@@ -252,6 +250,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             ),
                           )
                         : ListView.builder(
+                            cacheExtent: 600,
+                            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             itemCount: subjects.length,
                             itemBuilder: (context, index) {
@@ -261,19 +261,21 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                   .toList();
                               final hasAttendance = statsList != null && statsList.isNotEmpty;
                               final stats = hasAttendance ? statsList.first : null;
-                              return _buildSubjectCard(
-                                subjectName: subName,
-                                stats: stats,
-                                index: index,
+                              return RepaintBoundary(
+                                key: ValueKey('subj_card_$subName'),
+                                child: _buildSubjectCard(
+                                  subjectName: subName,
+                                  stats: stats,
+                                  index: index,
+                                ),
                               );
                             },
                           ),
                   ),
                 ],
               ),
-            ),
-    );
-  }
+      );
+    }
 
   Widget _buildSubjectCard({
     required String subjectName,
@@ -299,6 +301,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
+            HapticFeedback.lightImpact();
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -317,7 +320,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
             child: Row(
               children: [
                 AppIconBadge.indigo(
-                  icon: Icons.menu_book_rounded,
+                  icon: BiometricSubjects.getIconForSubject(subjectName),
                   size: 48,
                   iconSize: 24,
                 ),
@@ -343,17 +346,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           if (subModel?.code != null) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
                               child: Text(
                                 subModel!.code!,
                                 style: GoogleFonts.cairo(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF38BDF8),
+                                  color: AppTheme.primary,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -366,23 +370,23 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
+                                color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFFCD34D)),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.stars_rounded, size: 12, color: Color(0xFFD97706)),
-                                  const SizedBox(width: 3),
+                                  const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 4),
                                   Text(
                                     '${subModel!.units} وحدات',
                                     style: GoogleFonts.cairo(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFFB45309),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF475569),
                                     ),
                                   ),
                                 ],

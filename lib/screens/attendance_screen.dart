@@ -61,11 +61,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : RefreshIndicator(
-              onRefresh: _loadAttendance,
-              color: AppTheme.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+          : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,9 +134,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ],
                 ),
               ),
-            ),
-    );
-  }
+      );
+    }
 
   Widget _buildOverallStatsCard() {
     final pct = _summary?.overallPercentage ?? 100.0;

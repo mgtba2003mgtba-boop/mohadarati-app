@@ -635,6 +635,115 @@ class SupabaseService {
     }
   }
 
+  /// ── تسجيل أو تبديل صوت الطالب في الاستطلاع الأكاديمي ──────────
+  Future<AnnouncementModel?> castPollVote({
+    required String announcementId,
+    required int optionIndex,
+    required AppUserModel user,
+  }) async {
+    try {
+      final row = await client
+          .from('announcements')
+          .select('*')
+          .eq('id', announcementId)
+          .maybeSingle();
+
+      if (row == null) return null;
+
+      final current = AnnouncementModel.fromJson(row);
+      final poll = current.pollData;
+      if (poll == null || poll.isClosed) return null;
+
+      final studentKey = user.studentId.isNotEmpty ? user.studentId : user.id;
+      final existingVotes = Map<String, PollVote>.from(poll.votes);
+
+      List<int> newSelections = [];
+      if (existingVotes.containsKey(studentKey)) {
+        final currentSelections = List<int>.from(existingVotes[studentKey]!.selectedOptionIndices);
+        if (currentSelections.contains(optionIndex)) {
+          newSelections = []; // إلغاء التصويت بالضغط على نفس الخيار
+        } else {
+          newSelections = [optionIndex]; // انتقال فوري للخيار الجديد (خيار واحد فقط)
+        }
+      } else {
+        newSelections = [optionIndex];
+      }
+
+      if (newSelections.isEmpty) {
+        existingVotes.remove(studentKey);
+      } else {
+        existingVotes[studentKey] = PollVote(
+          studentId: studentKey,
+          studentName: user.name,
+          department: user.department,
+          stage: user.stage,
+          section: user.section ?? '',
+          selectedOptionIndices: newSelections,
+          votedAt: DateTime.now(),
+        );
+      }
+
+      final updatedPoll = poll.copyWith(votes: existingVotes);
+      final updatedContent = AnnouncementModel.embedPoll(current.content, updatedPoll);
+
+      await client
+          .from('announcements')
+          .update({'content': updatedContent})
+          .eq('id', announcementId);
+
+      invalidateCachePattern('announcements_');
+
+      return current.copyWithPoll(updatedPoll);
+    } catch (e) {
+      debugPrint('[-] Error casting poll vote: $e');
+      return null;
+    }
+  }
+
+  /// ── إغلاق التصويت وتثبيت النتائج النهائية ──────────
+  Future<bool> closePoll({
+    required String announcementId,
+    required AppUserModel user,
+  }) async {
+    try {
+      final row = await client
+          .from('announcements')
+          .select('*')
+          .eq('id', announcementId)
+          .maybeSingle();
+
+      if (row == null) return false;
+
+      final current = AnnouncementModel.fromJson(row);
+      final poll = current.pollData;
+      if (poll == null) return false;
+
+      final isAuthorized = user.isAdmin ||
+          user.studentId == 'ST-NUST-001630760-413' ||
+          user.name.contains('مجتبى') ||
+          user.studentId == current.authorId;
+
+      if (!isAuthorized) {
+        debugPrint('[-] Unauthorized to close poll');
+        return false;
+      }
+
+      final updatedPoll = poll.copyWith(isClosed: true);
+      final updatedContent = AnnouncementModel.embedPoll(current.content, updatedPoll);
+
+      await client
+          .from('announcements')
+          .update({'content': updatedContent})
+          .eq('id', announcementId);
+
+      invalidateCachePattern('announcements_');
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error closing poll: $e');
+      return false;
+    }
+  }
+
   /// ── حذف إعلان / بوستر / جدول (مع فحص هوية الكاتب وحذف تيليجرام وتفريغ الكاش) ───
   Future<bool> deleteAnnouncement(String id) async {
     try {

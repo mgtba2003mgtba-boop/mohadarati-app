@@ -37,7 +37,7 @@ class AppIconBadge extends StatelessWidget {
       size: size,
       iconSize: iconSize,
       gradient: const LinearGradient(
-        colors: [Color(0xFF4F46E5), Color(0xFF3730A3)],
+        colors: [Color(0xFF1B3FB6), Color(0xFF122C82)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),

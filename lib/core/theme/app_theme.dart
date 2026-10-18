@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// ثيم وهوية التطبيق الأكاديمية - نمط عصري أنيق ومضيء (Light Modern Academic)
 class AppTheme {
   // الألوان الرئيسية الفاتحة والفاخرة
-  static const Color primary = Color(0xFF4F46E5); // نيلي أكاديمي ملكي زاهي (Royal Indigo)
-  static const Color primaryDark = Color(0xFF3730A3);
-  static const Color primaryLight = Color(0xFF6366F1); // إنديجو ناعم
-  static const Color primarySubtle = Color(0xFFEEF2FF); // خلفية إنديجو فائقة النعومة
-  static const Color accent = Color(0xFF0EA5E9); // سيان / أزرق سماوي حيوي (Vibrant Sky)
-  static const Color accentSubtle = Color(0xFFE0F2FE);
+  static const Color primary = Color(0xFF1B3FB6); // أزرق ملكي أكاديمي فاخر (Royal Blue #1B3FB6)
+  static const Color primaryDark = Color(0xFF122C82); // أزرق ملكي داكن للظلال والتدرجات
+  static const Color primaryLight = Color(0xFF2C55D4); // أزرق ملكي زاهي
+  static const Color primarySubtle = Color(0xFFEEF3FF); // خلفية ناصعة بمسحة زرقاء ملكية ناعمة
+  static const Color accent = Color(0xFF1B3FB6); // اللون الملكي البارز (#1B3FB6)
+  static const Color accentSubtle = Color(0xFFE8EEFF);
 
   // ألوان الخلفيات للوضع الفاتح الأنيق (Light Mode)
   static const Color lightBg = Color(0xFFF8FAFC); // رمادي رخامي ناعم مريح للعين (Slate-50)
@@ -162,6 +163,15 @@ class AppTheme {
         unselectedLabelStyle: TextStyle(fontSize: 11),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+        },
       ),
     );
   }

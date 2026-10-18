@@ -21,7 +21,6 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _codeController = TextEditingController();
   final _pinController = TextEditingController();
-  final _phoneController = TextEditingController();
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
@@ -33,7 +32,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _codeController.dispose();
     _pinController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -355,7 +353,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final user = await SupabaseService().registerOrLinkStudentAccount(
       student: _verifiedStudent!,
       pinCode: pin,
-      phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+      phone: null,
     );
 
     if (!mounted) return;
@@ -615,19 +613,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                             onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-                        decoration: InputDecoration(
-                          labelText: 'الهاتف (اختياري)',
-                          prefixIcon: const Icon(Icons.phone_android_rounded, color: AppTheme.textMuted),
-                          filled: true,
-                          fillColor: AppTheme.lightSurface,
                         ),
                       ),
                       const SizedBox(height: 16),

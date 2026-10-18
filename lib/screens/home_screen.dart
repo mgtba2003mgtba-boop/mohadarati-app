@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
-import '../models/attendance_model.dart';
 import '../models/announcement_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
-import '../services/attendance_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_network_image.dart';
@@ -223,7 +222,12 @@ class _HomeScreenState extends State<HomeScreen> {
           selectedItemColor: AppTheme.primary,
           unselectedItemColor: const Color(0xFF94A3B8),
           elevation: 0,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            if (_currentIndex != index) {
+              HapticFeedback.selectionClick();
+              setState(() => _currentIndex = index);
+            }
+          },
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_rounded),
@@ -255,11 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: () => _loadData(forceRefresh: true),
-        color: AppTheme.primary,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -317,9 +318,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
   /// بانر الإعلانات والبوسترات الرسمية بصور حقيقية (ممنوع أي صور عشوائية)
   Widget _buildAnnouncementsMovingCarousel() {

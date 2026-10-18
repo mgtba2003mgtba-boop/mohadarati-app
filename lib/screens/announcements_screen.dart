@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/announcement_model.dart';
+import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
+import '../widgets/telegram_poll_card.dart';
+import '../widgets/create_poll_sheet.dart';
 import 'dashboard_screen.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -28,14 +33,65 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   String _supervisorStage = 'ALL';
   String _supervisorSection = 'ALL';
 
+  StreamSubscription<AnnouncementModel>? _announcementInsertSub;
+  StreamSubscription<AnnouncementModel>? _announcementUpdateSub;
+
   @override
   void initState() {
     super.initState();
-    _loadAnnouncements();
+    _loadAnnouncements(showSpinner: true);
+
+    // ── الاستماع اللحظي لتحديث التفاعلات عبر WebSocket لجميع المستخدمين ──
+    _announcementUpdateSub = AppNotificationService().announcementUpdateStream.listen((updated) {
+      if (!mounted) return;
+      setState(() {
+        final idx = _announcements.indexWhere((a) => a.id == updated.id);
+        if (idx != -1) {
+          _announcements[idx] = updated;
+        }
+      });
+    });
+
+    // ── الاستماع اللحظي لإضافة تبليغات جديدة دون إعادة تحميل الصفحة ──
+    _announcementInsertSub = AppNotificationService().announcementInsertStream.listen((inserted) {
+      if (!mounted) return;
+      final isAdmin = _user?.isAdmin == true;
+      final myDept = _user?.department ?? '';
+      final myStage = _user?.stage ?? '';
+      final mySection = _user?.section ?? 'ALL';
+
+      final matchesDept = isAdmin ||
+          inserted.department == 'ALL' ||
+          inserted.department == myDept;
+      final matchesStage = isAdmin ||
+          inserted.stage == 'ALL' ||
+          AppConstants.normalizeStage(inserted.stage) == AppConstants.normalizeStage(myStage);
+      final matchesSection = isAdmin ||
+          inserted.section == 'ALL' ||
+          inserted.section.isEmpty ||
+          inserted.section.toUpperCase() == mySection.toUpperCase();
+
+      if (matchesDept && matchesStage && matchesSection) {
+        setState(() {
+          if (!_announcements.any((a) => a.id == inserted.id)) {
+            _announcements.insert(0, inserted);
+          }
+        });
+      }
+    });
   }
 
-  Future<void> _loadAnnouncements({bool forceRefresh = false}) async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _announcementInsertSub?.cancel();
+    _announcementUpdateSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAnnouncements({bool forceRefresh = false, bool showSpinner = false}) async {
+    if (showSpinner || _announcements.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final service = SupabaseService();
     _user = service.currentUser;
 
@@ -139,31 +195,51 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
-            onPressed: () => _loadAnnouncements(forceRefresh: true),
+            onPressed: () => _loadAnnouncements(forceRefresh: true, showSpinner: false),
           ),
         ],
       ),
       floatingActionButton: canPublish
-          ? FloatingActionButton.extended(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_comment_rounded),
-              label: Text('نشر إعلان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 1)),
-                ).then((_) => _loadAnnouncements(forceRefresh: true));
-              },
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.extended(
+                  heroTag: 'create_poll_fab',
+                  backgroundColor: AppTheme.primaryDark,
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.poll_rounded, size: 20),
+                  label: Text('تصويت 📊', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () {
+                    CreatePollSheet.show(
+                      context: context,
+                      currentUser: _user!,
+                      department: _user!.department,
+                      stage: _user!.stage,
+                      onSuccess: (_) => _loadAnnouncements(forceRefresh: true),
+                    );
+                  },
+                ),
+                const SizedBox(width: 10),
+                FloatingActionButton.extended(
+                  heroTag: 'create_announce_fab',
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.add_comment_rounded, size: 20),
+                  label: Text('نشر إعلان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 1)),
+                    ).then((_) => _loadAnnouncements(forceRefresh: true, showSpinner: false));
+                  },
+                ),
+              ],
             )
           : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : RefreshIndicator(
-              onRefresh: () => _loadAnnouncements(forceRefresh: true),
-              color: AppTheme.primary,
-              child: Column(
-                children: [
+          : Column(
+              children: [
                   // شريط الرقابة والإشراف العام (خاص بالمشرف العام لمراقبة كافة الأقسام والشُعب)
                   if (_user?.isAdmin == true) _buildSupervisorBar(),
 
@@ -229,25 +305,41 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                             ),
                           )
                         : ListView.builder(
+                            cacheExtent: 800,
+                            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             itemCount: _filteredList.length,
                             itemBuilder: (context, index) {
                               final item = _filteredList[index];
-                              return TelegramAnnouncementCard(
-                                key: ValueKey('ann_${item.id}'),
-                                announcement: item,
-                                currentUser: _user,
-                                onReactionToggled: (emoji) => _toggleReaction(item, emoji),
-                                onDelete: () => _confirmDeleteAnnouncement(item),
+                              if (item.isPoll) {
+                                return RepaintBoundary(
+                                  key: ValueKey('poll_b_${item.id}'),
+                                  child: TelegramPollCard(
+                                    key: ValueKey('poll_${item.id}'),
+                                    announcement: item,
+                                    currentUser: _user,
+                                    onVoteChanged: () => _loadAnnouncements(forceRefresh: false, showSpinner: false),
+                                    onDelete: () => _confirmDeleteAnnouncement(item),
+                                  ),
+                                );
+                              }
+                              return RepaintBoundary(
+                                key: ValueKey('ann_b_${item.id}'),
+                                child: TelegramAnnouncementCard(
+                                  key: ValueKey('ann_${item.id}'),
+                                  announcement: item,
+                                  currentUser: _user,
+                                  onReactionToggled: (emoji) => _toggleReaction(item, emoji),
+                                  onDelete: () => _confirmDeleteAnnouncement(item),
+                                ),
                               );
                             },
-                          ),
+                            ),
                   ),
                 ],
               ),
-            ),
-    );
-  }
+      );
+    }
 
   Future<void> _toggleReaction(AnnouncementModel item, String emoji) async {
     if (_user == null) return;
@@ -300,7 +392,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) {
-        if (selected) setState(() => _selectedCategory = categoryKey);
+        if (selected) {
+          HapticFeedback.selectionClick();
+          setState(() => _selectedCategory = categoryKey);
+        }
       },
       selectedColor: AppTheme.primary,
       backgroundColor: Colors.white,

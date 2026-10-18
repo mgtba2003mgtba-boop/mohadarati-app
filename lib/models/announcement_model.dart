@@ -51,6 +51,179 @@ class AnnouncementReaction {
   }
 }
 
+/// نموذج صوت الطالب في الاستطلاع الأكاديمي
+class PollVote {
+  final String studentId;
+  final String studentName;
+  final String department;
+  final String stage;
+  final String section;
+  final List<int> selectedOptionIndices;
+  final DateTime votedAt;
+
+  PollVote({
+    required this.studentId,
+    required this.studentName,
+    this.department = '',
+    this.stage = '',
+    this.section = '',
+    required this.selectedOptionIndices,
+    required this.votedAt,
+  });
+
+  factory PollVote.fromJson(Map<String, dynamic> json) {
+    DateTime time = DateTime.now();
+    if (json['t'] != null) {
+      try {
+        time = DateTime.parse(json['t'].toString());
+      } catch (_) {}
+    }
+    List<int> opts = [];
+    if (json['o'] is List) {
+      opts = (json['o'] as List).map((e) => int.tryParse(e.toString()) ?? 0).toList();
+    } else if (json['o'] != null) {
+      final single = int.tryParse(json['o'].toString());
+      if (single != null) opts.add(single);
+    }
+    return PollVote(
+      studentId: json['id']?.toString() ?? '',
+      studentName: json['n']?.toString() ?? 'طالب',
+      department: json['d']?.toString() ?? '',
+      stage: json['st']?.toString() ?? '',
+      section: json['s']?.toString() ?? '',
+      selectedOptionIndices: opts,
+      votedAt: time,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': studentId,
+      'n': studentName,
+      'd': department,
+      'st': stage,
+      's': section,
+      'o': selectedOptionIndices,
+      't': votedAt.toIso8601String(),
+    };
+  }
+}
+
+/// هيكل بيانات الاستطلاع الأكاديمي الشامل
+class PollData {
+  final String question;
+  final List<String> options;
+  final Map<String, PollVote> votes; // المفتاح هو studentId
+  final bool isClosed;
+  final bool allowsMultiple;
+
+  PollData({
+    required this.question,
+    required this.options,
+    this.votes = const {},
+    this.isClosed = false,
+    this.allowsMultiple = false,
+  });
+
+  int get totalVotersCount => votes.length;
+  int get totalVotes => votes.length;
+  String get embedTag => '[POLL:${jsonEncode(toJson())}]';
+
+  int getVotesForOption(int optionIndex) {
+    int count = 0;
+    for (final v in votes.values) {
+      if (v.selectedOptionIndices.contains(optionIndex)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  int votesForOption(int optionIndex) => getVotesForOption(optionIndex);
+
+  double getPercentageForOption(int optionIndex) {
+    if (votes.isEmpty) return 0.0;
+    final count = getVotesForOption(optionIndex);
+    return (count / votes.length);
+  }
+
+  double percentageForOption(int optionIndex) {
+    return getPercentageForOption(optionIndex) * 100;
+  }
+
+  PollData withVote(PollVote vote) {
+    final updated = Map<String, PollVote>.from(votes);
+    updated[vote.studentId] = vote;
+    return copyWith(votes: updated);
+  }
+
+  bool hasStudentVoted(String? studentId) {
+    if (studentId == null || studentId.isEmpty) return false;
+    return votes.containsKey(studentId);
+  }
+
+  List<int> getStudentSelections(String? studentId) {
+    if (studentId == null || studentId.isEmpty) return const [];
+    return votes[studentId]?.selectedOptionIndices ?? const [];
+  }
+
+  List<PollVote> getVotersForOption(int optionIndex) {
+    return votes.values.where((v) => v.selectedOptionIndices.contains(optionIndex)).toList();
+  }
+
+  factory PollData.fromJson(Map<String, dynamic> json) {
+    final q = json['q']?.toString() ?? '';
+    final opts = (json['opts'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final isClosed = json['cls'] == true;
+    final allowsMult = json['mult'] == true;
+    final vMap = <String, PollVote>{};
+    if (json['v'] is Map) {
+      (json['v'] as Map).forEach((k, val) {
+        if (val is Map<String, dynamic>) {
+          vMap[k.toString()] = PollVote.fromJson(val);
+        } else if (val is Map) {
+          vMap[k.toString()] = PollVote.fromJson(Map<String, dynamic>.from(val));
+        }
+      });
+    }
+    return PollData(
+      question: q,
+      options: opts,
+      votes: vMap,
+      isClosed: isClosed,
+      allowsMultiple: allowsMult,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final vJson = <String, dynamic>{};
+    votes.forEach((k, v) => vJson[k] = v.toJson());
+    return {
+      'q': question,
+      'opts': options,
+      'cls': isClosed,
+      'mult': allowsMultiple,
+      'v': vJson,
+    };
+  }
+
+  PollData copyWith({
+    String? question,
+    List<String>? options,
+    Map<String, PollVote>? votes,
+    bool? isClosed,
+    bool? allowsMultiple,
+  }) {
+    return PollData(
+      question: question ?? this.question,
+      options: options ?? this.options,
+      votes: votes ?? this.votes,
+      isClosed: isClosed ?? this.isClosed,
+      allowsMultiple: allowsMultiple ?? this.allowsMultiple,
+    );
+  }
+}
+
 class AnnouncementModel {
   final String id;
   final String title;
@@ -172,9 +345,102 @@ class AnnouncementModel {
     );
   }
 
+  /// هل هذا المنشور يمثل استطلاع رأي طلابي
+  bool get isPoll => content.contains('[POLL:');
+
+  /// استخراج نص JSON الصريح للاستطلاع مع معالجة الأقواس المعقوفة المتداخلة
+  static String? extractPollJson(String text) {
+    final startIndex = text.indexOf('[POLL:');
+    if (startIndex == -1) return null;
+    int depth = 0;
+    int jsonStart = startIndex + 6;
+    int jsonEnd = -1;
+    for (int i = startIndex; i < text.length; i++) {
+      if (text[i] == '[') {
+        depth++;
+      } else if (text[i] == ']') {
+        depth--;
+        if (depth == 0) {
+          jsonEnd = i;
+          break;
+        }
+      }
+    }
+    if (jsonEnd != -1 && jsonEnd > jsonStart) {
+      return text.substring(jsonStart, jsonEnd);
+    }
+    return null;
+  }
+
+  /// إزالة وسم الاستطلاع بالكامل من النص
+  static String stripPollTag(String text) {
+    final startIndex = text.indexOf('[POLL:');
+    if (startIndex == -1) return text;
+    int depth = 0;
+    int jsonEnd = -1;
+    for (int i = startIndex; i < text.length; i++) {
+      if (text[i] == '[') {
+        depth++;
+      } else if (text[i] == ']') {
+        depth--;
+        if (depth == 0) {
+          jsonEnd = i;
+          break;
+        }
+      }
+    }
+    if (jsonEnd != -1) {
+      return (text.substring(0, startIndex) + text.substring(jsonEnd + 1)).trim();
+    }
+    return text;
+  }
+
+  /// استخراج بيانات الاستطلاع من المحتوى
+  PollData? get pollData {
+    final jsonStr = extractPollJson(content);
+    if (jsonStr != null) {
+      try {
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          return PollData.fromJson(decoded);
+        } else if (decoded is Map) {
+          return PollData.fromJson(Map<String, dynamic>.from(decoded));
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /// تضمين أو تحديث وسم الاستطلاع في المحتوى
+  static String embedPoll(String originalContent, PollData poll) {
+    final clean = stripPollTag(originalContent);
+    final encoded = jsonEncode(poll.toJson());
+    return clean.isEmpty ? '[POLL:$encoded]' : '$clean [POLL:$encoded]';
+  }
+
+  /// إنشاء نسخة محدثة ببيانات استطلاع جديدة
+  AnnouncementModel copyWithPoll(PollData newPoll) {
+    return AnnouncementModel(
+      id: id,
+      title: title,
+      content: embedPoll(content, newPoll),
+      authorId: authorId,
+      authorName: authorName,
+      authorRole: authorRole,
+      department: department,
+      stage: stage,
+      section: section,
+      category: category,
+      isPinned: isPinned,
+      imageUrl: imageUrl,
+      subjectName: subjectName,
+      createdAt: createdAt,
+    );
+  }
+
   /// المحتوى النظيف للعرض بدون وسوم تيليجرام والنظام الداخلية
   String get displayContent {
-    return content
+    return stripPollTag(content)
         .replaceAll(RegExp(r'\[TG_MSG_ID:\d+\]'), '')
         .replaceAll('[SCHEDULE_TIMETABLE]', '')
         .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')

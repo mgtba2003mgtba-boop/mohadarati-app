@@ -13,6 +13,7 @@ import '../services/telegram_uploader_service.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_media_preview_modal.dart';
+import '../widgets/create_poll_sheet.dart';
 import 'package:file_picker/file_picker.dart';
 
 class RepresentativeActivityItem {
@@ -264,8 +265,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.dispose();
   }
 
-  Future<void> _loadDashboardData({bool forceRefresh = false}) async {
-    setState(() => _isLoadingDashboard = true);
+  Future<void> _loadDashboardData({bool forceRefresh = false, bool showSpinner = false}) async {
+    if (showSpinner || (_allLectures.isEmpty && _allAnnouncements.isEmpty)) {
+      setState(() => _isLoadingDashboard = true);
+    }
     final service = SupabaseService();
     try {
       final results = await Future.wait([
@@ -466,18 +469,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── نشر إعلان أكاديمي ──────────────────────────────────────────
   Future<void> _submitAnnouncement() async {
-    final title = _announcementTitleController.text.trim();
     final content = _announcementContentController.text.trim();
     final subject = _announcementSubjectController.text.trim();
 
-    if (title.isEmpty) {
-      _showSnackbar('يرجى إدخال عنوان الإعلان', isError: true);
-      return;
-    }
     if (content.isEmpty) {
-      _showSnackbar('يرجى كتابة تفاصيل الإعلان', isError: true);
+      _showSnackbar('يرجى كتابة نص التبليغ بالتفصيل', isError: true);
       return;
     }
+
+    // استخراج عنوان تلقائي لقاعدة البيانات دون الحاجة لإدخاله يدوياً
+    final firstLine = content.split('\n').first.trim();
+    final autoTitle = firstLine.length > 50
+        ? '${firstLine.substring(0, 47)}...'
+        : (firstLine.isNotEmpty ? firstLine : (subject.isNotEmpty ? subject : 'تبليغ أكاديمي'));
 
     final targetDept = _currentUser?.isAdmin == true ? _selectedAnnounceDept : (_currentUser?.department ?? _selectedAnnounceDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedAnnounceStage : (_currentUser?.stage ?? _selectedAnnounceStage);
@@ -487,7 +491,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     final newAnnounce = AnnouncementModel(
       id: '',
-      title: title,
+      title: autoTitle,
       content: content,
       authorId: _currentUser?.studentId ?? 'ADMIN_NUST',
       authorName: _currentUser?.name ?? 'إدارة الكلية',
@@ -510,9 +514,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _announcementTitleController.clear();
       _announcementContentController.clear();
       _announcementSubjectController.clear();
-      setState(() => _isAnnouncePinned = false);
+      setState(() {
+        _isAnnouncePinned = false;
+        _allAnnouncements.insert(0, newAnnounce);
+      });
       _showSnackbar('تم نشر الإعلان بنجاح');
-      _loadDashboardData(forceRefresh: true);
+      _loadDashboardData(forceRefresh: true, showSpinner: false);
     } else {
       _showSnackbar('حدث خطأ أثناء نشر الإعلان', isError: true);
     }
@@ -1395,22 +1402,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
-            controller: _announcementTitleController,
-            style: GoogleFonts.cairo(color: AppTheme.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'عنوان الإعلان أو التبليغ',
-              prefixIcon: Icon(Icons.campaign_rounded, color: AppTheme.primaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          TextField(
             controller: _announcementContentController,
-            maxLines: 4,
+            maxLines: 5,
             style: GoogleFonts.cairo(color: AppTheme.textPrimary),
             decoration: const InputDecoration(
-              labelText: 'نص الإعلان بالتفصيل',
-              prefixIcon: Icon(Icons.description_rounded, color: AppTheme.primaryLight),
+              labelText: 'نص التبليغ أو الإعلان الأكاديمي',
+              hintText: 'اكتب نص التبليغ هنا ليظهر مباشرة في لوحة التبليغات...',
+              alignLabelWithHint: true,
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(bottom: 70),
+                child: Icon(Icons.campaign_rounded, color: AppTheme.primary),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -1581,6 +1583,44 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   )
                 : const Text('إرسال ونشر الإعلان للطلبة'),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _isLoading || _currentUser == null
+                ? null
+                : () {
+                    CreatePollSheet.show(
+                      context: context,
+                      currentUser: _currentUser!,
+                      department: _currentUser!.isAdmin
+                          ? (_selectedAnnounceDept == 'ALL' ? AppConstants.departments.first : _selectedAnnounceDept)
+                          : _currentUser!.department,
+                      stage: _currentUser!.isAdmin
+                          ? (_selectedAnnounceStage == 'ALL' ? AppConstants.stages.first : _selectedAnnounceStage)
+                          : _currentUser!.stage,
+                      section: _currentUser!.isAdmin
+                          ? (_selectedAnnounceSection == 'ALL' ? null : _selectedAnnounceSection)
+                          : _currentUser!.section,
+                      subjectName: _selectedAnnouncementSubject != null &&
+                              _selectedAnnouncementSubject != '__GENERAL__' &&
+                              _selectedAnnouncementSubject != '__CUSTOM__'
+                          ? _selectedAnnouncementSubject
+                          : (_announcementSubjectController.text.trim().isNotEmpty
+                              ? _announcementSubjectController.text.trim()
+                              : null),
+                      onSuccess: (_) => _loadDashboardData(forceRefresh: true),
+                    );
+                  },
+            icon: const Icon(Icons.poll_rounded, color: AppTheme.accent),
+            label: Text(
+              'إنشاء استطلاع رأي وتصويت طلابي 📊',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: AppTheme.accent, fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppTheme.accent, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
           const SizedBox(height: 32),
           _buildMyRecentAnnouncementsSection(),
         ],
@@ -1693,7 +1733,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           )
         else
-          ...myLectures.map((l) => _buildRecentLectureItemCard(l)),
+          ...myLectures.map((l) => RepaintBoundary(key: ValueKey('dash_lec_${l.id}'), child: _buildRecentLectureItemCard(l))),
       ],
     );
   }
@@ -1951,7 +1991,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           )
         else
-          ...myAnnouncements.map((a) => _buildRecentAnnouncementItemCard(a)),
+          ...myAnnouncements.map((a) => RepaintBoundary(key: ValueKey('dash_ann_${a.id}'), child: _buildRecentAnnouncementItemCard(a))),
       ],
     );
   }
@@ -1998,6 +2038,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       const Icon(Icons.push_pin_rounded, size: 11, color: AppTheme.primaryLight),
                       const SizedBox(width: 2),
                       Text('مثبت', style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.primaryLight, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+              if (a.isPoll) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.poll_rounded, size: 11, color: Colors.amber),
+                      const SizedBox(width: 2),
+                      Text('استطلاع', style: GoogleFonts.cairo(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -2178,9 +2236,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return matchDept && matchStage && matchType && matchSearch;
     }).toList();
 
-    return RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      child: ListView(
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ── لوحة المؤشرات والإحصائيات القيادية الحية للنظام ──
@@ -2634,8 +2690,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
           ],
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildActivityCard(RepresentativeActivityItem item) {
@@ -2916,9 +2971,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return matchDept && matchStage && matchSearch;
     }).toList();
 
-    return RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      child: ListView(
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ══════════════════════════════════════════════════════════════
@@ -3357,8 +3410,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
           ],
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildRepCard(AppUserModel rep) {
@@ -3936,9 +3988,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return true;
     }).toList();
 
-    return RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      child: ListView(
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // رأس لوحة إدارة المحتوى
@@ -4103,8 +4153,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
           ],
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildUnifiedContentCard(Map<String, dynamic> item) {

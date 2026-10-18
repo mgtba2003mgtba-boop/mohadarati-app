@@ -140,14 +140,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF4F46E5), Color(0xFF3730A3)],
+                    colors: [AppTheme.primary, AppTheme.primaryDark],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                      color: AppTheme.primary.withValues(alpha: 0.25),
                       blurRadius: 14,
                       offset: const Offset(0, 4),
                     ),
@@ -392,7 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Icon(
                       Icons.swap_horiz_rounded,
-                      color: isCustom ? const Color(0xFFD97706) : const Color(0xFF4F46E5),
+                      color: isCustom ? const Color(0xFFD97706) : AppTheme.primary,
                       size: 22,
                     ),
                   ),
@@ -415,7 +415,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isCustom ? const Color(0xFFF59E0B) : const Color(0xFF4F46E5),
+                                color: isCustom ? const Color(0xFFF59E0B) : AppTheme.primary,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -492,7 +492,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSelected: (val) {
                       if (val) preview.setStage(stg);
                     },
-                    selectedColor: const Color(0xFF4F46E5),
+                    selectedColor: AppTheme.primary,
                     backgroundColor: AppTheme.lightSurface,
                     labelStyle: GoogleFonts.cairo(
                       fontSize: 11,
@@ -502,7 +502,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                       side: BorderSide(
-                        color: isSelected ? const Color(0xFF4F46E5) : AppTheme.lightBorder,
+                        color: isSelected ? AppTheme.primary : AppTheme.lightBorder,
                       ),
                     ),
                   );
@@ -527,7 +527,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSelected: (val) {
                       if (val) preview.setSection(sec);
                     },
-                    selectedColor: isCustom ? const Color(0xFFD97706) : const Color(0xFF4F46E5),
+                    selectedColor: isCustom ? const Color(0xFFD97706) : AppTheme.primary,
                     backgroundColor: AppTheme.lightSurface,
                     labelStyle: GoogleFonts.cairo(
                       fontSize: 11,
@@ -538,7 +538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(10),
                       side: BorderSide(
                         color: isSelected
-                            ? (isCustom ? const Color(0xFFD97706) : const Color(0xFF4F46E5))
+                            ? (isCustom ? const Color(0xFFD97706) : AppTheme.primary)
                             : AppTheme.lightBorder,
                       ),
                     ),

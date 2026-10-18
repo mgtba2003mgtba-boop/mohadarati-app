@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../models/announcement_model.dart';
 import '../models/app_user_model.dart';
@@ -42,12 +41,14 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
   void _showAnnouncementModal(BuildContext context) {
     AppFullscreenModal.show(
       context: context,
-      title: widget.announcement.title,
+      title: widget.announcement.subjectName != null && widget.announcement.subjectName!.isNotEmpty
+          ? 'تبليغ • ${widget.announcement.subjectName}'
+          : (widget.announcement.title.isNotEmpty ? widget.announcement.title : 'تبليغ أكاديمي'),
       subtitle: '${widget.announcement.createdAt.year}/${widget.announcement.createdAt.month.toString().padLeft(2, '0')}/${widget.announcement.createdAt.day.toString().padLeft(2, '0')}',
       icon: Icons.campaign_rounded,
       imageUrl: widget.announcement.imageUrl,
       contentText: widget.announcement.displayContent,
-      accentColor: const Color(0xFF2AABEE),
+      accentColor: AppTheme.primary,
       actions: [
         if (_isMujtabaAdmin && widget.onDelete != null)
           OutlinedButton.icon(
@@ -66,7 +67,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
         ElevatedButton(
           onPressed: () => Navigator.pop(context),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2AABEE),
+            backgroundColor: AppTheme.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: Text('إغلاق', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
@@ -130,7 +131,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                           color: hasReacted ? const Color(0xFFEFF6FF) : Colors.transparent,
                           shape: BoxShape.circle,
                           border: hasReacted
-                              ? Border.all(color: const Color(0xFF2AABEE), width: 1.6)
+                              ? Border.all(color: AppTheme.primary, width: 1.6)
                               : null,
                         ),
                         child: Text(
@@ -179,7 +180,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: announcement.isPinned ? const Color(0xFF2AABEE).withValues(alpha: 0.6) : const Color(0xFFE2E8F0),
+          color: announcement.isPinned ? AppTheme.primary.withValues(alpha: 0.6) : const Color(0xFFE2E8F0),
           width: announcement.isPinned ? 1.5 : 1.0,
         ),
         boxShadow: [
@@ -233,14 +234,14 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                       height: 42,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF2AABEE), Color(0xFF229ED9)],
+                          colors: [AppTheme.primary, AppTheme.primaryLight],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(13),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF2AABEE).withValues(alpha: 0.25),
+                            color: AppTheme.primary.withValues(alpha: 0.25),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -317,46 +318,30 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                   ],
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // 2. عنوان التبليغ
+                // 2. فقاعة نص التبليغ مباشرة بنمط قنوات تيليجرام
                 InkWell(
                   onTap: () => _showAnnouncementModal(context),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Text(
-                    announcement.title,
-                    style: GoogleFonts.cairo(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // 3. فقاعة نص التبليغ (Telegram Bubble Content)
-                InkWell(
-                  onTap: () => _showReactionPicker(context),
-                  onLongPress: () => _showAnnouncementModal(context),
-                  borderRadius: BorderRadius.circular(12),
+                  onLongPress: () => _showReactionPicker(context),
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: const Color(0xFFF1F5F9)),
                     ),
                     child: Text(
                       announcement.displayContent,
                       style: GoogleFonts.cairo(
-                        fontSize: 12.5,
-                        color: const Color(0xFF334155),
+                        fontSize: 13.5,
+                        color: const Color(0xFF1E293B),
                         height: 1.6,
+                        fontWeight: FontWeight.w500,
                       ),
-                      maxLines: 4,
+                      maxLines: 6,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -423,7 +408,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                           borderRadius: BorderRadius.circular(20),
                                           border: Border.all(
                                             color: hasReacted
-                                                ? const Color(0xFF2AABEE)
+                                                ? AppTheme.primary
                                                 : const Color(0xFFE2E8F0),
                                             width: hasReacted ? 1.4 : 1.0,
                                           ),
@@ -441,7 +426,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                               style: GoogleFonts.cairo(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
-                                                color: hasReacted ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                                color: hasReacted ? AppTheme.primary : const Color(0xFF64748B),
                                               ),
                                             ),
                                           ],
@@ -482,14 +467,14 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFF4F46E5), Color(0xFF3730A3)],
+                                      colors: [AppTheme.primary, AppTheme.primaryDark],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
                                     borderRadius: BorderRadius.circular(10),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+                                        color: AppTheme.primary.withValues(alpha: 0.2),
                                         blurRadius: 6,
                                         offset: const Offset(0, 2),
                                       ),
@@ -583,10 +568,10 @@ class _ReactorsInspectorSheetState extends State<_ReactorsInspectorSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
+                      color: AppTheme.primarySubtle,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.people_alt_rounded, color: Color(0xFF4F46E5), size: 20),
+                    child: const Icon(Icons.people_alt_rounded, color: AppTheme.primary, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -743,7 +728,7 @@ class _ReactorsInspectorSheetState extends State<_ReactorsInspectorSheet> {
         label: Text(label),
         selected: isSelected,
         onSelected: (_) => setState(() => _selectedFilter = value),
-        selectedColor: const Color(0xFF2AABEE),
+        selectedColor: AppTheme.primary,
         backgroundColor: const Color(0xFFF1F5F9),
         labelStyle: GoogleFonts.cairo(
           fontSize: 11,
@@ -753,7 +738,7 @@ class _ReactorsInspectorSheetState extends State<_ReactorsInspectorSheet> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
-            color: isSelected ? const Color(0xFF2AABEE) : const Color(0xFFE2E8F0),
+            color: isSelected ? AppTheme.primary : const Color(0xFFE2E8F0),
           ),
         ),
       ),

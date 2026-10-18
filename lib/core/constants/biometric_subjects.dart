@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'app_constants.dart';
 import '../../models/subject_model.dart';
 
@@ -1543,5 +1544,164 @@ class BiometricSubjects {
       }
     }
     return map;
+  }
+
+  /// الحصول على أيقونة أكاديمية متخصصة ومعبرة عن طبيعة المادة بدلاً من أيقونة الكتاب العامة
+  static IconData getIconForSubject(String name) {
+    final clean = name.toLowerCase();
+
+    // 1. البرمجة وهندسة البرمجيات
+    if (clean.contains('برمج') ||
+        clean.contains('كود') ||
+        clean.contains('خوارزم') ||
+        clean.contains('هياكل بيانات') ||
+        clean.contains('ويب') ||
+        clean.contains('تطبيقات') ||
+        clean.contains('python') ||
+        clean.contains('java') ||
+        clean.contains('c++')) {
+      return Icons.code_rounded;
+    }
+
+    // 2. الأنظمة الرقمية والمعالجات والمعمارية
+    if (clean.contains('رقمي') ||
+        clean.contains('معالج') ||
+        clean.contains('معماري') ||
+        clean.contains('متحكم') ||
+        clean.contains('micro') ||
+        clean.contains('لوجك') ||
+        clean.contains('منطق')) {
+      return Icons.memory_rounded;
+    }
+
+    // 3. الرياضيات والإحصاء والتفاضل
+    if (clean.contains('رياض') ||
+        clean.contains('تفاضل') ||
+        clean.contains('تكامل') ||
+        clean.contains('جبر') ||
+        clean.contains('احصا') ||
+        clean.contains('معادلات') ||
+        clean.contains('math')) {
+      return Icons.calculate_rounded;
+    }
+
+    // 4. الهندسة الكهربائية والدوائر والإلكترونيات
+    if (clean.contains('كهربا') ||
+        clean.contains('دوائر') ||
+        clean.contains('الكترون') ||
+        clean.contains('قدرة') ||
+        clean.contains('طاقة') ||
+        clean.contains('موجات') ||
+        clean.contains('كهرومغناطيس')) {
+      return Icons.electric_bolt_rounded;
+    }
+
+    // 5. شبكات الحاسوب والاتصالات
+    if (clean.contains('شبك') ||
+        clean.contains('اتصال') ||
+        clean.contains('وايرلس') ||
+        clean.contains('الياف') ||
+        clean.contains('هوائي') ||
+        clean.contains('network') ||
+        clean.contains('انترنت')) {
+      return Icons.hub_rounded;
+    }
+
+    // 6. قواعد البيانات ونظم المعلومات
+    if (clean.contains('قواعد بيانات') ||
+        clean.contains('بيانات') ||
+        clean.contains('database') ||
+        clean.contains('sql') ||
+        clean.contains('نظم معلومات')) {
+      return Icons.storage_rounded;
+    }
+
+    // 7. الذكاء الاصطناعي ومعالجة الإشارات والصور
+    if (clean.contains('ذكاء') ||
+        clean.contains('اصطناعي') ||
+        clean.contains('معالجة صور') ||
+        clean.contains('اشارات') ||
+        clean.contains('ai') ||
+        clean.contains('رؤية')) {
+      return Icons.psychology_rounded;
+    }
+
+    // 8. الأمن السيبراني والتشفير وأمنية المعلومات
+    if (clean.contains('امن') ||
+        clean.contains('أمن') ||
+        clean.contains('سيبران') ||
+        clean.contains('تشفير') ||
+        clean.contains('security')) {
+      return Icons.shield_rounded;
+    }
+
+    // 9. أنظمة التشغيل والبيئة البرمجية
+    if (clean.contains('تشغيل') ||
+        clean.contains('لينكس') ||
+        clean.contains('ويندوز') ||
+        clean.contains('linux') ||
+        clean.contains('os')) {
+      return Icons.terminal_rounded;
+    }
+
+    // 10. الرسم الهندسي والأوتوكاد
+    if (clean.contains('رسم') ||
+        clean.contains('تصميم هندسي') ||
+        clean.contains('autocad') ||
+        clean.contains('كاد')) {
+      return Icons.architecture_rounded;
+    }
+
+    // 11. الورش الهندسية والتصنيع والميكانيك
+    if (clean.contains('ورش') ||
+        clean.contains('تصنيع') ||
+        clean.contains('ميكانيك') ||
+        clean.contains('حرار') ||
+        clean.contains('مواد هندسية') ||
+        clean.contains('هيدروليك')) {
+      return Icons.home_repair_service_rounded;
+    }
+
+    // 12. اللغة الإنكليزية واللغات
+    if (clean.contains('انكليز') ||
+        clean.contains('إنكليز') ||
+        clean.contains('انجليز') ||
+        clean.contains('لغة') ||
+        clean.contains('ترجم') ||
+        clean.contains('english')) {
+      return Icons.translate_rounded;
+    }
+
+    // 13. حقوق الإنسان والديمقراطية والأخلاقيات
+    if (clean.contains('حقوق') ||
+        clean.contains('ديمقراط') ||
+        clean.contains('اخلاق') ||
+        clean.contains('قانون') ||
+        clean.contains('تشريع') ||
+        clean.contains('انسان') ||
+        clean.contains('إنسان')) {
+      return Icons.balance_rounded;
+    }
+
+    // 14. الأجهزة الطبية والطبية الحياتية
+    if (clean.contains('طب') ||
+        clean.contains('حياتي') ||
+        clean.contains('بايو') ||
+        clean.contains('تشريح') ||
+        clean.contains('فسلج') ||
+        clean.contains('bio')) {
+      return Icons.monitor_heart_rounded;
+    }
+
+    // 15. العلوم العامة والفيزياء
+    if (clean.contains('فيزيا') ||
+        clean.contains('كيميا') ||
+        clean.contains('علوم') ||
+        clean.contains('مختبر')) {
+      return Icons.science_rounded;
+    }
+
+    // الأيقونة الافتراضية
+    return Icons.auto_stories_rounded;
   }
 }

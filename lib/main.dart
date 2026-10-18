@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
@@ -22,6 +23,24 @@ void main() async {
   runApp(const NustStudentPortalApp());
 }
 
+/// سلوك التمرير فائق السلاسة بنمط iOS التفاعلي على كافة الشاشات والمنصات
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
 class NustStudentPortalApp extends StatelessWidget {
   const NustStudentPortalApp({super.key});
 
@@ -31,6 +50,7 @@ class NustStudentPortalApp extends StatelessWidget {
       title: 'محاضراتي',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      scrollBehavior: const AppScrollBehavior(),
 
       // الدعم الكامل للغة العربية واتجاه النص (RTL)
       locale: const Locale('ar', 'IQ'),

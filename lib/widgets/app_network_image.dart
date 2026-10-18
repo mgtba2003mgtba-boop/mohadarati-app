@@ -50,26 +50,22 @@ class AppNetworkImage extends StatelessWidget {
 
     // 2. حل روابط تيليجرام وشبكات الـ CDN لتخطي CORS
     final resolved = AppConstants.resolveImageUrl(cleanUrl);
+    final int? targetCacheWidth = width != null ? (width! * 2.5).toInt().clamp(100, 1200) : 800;
+    final int? targetCacheHeight = height != null ? (height! * 2.5).toInt().clamp(100, 1200) : null;
 
     return Image.network(
       resolved,
       width: width,
       height: height,
+      cacheWidth: targetCacheWidth,
+      cacheHeight: targetCacheHeight,
       fit: fit,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return placeholder ??
-            Container(
+            _ImageShimmerSkeleton(
               width: width,
               height: height,
-              color: AppTheme.primarySubtle,
-              child: const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
             );
       },
       errorBuilder: (context, error, stackTrace) {
@@ -87,6 +83,69 @@ class AppNetworkImage extends StatelessWidget {
       child: const Center(
         child: Icon(Icons.image_outlined, color: Colors.white54, size: 28),
       ),
+    );
+  }
+}
+
+/// هيكل عظمي مموج ناعم (Shimmer Skeleton) بألوان الهوية الأكاديمية لتحميل الصور بسلاسة فائقة
+class _ImageShimmerSkeleton extends StatefulWidget {
+  final double? width;
+  final double? height;
+
+  const _ImageShimmerSkeleton({this.width, this.height});
+
+  @override
+  State<_ImageShimmerSkeleton> createState() => _ImageShimmerSkeletonState();
+}
+
+class _ImageShimmerSkeletonState extends State<_ImageShimmerSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) {
+        final t = _animController.value;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: Color.lerp(
+              const Color(0xFFF1F5F9), // Slate-100
+              const Color(0xFFE2E8F0), // Slate-200
+              t,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.image_outlined,
+              color: Color.lerp(
+                const Color(0xFFCBD5E1),
+                const Color(0xFF94A3B8),
+                t,
+              ),
+              size: 26,
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,12 +11,15 @@ import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../models/announcement_model.dart';
 import '../models/attendance_model.dart';
+import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
+import '../widgets/telegram_poll_card.dart';
+import '../widgets/create_poll_sheet.dart';
 import '../services/admin_preview_service.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
@@ -82,6 +86,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         _user!.studentId == 'ST-NUST-001630760-413';
   }
 
+  StreamSubscription<AnnouncementModel>? _announcementInsertSub;
+  StreamSubscription<AnnouncementModel>? _announcementUpdateSub;
+
   @override
   void initState() {
     super.initState();
@@ -93,17 +100,46 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
-    _loadSubjectData();
+    _loadSubjectData(showSpinner: true);
+
+    // ── الاستماع اللحظي لتحديث التفاعلات السحابية للتبليغات ──
+    _announcementUpdateSub = AppNotificationService().announcementUpdateStream.listen((updated) {
+      if (!mounted) return;
+      setState(() {
+        final idx = _subjectAnnouncements.indexWhere((a) => a.id == updated.id);
+        if (idx != -1) {
+          _subjectAnnouncements[idx] = updated;
+        }
+      });
+    });
+
+    // ── الاستماع اللحظي لإضافة تبليغات جديدة للمادة دون وميض الشاشة ──
+    _announcementInsertSub = AppNotificationService().announcementInsertStream.listen((inserted) {
+      if (!mounted) return;
+      final matchSub = inserted.subjectName != null &&
+          (AppConstants.arabicEquals(inserted.subjectName!, widget.subjectName) ||
+              AppConstants.arabicContains(inserted.subjectName!, widget.subjectName) ||
+              AppConstants.arabicContains(widget.subjectName, inserted.subjectName!));
+      if (matchSub && !_subjectAnnouncements.any((a) => a.id == inserted.id)) {
+        setState(() {
+          _subjectAnnouncements.insert(0, inserted);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _announcementInsertSub?.cancel();
+    _announcementUpdateSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadSubjectData({bool forceRefresh = false}) async {
-    setState(() => _isLoading = true);
+  Future<void> _loadSubjectData({bool forceRefresh = false, bool showSpinner = false}) async {
+    if (showSpinner || (_subjectLectures.isEmpty && _subjectAnnouncements.isEmpty)) {
+      setState(() => _isLoading = true);
+    }
     final service = SupabaseService();
     _user = service.currentUser;
 
@@ -312,12 +348,12 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   if (subModel?.code != null)
                     Text(
                       'كود: ${subModel!.code}  ',
-                      style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                      style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
                     ),
                   if (subModel?.units != null)
                     Text(
-                      '•  ${subModel!.units} وحدات معتمدة',
-                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFB45309)),
+                      '•  ${subModel!.units} وحدات',
+                      style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
                     ),
                 ],
               ),
@@ -331,17 +367,34 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 tooltip: 'نشر محاضرة جديدة',
                 onPressed: () => _showPublishSheet(initialMode: 'lecture'),
               )
-            else if (_tabController.index == 1)
+            else if (_tabController.index == 1) ...[
               IconButton(
-                icon: const Icon(Icons.campaign_rounded, color: AppTheme.accent),
+                icon: const Icon(Icons.poll_rounded, color: AppTheme.primary),
+                tooltip: 'إنشاء تصويت للمادة',
+                onPressed: () {
+                  if (_user != null) {
+                    CreatePollSheet.show(
+                      context: context,
+                      currentUser: _user!,
+                      department: _effectiveDepartment,
+                      stage: _effectiveStage,
+                      subjectName: widget.subjectName,
+                      onSuccess: (_) => _loadSubjectData(forceRefresh: true),
+                    );
+                  }
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.campaign_rounded, color: AppTheme.primary),
                 tooltip: 'نشر تبليغ للمادة',
                 onPressed: () => _showPublishSheet(initialMode: 'announcement'),
               ),
+            ],
           ],
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
             tooltip: 'تحديث البيانات',
-            onPressed: () => _loadSubjectData(forceRefresh: true),
+            onPressed: () => _loadSubjectData(forceRefresh: true, showSpinner: false),
           ),
         ],
         bottom: TabBar(
@@ -393,79 +446,12 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : Column(
+          : TabBarView(
+              controller: _tabController,
               children: [
-                // ── بطاقة رأس المادة والمؤشرات الأكاديمية ──
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.lightBorder),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primarySubtle,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.class_rounded, color: AppTheme.primary, size: 26),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.subjectName,
-                              style: GoogleFonts.cairo(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${_user?.department ?? ''} • ${_user?.stage ?? ''}',
-                              style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primarySubtle,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${_subjectLectures.length} محاضرات',
-                          style: GoogleFonts.cairo(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── محتوى التبويبات ──
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildLecturesTab(),
-                      _buildAnnouncementsTab(),
-                      _buildAttendanceTab(),
-                    ],
-                  ),
-                ),
+                _buildLecturesTab(),
+                _buildAnnouncementsTab(),
+                _buildAttendanceTab(),
               ],
             ),
     );
@@ -894,16 +880,33 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
 
     return ListView.builder(
+      cacheExtent: 800,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: announcements.length,
       itemBuilder: (context, index) {
         final item = announcements[index];
-        return TelegramAnnouncementCard(
-          key: ValueKey('subj_ann_${item.id}'),
-          announcement: item,
-          currentUser: _user,
-          onReactionToggled: (emoji) => _toggleReaction(item, emoji),
-          onDelete: () => _confirmDeleteAnnouncement(item),
+        if (item.isPoll) {
+          return RepaintBoundary(
+            key: ValueKey('subj_poll_b_${item.id}'),
+            child: TelegramPollCard(
+              key: ValueKey('subj_poll_${item.id}'),
+              announcement: item,
+              currentUser: _user,
+              onVoteChanged: () => _loadSubjectData(forceRefresh: false, showSpinner: false),
+              onDelete: () => _confirmDeleteAnnouncement(item),
+            ),
+          );
+        }
+        return RepaintBoundary(
+          key: ValueKey('subj_ann_b_${item.id}'),
+          child: TelegramAnnouncementCard(
+            key: ValueKey('subj_ann_${item.id}'),
+            announcement: item,
+            currentUser: _user,
+            onReactionToggled: (emoji) => _toggleReaction(item, emoji),
+            onDelete: () => _confirmDeleteAnnouncement(item),
+          ),
         );
       },
     );
@@ -1052,8 +1055,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         section: _effectiveSection,
         currentUser: _user,
         initialMode: initialMode,
-        onSuccess: () {
-          _loadSubjectData(forceRefresh: true);
+        onSuccess: (newAnnounce) {
+          if (newAnnounce != null) {
+            setState(() {
+              if (!_subjectAnnouncements.any((a) => a.id == newAnnounce.id)) {
+                _subjectAnnouncements.insert(0, newAnnounce);
+              }
+            });
+          }
+          _loadSubjectData(forceRefresh: true, showSpinner: false);
         },
       ),
     );
@@ -1130,7 +1140,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
   final String? section;
   final AppUserModel? currentUser;
   final String initialMode;
-  final VoidCallback onSuccess;
+  final Function(AnnouncementModel? newAnnounce)? onSuccess;
 
   const _PublishToSubjectSheet({
     required this.subjectName,
@@ -1139,7 +1149,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
     this.section,
     required this.currentUser,
     this.initialMode = 'lecture',
-    required this.onSuccess,
+    this.onSuccess,
   });
 
   @override
@@ -1173,14 +1183,12 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   bool _isPickingFile = false;
 
   // حقول التبليغ
-  final _announceTitleController = TextEditingController();
   final _announceContentController = TextEditingController();
 
   @override
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
-    _announceTitleController.dispose();
     _announceContentController.dispose();
     super.dispose();
   }
@@ -1257,7 +1265,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم نشر المحاضرة بنجاح')),
         );
-        widget.onSuccess();
+        widget.onSuccess?.call(null);
       }
     } catch (e) {
       if (mounted) {
@@ -1268,13 +1276,18 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
   }
 
   Future<void> _submitAnnouncement() async {
-    final title = _announceTitleController.text.trim();
     final content = _announceContentController.text.trim();
 
-    if (title.isEmpty || content.isEmpty) {
-      _showSnack('يرجى كتابة عنوان ونص التبليغ', isError: true);
+    if (content.isEmpty) {
+      _showSnack('يرجى كتابة نص التبليغ', isError: true);
       return;
     }
+
+    // استخراج عنوان تلقائي لقاعدة البيانات دون الحاجة لإدخاله يدوياً
+    final firstLine = content.split('\n').first.trim();
+    final autoTitle = firstLine.length > 50
+        ? '${firstLine.substring(0, 47)}...'
+        : (firstLine.isNotEmpty ? firstLine : (widget.subjectName ?? 'تبليغ أكاديمي'));
 
     setState(() => _isSubmitting = true);
 
@@ -1285,7 +1298,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
 
       final newAnnounce = AnnouncementModel(
         id: '',
-        title: title,
+        title: autoTitle,
         content: content,
         authorId: widget.currentUser?.studentId ?? 'ADMIN',
         authorName: widget.currentUser?.name ?? 'ممثل الشعبة',
@@ -1306,7 +1319,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم نشر التبليغ بنجاح')),
         );
-        widget.onSuccess();
+        widget.onSuccess?.call(newAnnounce);
       }
     } catch (e) {
       if (mounted) {
@@ -1595,29 +1608,21 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                 ),
               ),
             ] else ...[
-              // نموذج التبليغ
-              TextField(
-                controller: _announceTitleController,
-                style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'عنوان التبليغ',
-                  hintText: 'مثال: موعد كويز / تأجيل محاضرة',
-                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.campaign_rounded, size: 20),
-                ),
-              ),
-              const SizedBox(height: 12),
-
+              // نموذج التبليغ المباشر (نمط تيليجرام: نص التبليغ فقط)
               TextField(
                 controller: _announceContentController,
-                maxLines: 4,
+                maxLines: 5,
                 style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
                 decoration: InputDecoration(
-                  labelText: 'نص وتفاصيل التبليغ',
+                  labelText: 'نص التبليغ الأكاديمي',
+                  hintText: 'اكتب نص التبليغ هنا ليظهر مباشرة للطلاب...',
                   labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   alignLabelWithHint: true,
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(bottom: 70),
+                    child: Icon(Icons.campaign_rounded, size: 22, color: AppTheme.primary),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),

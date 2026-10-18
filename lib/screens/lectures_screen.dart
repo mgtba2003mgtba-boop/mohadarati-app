@@ -289,16 +289,12 @@ class _LecturesScreenState extends State<LecturesScreen> {
                           ],
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: _loadLectures,
-                        color: AppTheme.primaryLight,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                          itemCount: _filteredLectures.length,
-                          itemBuilder: (context, index) {
-                            return _buildLectureCard(_filteredLectures[index]);
-                          },
-                        ),
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                        itemCount: _filteredLectures.length,
+                        itemBuilder: (context, index) {
+                          return _buildLectureCard(_filteredLectures[index]);
+                        },
                       ),
           ),
         ],

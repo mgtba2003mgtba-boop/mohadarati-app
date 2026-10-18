@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
+import '../models/announcement_model.dart';
 import 'web_notification_helper.dart';
 
 enum AppNotificationType { announcement, lecture }
@@ -38,6 +39,12 @@ class AppNotificationService {
   final _notificationController = StreamController<AppNotificationItem>.broadcast();
   Stream<AppNotificationItem> get notificationStream => _notificationController.stream;
 
+  final _announcementInsertController = StreamController<AnnouncementModel>.broadcast();
+  Stream<AnnouncementModel> get announcementInsertStream => _announcementInsertController.stream;
+
+  final _announcementUpdateController = StreamController<AnnouncementModel>.broadcast();
+  Stream<AnnouncementModel> get announcementUpdateStream => _announcementUpdateController.stream;
+
   RealtimeChannel? _realtimeChannel;
   bool _isSubscribed = false;
 
@@ -57,6 +64,16 @@ class AppNotificationService {
         table: 'announcements',
         callback: (payload) {
           _handleNewAnnouncement(payload.newRecord);
+        },
+      );
+
+      // الاستماع لتحديثات التبليغات والتفاعلات اللحظية
+      _realtimeChannel!.onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'announcements',
+        callback: (payload) {
+          _handleUpdatedAnnouncement(payload.newRecord);
         },
       );
 
@@ -83,6 +100,11 @@ class AppNotificationService {
       final content = record['content']?.toString() ?? '';
       final id = record['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
 
+      try {
+        final ann = AnnouncementModel.fromJson(record);
+        _announcementInsertController.add(ann);
+      } catch (_) {}
+
       final notif = AppNotificationItem(
         id: id,
         title: '📢 تبليغ رسمي جديد',
@@ -101,6 +123,15 @@ class AppNotificationService {
       );
     } catch (e) {
       debugPrint('[-] Error handling new announcement: $e');
+    }
+  }
+
+  void _handleUpdatedAnnouncement(Map<String, dynamic> record) {
+    try {
+      final ann = AnnouncementModel.fromJson(record);
+      _announcementUpdateController.add(ann);
+    } catch (e) {
+      debugPrint('[-] Error handling updated announcement/reactions: $e');
     }
   }
 
@@ -189,14 +220,14 @@ class AppNotificationService {
                     height: 58,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF2AABEE), Color(0xFF0284C7)],
+                        colors: [AppTheme.primary, AppTheme.primaryLight],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2AABEE).withValues(alpha: 0.35),
+                          color: AppTheme.primary.withValues(alpha: 0.35),
                           blurRadius: 14,
                           offset: const Offset(0, 4),
                         ),
@@ -268,7 +299,7 @@ class AppNotificationService {
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2AABEE),
+                            backgroundColor: AppTheme.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 11),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -294,5 +325,7 @@ class AppNotificationService {
   void dispose() {
     _realtimeChannel?.unsubscribe();
     _notificationController.close();
+    _announcementInsertController.close();
+    _announcementUpdateController.close();
   }
 }

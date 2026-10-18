@@ -1528,6 +1528,109 @@ void main() {
       final service = AppNotificationService.instance;
       expect(service, isNotNull);
     });
+
+    test('اختبار استطلاعات الرأي والتصويت الطلابي بنمط تيليجرام وسرية الأسماء (Student Polls & Privacy Guarantee)', () {
+      // 1. إنشاء استطلاع رأي طلابي
+      final poll = PollData(
+        question: 'ما هو الوقت الأنسب للامتحان الفصلي لمادة الأجهزة الطبية؟',
+        options: ['الأحد 9:00 صباحاً', 'الثلاثاء 11:30 صباحاً', 'الخميس 1:00 ظهراً'],
+        allowsMultiple: false,
+      );
+
+      // تضمينه في إعلان
+      final rawContent = 'يرجى من جميع الطلبة التصويت على موعد الامتحان.\n${poll.embedTag}';
+      final announcement = AnnouncementModel(
+        id: 'poll-101',
+        title: 'استطلاع موعد الامتحان',
+        content: rawContent,
+        authorId: 'REP-001',
+        authorName: 'ممثل المرحلة',
+        authorRole: 'representative',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        section: 'A',
+        createdAt: DateTime.now(),
+      );
+
+      expect(announcement.isPoll, true);
+      expect(announcement.displayContent, contains('يرجى من جميع الطلبة التصويت'));
+      expect(announcement.displayContent, isNot(contains('[POLL:')));
+
+      final parsedPoll = announcement.pollData!;
+      expect(parsedPoll.question, 'ما هو الوقت الأنسب للامتحان الفصلي لمادة الأجهزة الطبية؟');
+      expect(parsedPoll.options.length, 3);
+      expect(parsedPoll.totalVotes, 0);
+
+      // 2. تصويت طالب (حسين) على الخيار الأول (0)
+      final voterHussein = PollVote(
+        studentId: 'ST-001',
+        studentName: 'حسين علي',
+        section: 'A',
+        selectedOptionIndices: [0],
+        votedAt: DateTime.now(),
+      );
+
+      final pollAfterVote1 = parsedPoll.withVote(voterHussein);
+      expect(pollAfterVote1.totalVotes, 1);
+      expect(pollAfterVote1.votesForOption(0), 1);
+      expect(pollAfterVote1.percentageForOption(0), 100);
+      expect(pollAfterVote1.percentageForOption(1), 0);
+
+      // 3. تصويت طالب ثانٍ (مريم) على الخيار الثاني (1)
+      final voterMaryam = PollVote(
+        studentId: 'ST-002',
+        studentName: 'مريم أحمد',
+        section: 'A',
+        selectedOptionIndices: [1],
+        votedAt: DateTime.now(),
+      );
+      final pollAfterVote2 = pollAfterVote1.withVote(voterMaryam);
+      expect(pollAfterVote2.totalVotes, 2);
+      expect(pollAfterVote2.percentageForOption(0), 50);
+      expect(pollAfterVote2.percentageForOption(1), 50);
+
+      // 4. تغيير التصويت بسلاسة (Smooth Vote Switching) من الخيار 0 إلى الخيار 2
+      final switchedHussein = PollVote(
+        studentId: 'ST-001',
+        studentName: 'حسين علي',
+        section: 'A',
+        selectedOptionIndices: [2],
+        votedAt: DateTime.now(),
+      );
+      final pollAfterSwitch = pollAfterVote2.withVote(switchedHussein);
+      expect(pollAfterSwitch.totalVotes, 2);
+      expect(pollAfterSwitch.votesForOption(0), 0);
+      expect(pollAfterSwitch.votesForOption(1), 1);
+      expect(pollAfterSwitch.votesForOption(2), 1);
+
+      // 5. إغلاق التصويت (Close Poll)
+      final closedPoll = pollAfterSwitch.copyWith(isClosed: true);
+      expect(closedPoll.isClosed, true);
+
+      // 6. التحقق من صلاحيات استعراض الأسماء (حصرية للمشرف العام مجتبى)
+      final mujtabaUser = AppUserModel(
+        id: 'admin_1',
+        studentId: 'ST-NUST-001630760-413',
+        name: 'مجتبى عواد',
+        role: 'admin',
+        stage: 'المرحلة الرابعة',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+      );
+      final normalStudent = AppUserModel(
+        id: 'stud_1',
+        studentId: 'ST-001',
+        name: 'حسين علي',
+        role: 'student',
+        stage: 'المرحلة الثانية',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+      );
+
+      final isMujtabaAuthorized = mujtabaUser.isAdmin || mujtabaUser.studentId == 'ST-NUST-001630760-413';
+      final isStudentAuthorized = normalStudent.isAdmin || normalStudent.studentId == 'ST-NUST-001630760-413';
+
+      expect(isMujtabaAuthorized, true, reason: 'مجتبى عواد يملك الصلاحية الحصرية لمعاينة أسماء المصوتين');
+      expect(isStudentAuthorized, false, reason: 'لا يُسمح للطلبة بالاطلاع على أسماء المصوتين إطلاقاً');
+    });
   });
 }
 

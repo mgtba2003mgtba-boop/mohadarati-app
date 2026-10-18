@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
@@ -38,6 +39,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        HapticFeedback.selectionClick();
+      }
+    });
     final user = SupabaseService().currentUser;
     _user = user;
     final preview = AdminPreviewService();
@@ -68,7 +74,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   }
 
   Future<void> _loadSchedules({bool forceRefresh = false}) async {
-    setState(() => _isLoading = true);
+    if (_schedules.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final service = SupabaseService();
     _user = service.currentUser;
 
@@ -605,10 +613,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final schedules = _getFilteredSchedules(type);
     final preview = AdminPreviewService();
 
-    return RefreshIndicator(
-      onRefresh: _loadSchedules,
-      color: AppTheme.primary,
-      child: Column(
+    return Column(
         children: [
           // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات (خاص بالمشرف العام عندما لا تكون المحاكاة لشعبة محددة)
           if (_isPrivileged && (!preview.isCustomActive || preview.section == null))
@@ -649,8 +654,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildScheduleSectionChip(String type, String sectionKey, String label, int count) {
