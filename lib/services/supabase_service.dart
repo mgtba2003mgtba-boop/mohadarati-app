@@ -12,6 +12,7 @@ import '../models/announcement_model.dart';
 import '../models/lecture_model.dart';
 import '../models/schedule_model.dart';
 import '../models/subject_model.dart';
+import '../models/lecture_comment_model.dart';
 import '../core/constants/biometric_subjects.dart';
 import 'telegram_uploader_service.dart';
 
@@ -800,6 +801,198 @@ class SupabaseService {
       debugPrint('[-] Error deleting announcement: $e');
       return false;
     }
+  }
+
+  /// ── جلب استفسارات وملاحظات المحاضرة الأكاديمية (سريعة وخفيفة من الكاش والسحابة) ──
+  Future<List<LectureCommentModel>> fetchLectureComments({
+    required String lectureId,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'lecture_comments_$lectureId';
+
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<LectureCommentModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((i) {
+          final ann = AnnouncementModel.fromJson(i);
+          return LectureCommentModel.fromAnnouncement(ann);
+        }).whereType<LectureCommentModel>().toList(),
+      );
+      if (cached != null) return cached;
+    }
+
+    try {
+      final res = await client
+          .from('announcements')
+          .select('*')
+          .eq('subject_name', 'LECTURE_NOTE')
+          .eq('title', lectureId)
+          .order('created_at', ascending: true)
+          .timeout(const Duration(seconds: 8));
+
+      final list = (res as List)
+          .map((item) => AnnouncementModel.fromJson(item))
+          .map((ann) => LectureCommentModel.fromAnnouncement(ann))
+          .whereType<LectureCommentModel>()
+          .toList();
+
+      list.sort((a, b) {
+        if (a.isPinned != b.isPinned) {
+          return a.isPinned ? -1 : 1;
+        }
+        return a.createdAt.compareTo(b.createdAt);
+      });
+
+      await _setCachedData(
+        key: cacheKey,
+        rawData: list,
+        toJson: () => (res as List),
+      );
+      return list;
+    } catch (e) {
+      debugPrint('[-] Error fetching lecture comments: $e');
+      return [];
+    }
+  }
+
+  /// ── إضافة استفسار أو ملاحظة جديدة للمحاضرة ───────────────────────────
+  Future<LectureCommentModel?> addLectureComment({
+    required String lectureId,
+    required String text,
+    required AppUserModel user,
+    required String department,
+    required String stage,
+    String? section,
+  }) async {
+    try {
+      final encodedContent = LectureCommentModel.encodeContent(text: text);
+      final payload = {
+        'title': lectureId,
+        'content': encodedContent,
+        'category': 'academic',
+        'subject_name': 'LECTURE_NOTE',
+        'department': department,
+        'stage': AppConstants.normalizeStage(stage),
+        'section': section ?? user.section ?? 'ALL',
+        'author_id': user.studentId.isNotEmpty ? user.studentId : user.id,
+        'author_name': user.name,
+        'author_role': user.role,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      final res = await client
+          .from('announcements')
+          .insert(payload)
+          .select('*')
+          .single();
+
+      invalidateCachePattern('lecture_comments_$lectureId');
+      final ann = AnnouncementModel.fromJson(res);
+      return LectureCommentModel.fromAnnouncement(ann);
+    } catch (e) {
+      debugPrint('[-] Error adding lecture comment: $e');
+      return null;
+    }
+  }
+
+  /// ── تبديل الإعجاب / مفيد على تعليق المحاضرة ───────────────────────────
+  Future<bool> toggleLectureCommentHelpful({
+    required String commentId,
+    required String lectureId,
+    required String studentId,
+  }) async {
+    try {
+      final row = await client
+          .from('announcements')
+          .select('*')
+          .eq('id', commentId)
+          .maybeSingle();
+
+      if (row == null) return false;
+      final ann = AnnouncementModel.fromJson(row);
+      final comment = LectureCommentModel.fromAnnouncement(ann);
+      if (comment == null) return false;
+
+      final currentUsers = List<String>.from(comment.helpfulUserIds);
+      if (currentUsers.contains(studentId)) {
+        currentUsers.remove(studentId);
+      } else {
+        currentUsers.add(studentId);
+      }
+
+      final newContent = LectureCommentModel.encodeContent(
+        text: comment.content,
+        isPinned: comment.isPinned,
+        helpfulUserIds: currentUsers,
+      );
+
+      await client
+          .from('announcements')
+          .update({'content': newContent})
+          .eq('id', commentId);
+
+      invalidateCachePattern('lecture_comments_$lectureId');
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error toggling lecture comment helpful: $e');
+      return false;
+    }
+  }
+
+  /// ── تثبيت أو إلغاء تثبيت ملاحظة المحاضرة من قبل الممثل أو المشرف ───────
+  Future<bool> toggleLectureCommentPin({
+    required String commentId,
+    required String lectureId,
+    required bool isPinned,
+    required AppUserModel user,
+  }) async {
+    try {
+      final isAuthorized = user.isAdmin ||
+          user.role == AppConstants.roleRepresentative ||
+          user.studentId == 'ST-NUST-001630760-413';
+
+      if (!isAuthorized) return false;
+
+      final row = await client
+          .from('announcements')
+          .select('*')
+          .eq('id', commentId)
+          .maybeSingle();
+
+      if (row == null) return false;
+      final ann = AnnouncementModel.fromJson(row);
+      final comment = LectureCommentModel.fromAnnouncement(ann);
+      if (comment == null) return false;
+
+      final newContent = LectureCommentModel.encodeContent(
+        text: comment.content,
+        isPinned: isPinned,
+        helpfulUserIds: comment.helpfulUserIds,
+      );
+
+      await client
+          .from('announcements')
+          .update({'content': newContent})
+          .eq('id', commentId);
+
+      invalidateCachePattern('lecture_comments_$lectureId');
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error toggling comment pin: $e');
+      return false;
+    }
+  }
+
+  /// ── حذف استفسار المحاضرة ───────────────────────────
+  Future<bool> deleteLectureComment({
+    required String commentId,
+    required String lectureId,
+  }) async {
+    final ok = await deleteAnnouncement(commentId);
+    if (ok) {
+      invalidateCachePattern('lecture_comments_$lectureId');
+    }
+    return ok;
   }
 
   /// ── جلب الجداول الدراسية والامتحانية (كاش فوري + دعم إشراف شامل لكافة الأقسام) ──────────────

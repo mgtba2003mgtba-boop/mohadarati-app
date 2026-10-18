@@ -21,6 +21,8 @@ import '../widgets/telegram_announcement_card.dart';
 import '../widgets/telegram_poll_card.dart';
 import '../widgets/create_poll_sheet.dart';
 import '../services/admin_preview_service.dart';
+import '../models/lecture_comment_model.dart';
+import '../widgets/app_tactile_bounce.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final String subjectName;
@@ -865,6 +867,44 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               ],
             ),
           ],
+          const SizedBox(height: 10),
+          // زر استفسارات وملاحظات المحاضرة الأكاديمية
+          AppTactileBounce(
+            onTap: () => _openLectureCommentsSheet(lecture),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.forum_outlined, size: 16, color: AppTheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'استفسارات وملاحظات المحاضرة',
+                    style: GoogleFonts.cairo(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'مناقشة أكاديمية 💬',
+                    style: GoogleFonts.cairo(
+                      fontSize: 10,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1153,6 +1193,20 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         _loadSubjectData();
       }
     }
+  }
+
+  void _openLectureCommentsSheet(LectureModel lecture) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _LectureCommentsSheet(
+        lecture: lecture,
+        department: _effectiveDepartment,
+        stage: _effectiveStage,
+        currentUser: _user,
+      ),
+    );
   }
 }
 
@@ -1702,6 +1756,555 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// نافذة الاستفسارات والملاحظات الأكاديمية للمحاضرة
+// ══════════════════════════════════════════════════════════════
+class _LectureCommentsSheet extends StatefulWidget {
+  final LectureModel lecture;
+  final String department;
+  final String stage;
+  final AppUserModel? currentUser;
+
+  const _LectureCommentsSheet({
+    required this.lecture,
+    required this.department,
+    required this.stage,
+    required this.currentUser,
+  });
+
+  @override
+  State<_LectureCommentsSheet> createState() => _LectureCommentsSheetState();
+}
+
+class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
+  final _commentController = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _isLoading = true;
+  bool _isSending = false;
+  List<LectureCommentModel> _comments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadComments({bool forceRefresh = false}) async {
+    final list = await SupabaseService().fetchLectureComments(
+      lectureId: widget.lecture.id,
+      forceRefresh: forceRefresh,
+    );
+    if (mounted) {
+      setState(() {
+        _comments = list;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _sendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || widget.currentUser == null) return;
+
+    setState(() => _isSending = true);
+    final newComment = await SupabaseService().addLectureComment(
+      lectureId: widget.lecture.id,
+      text: text,
+      user: widget.currentUser!,
+      department: widget.department,
+      stage: widget.stage,
+      section: widget.lecture.section,
+    );
+
+    if (mounted) {
+      setState(() => _isSending = false);
+      if (newComment != null) {
+        _commentController.clear();
+        setState(() {
+          _comments.add(newComment);
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر إرسال التعليق، يرجى المحاولة لاحقاً')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleHelpful(LectureCommentModel comment) async {
+    if (widget.currentUser == null) return;
+    final studentId = widget.currentUser!.studentId.isNotEmpty
+        ? widget.currentUser!.studentId
+        : widget.currentUser!.id;
+
+    final ok = await SupabaseService().toggleLectureCommentHelpful(
+      commentId: comment.id,
+      lectureId: widget.lecture.id,
+      studentId: studentId,
+    );
+    if (ok && mounted) {
+      _loadComments(forceRefresh: true);
+    }
+  }
+
+  Future<void> _togglePin(LectureCommentModel comment) async {
+    if (widget.currentUser == null) return;
+    final ok = await SupabaseService().toggleLectureCommentPin(
+      commentId: comment.id,
+      lectureId: widget.lecture.id,
+      isPinned: !comment.isPinned,
+      user: widget.currentUser!,
+    );
+    if (ok && mounted) {
+      _loadComments(forceRefresh: true);
+    }
+  }
+
+  Future<void> _deleteComment(LectureCommentModel comment) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('حذف الاستفسار', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
+        content: Text('هل تريد بالتأكيد حذف هذا الاستفسار؟', style: GoogleFonts.cairo(fontSize: 12)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('إلغاء', style: GoogleFonts.cairo())),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('حذف', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final ok = await SupabaseService().deleteLectureComment(
+        commentId: comment.id,
+        lectureId: widget.lecture.id,
+      );
+      if (ok && mounted) {
+        setState(() {
+          _comments.removeWhere((c) => c.id == comment.id);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final currentStudentId = widget.currentUser?.studentId ?? widget.currentUser?.id ?? '';
+    final canModerate = widget.currentUser?.isAdmin == true ||
+        widget.currentUser?.role == AppConstants.roleRepresentative ||
+        widget.currentUser?.studentId == 'ST-NUST-001630760-413';
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primarySubtle,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.forum_rounded, color: AppTheme.primary, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'استفسارات وملاحظات المحاضرة',
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        widget.lecture.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppTheme.lightBorder),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                : _comments.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: const BoxDecoration(
+                                  color: AppTheme.primarySubtle,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.mark_chat_unread_outlined, color: AppTheme.primary, size: 28),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'لا توجد استفسارات لهذه المحاضرة بعد',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'اطرح أول سؤال أو شارك ملاحظة مهمة ليستفيد منها زملائك في الشعبة',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _comments.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, index) {
+                          final comment = _comments[index];
+                          final isMe = comment.authorId == currentStudentId;
+                          final canDelete = isMe || canModerate;
+                          final isHelpful = comment.isHelpfulBy(currentStudentId);
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: comment.isPinned
+                                  ? const Color(0xFFFEFCE8)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: comment.isPinned
+                                    ? const Color(0xFFFACC15)
+                                    : AppTheme.lightBorder,
+                                width: comment.isPinned ? 1.4 : 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (comment.isPinned) ...[
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.push_pin_rounded, size: 14, color: Color(0xFFCA8A04)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'ملاحظة مثبتة من الممثل الأكاديمي',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFCA8A04),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                ],
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: comment.isRepresentative
+                                          ? AppTheme.accent.withValues(alpha: 0.15)
+                                          : AppTheme.primarySubtle,
+                                      child: Text(
+                                        comment.authorName.isNotEmpty
+                                            ? comment.authorName.characters.first
+                                            : 'ط',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: comment.isRepresentative
+                                              ? AppTheme.accent
+                                              : AppTheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  comment.authorName,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: GoogleFonts.cairo(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppTheme.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (comment.isRepresentative) ...[
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.accent.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+                                                  ),
+                                                  child: Text(
+                                                    'ممثل الشعبة ⭐',
+                                                    style: GoogleFonts.cairo(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppTheme.accent,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ] else if (comment.isAdmin) ...[
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.primarySubtle,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    'إشراف عام 🛡️',
+                                                    style: GoogleFonts.cairo(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppTheme.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          Text(
+                                            '${comment.createdAt.hour}:${comment.createdAt.minute.toString().padLeft(2, '0')}',
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 9.5,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (canModerate)
+                                      IconButton(
+                                        icon: Icon(
+                                          comment.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                                          size: 16,
+                                          color: comment.isPinned ? const Color(0xFFCA8A04) : AppTheme.textMuted,
+                                        ),
+                                        tooltip: comment.isPinned ? 'إلغاء التثبيت' : 'تثبيت الملاحظة',
+                                        onPressed: () => _togglePin(comment),
+                                      ),
+                                    if (canDelete)
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.danger),
+                                        tooltip: 'حذف',
+                                        onPressed: () => _deleteComment(comment),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SelectableText(
+                                  comment.content,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    color: AppTheme.textPrimary,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: AppTactileBounce(
+                                    onTap: () => _toggleHelpful(comment),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: isHelpful
+                                            ? AppTheme.primarySubtle
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isHelpful
+                                              ? AppTheme.primary.withValues(alpha: 0.3)
+                                              : Colors.transparent,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.thumb_up_alt_rounded,
+                                            size: 13,
+                                            color: isHelpful ? AppTheme.primary : AppTheme.textMuted,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            comment.helpfulCount > 0
+                                                ? 'مفيد (${comment.helpfulCount})'
+                                                : 'مفيد',
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 10,
+                                              fontWeight: isHelpful ? FontWeight.bold : FontWeight.w600,
+                                              color: isHelpful ? AppTheme.primary : AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: AppTheme.lightBorder)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    minLines: 1,
+                    maxLines: 3,
+                    style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'اكتب سؤالك أو ملاحظتك الأكاديمية...',
+                      hintStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: AppTheme.primary),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AppTactileBounce(
+                  onTap: _isSending ? null : _sendComment,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: _isSending
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

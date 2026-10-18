@@ -17,6 +17,7 @@ import 'package:nust_student_portal/services/telegram_uploader_service.dart';
 import 'package:nust_student_portal/services/app_notification_service.dart';
 import 'package:nust_student_portal/models/course_override_model.dart';
 import 'package:nust_student_portal/services/course_customization_service.dart';
+import 'package:nust_student_portal/models/lecture_comment_model.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1881,6 +1882,74 @@ void main() {
       // بعد التحويل من الداشبورد: تم تغيير فصل الطالب إلى 2
       final promotedStudent = studentUser.copyWith(semester: 2);
       expect(determineEffectiveStudentSemester(promotedStudent, 1), 2, reason: 'بعد تحويل الطالب إلى الفصل الثاني في الداشبورد، يرى الفصل الثاني تلقائياً دون مبدل');
+    });
+
+    test('اختبار نظام الاستفسارات والملاحظات الأكاديمية للمحاضرة وتثبيت ملاحظة الممثل (Lecture Academic Q&A Engine)', () {
+      // 1. فحص تشفير وفك تشفير التعليقات الأكاديمية
+      const commentText = 'يرجى مراجعة المسألة الثالثة في الصفحة 12 لأنها مهمة جداً بالامتحان';
+      final encoded = LectureCommentModel.encodeContent(
+        text: commentText,
+        isPinned: true,
+        helpfulUserIds: ['ST-001', 'ST-002'],
+      );
+
+      final dummyAnnouncement = AnnouncementModel(
+        id: 'ann_comment_1',
+        title: 'lec_123', // lectureId
+        content: encoded,
+        category: 'academic',
+        subjectName: 'LECTURE_NOTE',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        authorId: 'ST-REP-01',
+        authorName: 'سجاد محمد',
+        authorRole: 'representative',
+        createdAt: DateTime.now(),
+      );
+
+      final comment = LectureCommentModel.fromAnnouncement(dummyAnnouncement);
+      expect(comment, isNotNull);
+      expect(comment!.lectureId, 'lec_123');
+      expect(comment.content, commentText);
+      expect(comment.isPinned, true);
+      expect(comment.isRepresentative, true);
+      expect(comment.helpfulCount, 2);
+      expect(comment.isHelpfulBy('ST-001'), true);
+      expect(comment.isHelpfulBy('ST-099'), false);
+
+      // 2. فحص الإعجاب وتبديل مفيد (Helpful Toggle)
+      final withNewHelpful = comment.copyWith(
+        helpfulUserIds: [...comment.helpfulUserIds, 'ST-099'],
+      );
+      expect(withNewHelpful.helpfulCount, 3);
+      expect(withNewHelpful.isHelpfulBy('ST-099'), true);
+
+      // 3. فحص صلاحيات التثبيت والإشراف
+      final normalStudent = AppUserModel(
+        id: 'stud_1',
+        studentId: 'ST-001',
+        name: 'أحمد علي',
+        role: 'student',
+        stage: 'المرحلة الأولى',
+        department: 'هندسة تقنيات الحاسوب',
+      );
+      final repUser = AppUserModel(
+        id: 'rep_1',
+        studentId: 'ST-REP-01',
+        name: 'سجاد محمد',
+        role: 'representative',
+        stage: 'المرحلة الأولى',
+        department: 'هندسة تقنيات الحاسوب',
+      );
+
+      bool canModerate(AppUserModel user) {
+        return user.isAdmin ||
+            user.role == AppConstants.roleRepresentative ||
+            user.studentId == 'ST-NUST-001630760-413';
+      }
+
+      expect(canModerate(normalStudent), false, reason: 'الطالب العادي لا يستطيع تثبيت الملاحظات');
+      expect(canModerate(repUser), true, reason: 'ممثل الشعبة يستطيع تثبيت وتوجيه الملاحظات للطلبة');
     });
   });
 }

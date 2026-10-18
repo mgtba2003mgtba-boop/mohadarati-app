@@ -324,12 +324,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// شعار التطبيق الأنيق أعلى اليمين مع استجابة لمسية وحركة للصعود للأعلى
+  /// شعار التطبيق الأنيق أعلى اليمين وبجواره اسم التطبيق بتنسيق راقٍ واستجابة لمسية
   Widget _buildBrandHeader() {
     return Align(
       alignment: Alignment.centerRight,
       child: AppTactileBounce(
-        lowerBound: 0.90,
+        lowerBound: 0.92,
         onTap: () {
           HapticFeedback.lightImpact();
           if (_homeScrollController.hasClients) {
@@ -340,37 +340,68 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
         },
-        child: Container(
-          width: 44,
-          height: 44,
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppTheme.lightBorder.withValues(alpha: 0.8),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: AppTheme.lightBorder.withValues(alpha: 0.8),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: Image.asset(
-              'assets/images/app_logo.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.school_rounded,
-                color: AppTheme.primary,
-                size: 24,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.school_rounded,
+                    color: AppTheme.primary,
+                    size: 24,
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'محاضراتي',
+                  style: GoogleFonts.cairo(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                    height: 1.2,
+                  ),
+                ),
+                Text(
+                  'المنصة الأكاديمية الرسمية',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primary,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

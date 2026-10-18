@@ -319,44 +319,12 @@ class _CoursesScreenState extends State<CoursesScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : Column(
               children: [
-                // شريط البحث المقتضب
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: TextField(
-                    style: AppTypography.body(color: AppTheme.textPrimary),
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    decoration: InputDecoration(
-                      hintText: 'بحث في المواد الدراسية أو الرمز...',
-                      hintStyle: AppTypography.body(color: AppTheme.textMuted),
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? AppTactileBounce(
-                              onTap: () => setState(() => _searchQuery = ''),
-                              child: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: AppTheme.lightSurface,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(color: AppTheme.lightBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: const BorderSide(color: AppTheme.lightBorder),
-                      ),
-                    ),
-                  ),
-                ),
-
                 // مبدل الفصل الدراسي الأول / الفصل الدراسي الثاني (حصري للإدارة والممثلين - مخفي تماماً عن الطلاب)
                 if (_canManageCourses)
                   Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: AppTheme.lightSurface,
