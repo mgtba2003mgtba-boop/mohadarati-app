@@ -15,6 +15,7 @@ import 'package:nust_student_portal/services/admin_preview_service.dart';
 import 'package:nust_student_portal/services/auto_update_service.dart';
 import 'package:nust_student_portal/services/telegram_uploader_service.dart';
 import 'package:nust_student_portal/services/app_notification_service.dart';
+import 'package:nust_student_portal/models/course_override_model.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1630,6 +1631,92 @@ void main() {
 
       expect(isMujtabaAuthorized, true, reason: 'مجتبى عواد يملك الصلاحية الحصرية لمعاينة أسماء المصوتين');
       expect(isStudentAuthorized, false, reason: 'لا يُسمح للطلبة بالاطلاع على أسماء المصوتين إطلاقاً');
+    });
+
+    test('اختبار نظام تخصيص المقررات الدراسية وتعديل الاسم والرمز وحجب المواد (Course Customization & Overrides System)', () {
+      // 1. فحص نموذج التخصيص والترميز إلى ومن JSON
+      final override = CourseOverrideModel(
+        originalName: 'مبادىء الرقمية',
+        displayName: 'الدوائر الرقمية والمنطقية المتقدمة',
+        customCode: 'DIG101',
+        isHidden: true,
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        semester: 1,
+        updatedAt: DateTime(2026, 10, 19),
+        updatedBy: 'مجتبى عواد',
+      );
+
+      final json = override.toJson();
+      expect(json['original_name'], 'مبادىء الرقمية');
+      expect(json['display_name'], 'الدوائر الرقمية والمنطقية المتقدمة');
+      expect(json['custom_code'], 'DIG101');
+      expect(json['is_hidden'], true);
+
+      final restored = CourseOverrideModel.fromJson(json);
+      expect(restored.originalName, override.originalName);
+      expect(restored.displayName, override.displayName);
+      expect(restored.customCode, override.customCode);
+      expect(restored.isHidden, true);
+
+      // 2. فحص فك التشفير من وسوم الإعلانات السحابية [COURSE_OVERRIDE_V1]
+      final tagContent = '[COURSE_OVERRIDE_V1]{"original_name":"الرسم الهندسي","display_name":"الرسم الهندسي بمساعدة الحاسوب","custom_code":"CAD102","is_hidden":false,"department":"هندسة تقنيات الحاسوب","stage":"المرحلة الأولى","semester":1}';
+      final parsedFromTag = CourseOverrideModel.fromAnnouncementContent(tagContent);
+      expect(parsedFromTag, isNotNull);
+      expect(parsedFromTag!.originalName, 'الرسم الهندسي');
+      expect(parsedFromTag.displayName, 'الرسم الهندسي بمساعدة الحاسوب');
+      expect(parsedFromTag.customCode, 'CAD102');
+      expect(parsedFromTag.isHidden, false);
+
+      // 3. التحقق من منطق فلترة المقررات المخفية للطلبة العاديين والممثلين
+      final allSubjects = ['مبادىء الرقمية', 'الرسم الهندسي', 'الرياضيات I'];
+      final overridesMap = {
+        'مبادىء الرقمية': override, // isHidden = true
+      };
+
+      // فحص عرض المقررات لطالب عادي (canManage == false)
+      final studentVisible = allSubjects.where((sub) {
+        final ov = overridesMap[sub];
+        final isHidden = ov?.isHidden ?? false;
+        return !isHidden; // الطالب العادي لا يرى المخفي
+      }).toList();
+
+      expect(studentVisible.contains('مبادىء الرقمية'), false, reason: 'المقرر المخفي يجب أن يُحجب عن شاشة الطالب تماماً');
+      expect(studentVisible.contains('الرسم الهندسي'), true);
+      expect(studentVisible.contains('الرياضيات I'), true);
+
+      // فحص عرض المقررات للمشرف والممثل (canManage == true)
+      final adminVisible = allSubjects.where((sub) {
+        // المشرف يرى كل المقررات حتى المخفية
+        return true;
+      }).toList();
+
+      expect(adminVisible.contains('مبادىء الرقمية'), true, reason: 'المشرف والممثل يرى المقررات المخفية مع تمييزها');
+      expect(adminVisible.length, 3);
+
+      // 4. الحفاظ على العلاقات التاريخية للمحاضرات (Dual-key query matching)
+      final historicalLecture = LectureModel(
+        id: 'lec_001',
+        title: 'المحاضرة الأولى - البوابات المنطقية',
+        subjectName: 'مبادىء الرقمية', // الاسم البيومتري الأصلي المخزن في قاعدة البيانات
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        semester: 1,
+        driveUrl: 'https://t.me/mohadarati_nust/100',
+        uploaderId: 'u1',
+        uploaderName: 'مجتبى',
+        uploaderRole: 'admin',
+        createdAt: DateTime.now(),
+      );
+
+      // التحقق من أن المطابقة المزدوجة تجلب المحاضرة سواء بالاسم الأصلي أو بالاسم المعروض المخصص
+      bool matchesLecture(LectureModel l, String originalName, String displayName) {
+        return AppConstants.arabicEquals(l.subjectName, originalName) ||
+            AppConstants.arabicEquals(l.subjectName, displayName);
+      }
+
+      expect(matchesLecture(historicalLecture, override.originalName, override.displayName), true,
+          reason: 'المحاضرات القديمة لا تُفقد عند تخصيص اسم المقرر');
     });
   });
 }

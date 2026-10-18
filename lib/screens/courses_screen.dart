@@ -7,14 +7,33 @@ import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/attendance_model.dart';
 import '../models/lecture_model.dart';
+import '../models/course_override_model.dart';
 import '../services/supabase_service.dart';
 import '../services/attendance_service.dart';
+import '../services/admin_preview_service.dart';
+import '../services/course_customization_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_tactile_bounce.dart';
+import '../widgets/course_customization_sheet.dart';
 import 'subject_detail_screen.dart';
 import 'dashboard_screen.dart';
-import '../services/admin_preview_service.dart';
+
+class CourseItemDisplay {
+  final String originalName;
+  final String displayName;
+  final String? code;
+  final bool isHidden;
+  final CourseOverrideModel? override;
+
+  CourseItemDisplay({
+    required this.originalName,
+    required this.displayName,
+    this.code,
+    required this.isHidden,
+    this.override,
+  });
+}
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -36,6 +55,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
       (_user?.name.contains('مجتبى') ?? false);
+
+  bool get _canManageCourses =>
+      _isPrivileged ||
+      _user?.isRepresentative == true ||
+      _user?.canManageLectures == true;
 
   String get _effectiveDept {
     if (_isPrivileged) {
@@ -63,6 +87,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
     super.initState();
     _user = SupabaseService().currentUser;
     AdminPreviewService().addListener(_onAdminPreviewChanged);
+    CourseCustomizationService().addListener(_onCustomizationChanged);
     _loadCourses();
   }
 
@@ -70,9 +95,14 @@ class _CoursesScreenState extends State<CoursesScreen> {
     if (mounted) _loadCourses(forceRefresh: true);
   }
 
+  void _onCustomizationChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
+    CourseCustomizationService().removeListener(_onCustomizationChanged);
     super.dispose();
   }
 
@@ -99,6 +129,12 @@ class _CoursesScreenState extends State<CoursesScreen> {
             stage: _effectiveStage,
             semester: _selectedSemester,
           ),
+          CourseCustomizationService().getOverrides(
+            department: _effectiveDept,
+            stage: _effectiveStage,
+            semester: _selectedSemester,
+            forceRefresh: forceRefresh,
+          ),
         ]);
 
         final records = results[0] as List<AttendanceRecordModel>;
@@ -115,8 +151,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
     }
   }
 
-  /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول)
-  List<String> get _subjectNames {
+  /// جلب المقررات مع دمج التخصيصات وإخفاء المواد المحجوبة عن الطلبة العاديين
+  List<CourseItemDisplay> get _displayCourses {
     if (_user == null) return [];
 
     final biometricList = BiometricSubjects.getSubjectNames(
@@ -125,18 +161,56 @@ class _CoursesScreenState extends State<CoursesScreen> {
       semester: 1,
     );
 
-    if (_searchQuery.isEmpty) return biometricList;
-    return biometricList
-        .where((name) => name.toLowerCase().contains(_searchQuery.toLowerCase().trim()))
-        .toList();
+    final customService = CourseCustomizationService();
+    final List<CourseItemDisplay> items = [];
+
+    for (final origName in biometricList) {
+      final override = customService.getOverrideFor(
+        origName,
+        department: _effectiveDept,
+        stage: _effectiveStage,
+      );
+
+      final isHidden = override?.isHidden ?? false;
+
+      // المقررات المخفية تُحجب تماماً عن الطلبة العاديين وتظهر فقط للمشرف والممثلين
+      if (isHidden && !_canManageCourses) {
+        continue;
+      }
+
+      final subModel = BiometricSubjects.findSubject(
+        origName,
+        department: _effectiveDept,
+        stage: _effectiveStage,
+      );
+
+      final displayName = override?.displayName ?? origName;
+      final code = override?.customCode ?? subModel?.code;
+
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase().trim();
+        final matches = displayName.toLowerCase().contains(query) ||
+            origName.toLowerCase().contains(query) ||
+            (code != null && code.toLowerCase().contains(query));
+        if (!matches) continue;
+      }
+
+      items.add(CourseItemDisplay(
+        originalName: origName,
+        displayName: displayName,
+        code: code,
+        isHidden: isHidden,
+        override: override,
+      ));
+    }
+
+    return items;
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     final canPublish = _user?.canManageLectures == true || _user?.isAdmin == true;
-    final subjects = _subjectNames;
+    final courses = _displayCourses;
 
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
@@ -164,7 +238,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                '${subjects.length}',
+                '${courses.length}',
                 style: GoogleFonts.cairo(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -178,7 +252,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
             tooltip: 'تحديث',
-            onPressed: _loadCourses,
+            onPressed: () => _loadCourses(forceRefresh: true),
           ),
         ],
       ),
@@ -205,7 +279,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       MaterialPageRoute(
                         builder: (_) => const DashboardScreen(initialTabIndex: 0),
                       ),
-                    ).then((_) => _loadCourses());
+                    ).then((_) => _loadCourses(forceRefresh: true));
                   },
                 ),
               ),
@@ -215,100 +289,107 @@ class _CoursesScreenState extends State<CoursesScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : Column(
               children: [
-                  // شريط البحث المقتضب
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: TextField(
-                      style: AppTypography.body(color: AppTheme.textPrimary),
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      decoration: InputDecoration(
-                        hintText: 'بحث في المواد الدراسية...',
-                        hintStyle: AppTypography.body(color: AppTheme.textMuted),
-                        prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? AppTactileBounce(
-                                onTap: () => setState(() => _searchQuery = ''),
-                                child: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: AppTheme.lightSurface,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            borderSide: const BorderSide(color: AppTheme.lightBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            borderSide: const BorderSide(color: AppTheme.lightBorder),
-                        ),
+                // شريط البحث المقتضب
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: TextField(
+                    style: AppTypography.body(color: AppTheme.textPrimary),
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: 'بحث في المواد الدراسية أو الرمز...',
+                      hintStyle: AppTypography.body(color: AppTheme.textMuted),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? AppTactileBounce(
+                              onTap: () => setState(() => _searchQuery = ''),
+                              child: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: AppTheme.lightSurface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: const BorderSide(color: AppTheme.lightBorder),
                       ),
                     ),
                   ),
+                ),
 
-                  // قائمة المواد الدراسية الكاملة
-                  Expanded(
-                    child: subjects.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.menu_book_outlined, size: 54, color: Color(0xFFCBD5E1)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'لا توجد مواد مطابقة للبحث',
-                                  style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            cacheExtent: 600,
-                            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            itemCount: subjects.length,
-                            itemBuilder: (context, index) {
-                              final subName = subjects[index];
-                              final statsList = _attendanceSummary?.subjectsStats
-                                  .where((s) => s.subjectName.trim().toLowerCase() == subName.toLowerCase())
-                                  .toList();
-                              final hasAttendance = statsList != null && statsList.isNotEmpty;
-                              final stats = hasAttendance ? statsList.first : null;
-                              return RepaintBoundary(
-                                key: ValueKey('subj_card_$subName'),
-                                child: _buildSubjectCard(
-                                  subjectName: subName,
-                                  stats: stats,
-                                  index: index,
-                                ),
-                              );
-                            },
+                // قائمة المواد الدراسية الكاملة
+                Expanded(
+                  child: courses.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.menu_book_outlined, size: 54, color: Color(0xFFCBD5E1)),
+                              const SizedBox(height: 12),
+                              Text(
+                                'لا توجد مواد مطابقة للبحث',
+                                style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
+                              ),
+                            ],
                           ),
-                  ),
-                ],
-              ),
-      );
-    }
+                        )
+                      : ListView.builder(
+                          cacheExtent: 600,
+                          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          itemCount: courses.length,
+                          itemBuilder: (context, index) {
+                            final item = courses[index];
+                            final statsList = _attendanceSummary?.subjectsStats
+                                .where((s) =>
+                                    s.subjectName.trim().toLowerCase() == item.originalName.toLowerCase() ||
+                                    s.subjectName.trim().toLowerCase() == item.displayName.toLowerCase())
+                                .toList();
+                            final hasAttendance = statsList != null && statsList.isNotEmpty;
+                            final stats = hasAttendance ? statsList.first : null;
+                            return RepaintBoundary(
+                              key: ValueKey('subj_card_${item.originalName}'),
+                              child: _buildSubjectCard(
+                                item: item,
+                                stats: stats,
+                                index: index,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
 
   Widget _buildSubjectCard({
-    required String subjectName,
+    required CourseItemDisplay item,
     required SubjectAttendanceStats? stats,
     required int index,
   }) {
     final subModel = BiometricSubjects.findSubject(
-      subjectName,
+      item.originalName,
       department: _effectiveDept,
       stage: _effectiveStage,
     );
 
+    final hasOverride = item.override != null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: item.isHidden ? const Color(0xFFF8FAFC) : Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppTheme.lightBorder),
-        boxShadow: AppShadows.card,
+        border: Border.all(
+          color: item.isHidden ? const Color(0xFFCBD5E1) : AppTheme.lightBorder,
+          width: item.isHidden ? 1.2 : 1.0,
+        ),
+        boxShadow: item.isHidden ? [] : AppShadows.card,
       ),
       child: AppTactileBounce(
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -317,21 +398,23 @@ class _CoursesScreenState extends State<CoursesScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => SubjectDetailScreen(
-                subjectName: subjectName,
+                subjectName: item.originalName,
+                displayName: item.displayName,
+                customCode: item.code,
                 attendanceStats: stats,
                 department: _effectiveDept,
                 stage: _effectiveStage,
                 section: _effectiveSection,
               ),
             ),
-          ).then((_) => _loadCourses());
+          ).then((_) => _loadCourses(forceRefresh: true));
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
               AppIconBadge.indigo(
-                icon: BiometricSubjects.getIconForSubject(subjectName),
+                icon: BiometricSubjects.getIconForSubject(item.originalName),
                 size: 48,
                 iconSize: 24,
               ),
@@ -344,13 +427,41 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            subjectName,
-                            style: AppTypography.h3(color: AppTheme.textPrimary),
+                            item.displayName,
+                            style: AppTypography.h3(
+                              color: item.isHidden ? const Color(0xFF64748B) : AppTheme.textPrimary,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (subModel?.code != null) ...[
+                        if (item.isHidden) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFCA5A5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.visibility_off_rounded, size: 11, color: AppTheme.danger),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'مخفي للطلاب',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.danger,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (item.code != null) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
@@ -360,7 +471,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Text(
-                              subModel!.code!,
+                              item.code!,
                               style: GoogleFonts.cairo(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -372,6 +483,15 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         ],
                       ],
                     ),
+                    if (item.displayName != item.originalName) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'الاسم الرسمي: ${item.originalName}',
+                        style: AppTypography.tiny(color: AppTheme.textMuted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     if (subModel?.units != null) ...[
                       const SizedBox(height: 5),
                       Row(
@@ -401,8 +521,32 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF94A3B8)),
+              if (_canManageCourses) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(
+                    Icons.tune_rounded,
+                    color: hasOverride ? AppTheme.primary : const Color(0xFF94A3B8),
+                    size: 20,
+                  ),
+                  tooltip: 'تخصيص المقرر',
+                  onPressed: () {
+                    CourseCustomizationSheet.show(
+                      context: context,
+                      originalName: item.originalName,
+                      defaultCode: subModel?.code,
+                      department: _effectiveDept,
+                      stage: _effectiveStage,
+                      user: _user!,
+                      currentOverride: item.override,
+                      onSaved: () => _loadCourses(forceRefresh: true),
+                    );
+                  },
+                ),
+              ] else ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF94A3B8)),
+              ],
             ],
           ),
         ),

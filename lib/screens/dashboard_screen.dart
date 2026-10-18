@@ -15,6 +15,12 @@ import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/create_poll_sheet.dart';
 import 'package:file_picker/file_picker.dart';
+import '../models/course_override_model.dart';
+import '../services/course_customization_service.dart';
+import '../widgets/course_customization_sheet.dart';
+import '../widgets/app_icon_badge.dart';
+import '../widgets/app_tactile_bounce.dart';
+
 
 class RepresentativeActivityItem {
   final String id;
@@ -147,6 +153,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   int _publishModeIndex = 0; // 0 = محاضرة, 1 = إعلان, 2 = بوستر
   int _moderationSegmentIndex = 0; // 0 = المحتوى والمنشورات, 1 = الطلاب والممثلين
+  // ── إدارة المقررات وتخصيص الأسماء والرموز والإخفاء ──
+  String _courseMgmtDept = AppConstants.departments.first;
+  String _courseMgmtStage = AppConstants.stages.first;
+  String _courseMgmtSearchQuery = '';
+  int _courseAndUserSegmentIndex = 0; // 0 = المقررات, 1 = الطلاب والترقيات
+  int _radarAndModerationSegmentIndex = 0; // 0 = رادار النشاط والنبض, 1 = إدارة وحذف المحتوى
+
 
   // ── مواد البصمة لقسم ومرحلة وكورس المحاضرة ──
   String? _selectedBiometricSubject;
@@ -201,18 +214,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _selectedLectureStage = _currentUser!.stage;
       _selectedAnnounceDept = _currentUser!.department;
       _selectedAnnounceStage = _currentUser!.stage;
+      _courseMgmtDept = _currentUser!.department;
+      _courseMgmtStage = _currentUser!.stage;
     }
 
     final int tabsCount = _isMujtaba ? 3 : 2;
     int initialTab = 0;
     if (_isMujtaba) {
       if (widget.initialTabIndex == 1) {
-        initialTab = 1;
+        initialTab = 0;
         _publishModeIndex = 1; // نشر إعلان
-      } else if (widget.initialTabIndex >= 2) {
-        initialTab = 2; // إدارة المحتوى والطلاب
+      } else if (widget.initialTabIndex == 2) {
+        initialTab = 1; // إدارة المقررات والطلاب
+        _courseAndUserSegmentIndex = 0;
+      } else if (widget.initialTabIndex >= 3) {
+        initialTab = 2; // رادار العمليات والمحتوى
       } else {
-        initialTab = 0; // إحصائيات الطلاب والنبض
+        initialTab = 0; // استوديو النشر
+        _publishModeIndex = 0;
       }
     } else {
       initialTab = widget.initialTabIndex.clamp(0, 1);
@@ -538,7 +557,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: AppTheme.darkCard,
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
                 'ترقية وإدارة صلاحيات: ${user.name}',
@@ -553,7 +572,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       'المعرف: ${user.studentId} • ${user.department}',
                       style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
                     ),
-                    const Divider(color: AppTheme.darkBorder, height: 20),
+                    const Divider(color: AppTheme.lightBorder, height: 20),
 
                     Text('الدور والصلاحية الأكاديمية:', style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary)),
                     const SizedBox(height: 8),
@@ -599,7 +618,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       },
                     ),
 
-                    const Divider(color: AppTheme.darkBorder, height: 20),
+                    const Divider(color: AppTheme.lightBorder, height: 20),
 
                     // الشعبة
                     TextField(
@@ -694,24 +713,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
+      backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
         title: Text(
-          _isMujtaba ? 'داش بورد مجتبى (المشرف العام)' : 'لوحة ممثل الدفعة والنشر',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+          _isMujtaba ? 'داش بورد المشرف العام (مجتبى عواد)' : 'لوحة ممثل الدفعة والنشر',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
         ),
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          labelColor: AppTheme.accent,
-          unselectedLabelColor: const Color(0xFF94A3B8),
-          indicatorColor: AppTheme.accent,
-          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+          isScrollable: false,
+          labelColor: AppTheme.primary,
+          unselectedLabelColor: AppTheme.textSecondary,
+          indicatorColor: AppTheme.primary,
+          indicatorWeight: 3,
+          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
           tabs: _isMujtaba
               ? const [
-                  Tab(icon: Icon(Icons.analytics_rounded), text: 'إحصائيات الطلاب والنبض'),
-                  Tab(icon: Icon(Icons.add_circle_outline_rounded), text: 'مركز النشر والمقررات'),
-                  Tab(icon: Icon(Icons.admin_panel_settings_rounded), text: 'إدارة المحتوى والطلاب'),
+                  Tab(icon: Icon(Icons.cloud_upload_rounded), text: 'استوديو النشر'),
+                  Tab(icon: Icon(Icons.manage_accounts_rounded), text: 'المقررات والطلاب'),
+                  Tab(icon: Icon(Icons.radar_rounded), text: 'رادار العمليات'),
                 ]
               : const [
                   Tab(icon: Icon(Icons.upload_file_rounded), text: 'نشر المحاضرات'),
@@ -723,9 +746,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         controller: _tabController,
         children: _isMujtaba
             ? [
-                _buildActivityRadarTab(),
                 _buildUnifiedPublishTab(),
-                _buildModerationAndDirectoryTab(),
+                _buildCourseAndDirectoryTab(),
+                _buildRadarAndModerationTab(),
               ]
             : [
                 _buildPublishLectureTab(),
@@ -735,7 +758,49 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // ── مركز النشر الموحد (محاضرات، إعلانات، بوسترات) للمشرف العام ──────────
+  // ── زر الشريحة الموحد (Modern Segmented Pill Button) ────────────────
+  Widget _buildPillSegmentButton({
+    required int selectedIndex,
+    required int index,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = selectedIndex == index;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected ? AppShadows.card : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.cairo(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── تبويب 1: استوديو النشر السحابي (محاضرات، إعلانات، بوسترات) للمشرف العام ──────────
   Widget _buildUnifiedPublishTab() {
     return Column(
       children: [
@@ -743,31 +808,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppTheme.darkCard,
+            color: AppTheme.lightSurface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: AppTheme.lightBorder),
           ),
           child: Row(
             children: [
               Expanded(
-                child: _buildPublishSegmentButton(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _publishModeIndex,
                   index: 0,
                   icon: Icons.upload_file_rounded,
                   label: 'رفع محاضرة',
+                  onTap: () => setState(() => _publishModeIndex = 0),
                 ),
               ),
               Expanded(
-                child: _buildPublishSegmentButton(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _publishModeIndex,
                   index: 1,
                   icon: Icons.campaign_rounded,
                   label: 'نشر إعلان',
+                  onTap: () => setState(() => _publishModeIndex = 1),
                 ),
               ),
               Expanded(
-                child: _buildPublishSegmentButton(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _publishModeIndex,
                   index: 2,
                   icon: Icons.photo_library_rounded,
                   label: 'بوستر الواجهة',
+                  onTap: () => setState(() => _publishModeIndex = 2),
                 ),
               ),
             ],
@@ -784,118 +855,475 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildPublishSegmentButton({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = _publishModeIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _publishModeIndex = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.black : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.black : const Color(0xFF94A3B8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── مركز إدارة المحتوى والطلاب الموحد (مع شريحة تبديل سريعة) ──────────
-  Widget _buildModerationAndDirectoryTab() {
+  // ── تبويب 2: إدارة المقررات والطلاب (المقررات + دليل الطلاب والترقيات) ──────────
+  Widget _buildCourseAndDirectoryTab() {
     return Column(
       children: [
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppTheme.darkCard,
+            color: AppTheme.lightSurface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: AppTheme.lightBorder),
           ),
           child: Row(
             children: [
               Expanded(
-                child: _buildModerationSegmentButton(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _courseAndUserSegmentIndex,
                   index: 0,
-                  icon: Icons.auto_stories_rounded,
-                  label: 'المحتوى والمنشورات',
+                  icon: Icons.menu_book_rounded,
+                  label: 'تخصيص وإخفاء المقررات',
+                  onTap: () => setState(() => _courseAndUserSegmentIndex = 0),
                 ),
               ),
               Expanded(
-                child: _buildModerationSegmentButton(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _courseAndUserSegmentIndex,
                   index: 1,
                   icon: Icons.people_alt_rounded,
-                  label: 'الطلاب والممثلين',
+                  label: 'دليل الطلاب والترقيات',
+                  onTap: () => setState(() => _courseAndUserSegmentIndex = 1),
                 ),
               ),
             ],
           ),
         ),
         Expanded(
-          child: _moderationSegmentIndex == 0
-              ? _buildContentManagementTab()
+          child: _courseAndUserSegmentIndex == 0
+              ? _buildCourseManagementTab()
               : _buildRepsDirectoryTab(),
         ),
       ],
     );
   }
 
-  Widget _buildModerationSegmentButton({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = _moderationSegmentIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _moderationSegmentIndex = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.black : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+  // ── تبويب 3: رادار العمليات والنشاط (الرادار + إدارة وحذف المحتوى) ──────────
+  Widget _buildRadarAndModerationTab() {
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppTheme.lightSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.lightBorder),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _radarAndModerationSegmentIndex,
+                  index: 0,
+                  icon: Icons.analytics_rounded,
+                  label: 'رادار النشاط والنبض',
+                  onTap: () => setState(() => _radarAndModerationSegmentIndex = 0),
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: _buildPillSegmentButton(
+                  selectedIndex: _radarAndModerationSegmentIndex,
+                  index: 1,
+                  icon: Icons.auto_stories_rounded,
+                  label: 'إدارة وحذف المحتوى',
+                  onTap: () => setState(() => _radarAndModerationSegmentIndex = 1),
+                ),
+              ),
+            ],
+          ),
         ),
+        Expanded(
+          child: _radarAndModerationSegmentIndex == 0
+              ? _buildActivityRadarTab()
+              : _buildContentManagementTab(),
+        ),
+      ],
+    );
+  }
+
+  // ── مركز إدارة وتخصيص وإخفاء المقررات الدراسية ──────────────────
+  Widget _buildCourseManagementTab() {
+    final allBiometric = BiometricSubjects.getSubjectNames(
+      department: _courseMgmtDept,
+      stage: _courseMgmtStage,
+      semester: 1,
+    );
+
+    final customService = CourseCustomizationService();
+
+    final filteredSubjects = allBiometric.where((name) {
+      if (_courseMgmtSearchQuery.isEmpty) return true;
+      final q = _courseMgmtSearchQuery.toLowerCase().trim();
+      final override = customService.getOverrideFor(name, department: _courseMgmtDept, stage: _courseMgmtStage);
+      final disp = override?.displayName ?? name;
+      final code = override?.customCode ?? BiometricSubjects.findSubject(name, department: _courseMgmtDept, stage: _courseMgmtStage)?.code;
+      return disp.toLowerCase().contains(q) || name.toLowerCase().contains(q) || (code != null && code.toLowerCase().contains(q));
+    }).toList();
+
+    int hiddenCount = 0;
+    for (final name in allBiometric) {
+      if (customService.getOverrideFor(name, department: _courseMgmtDept, stage: _courseMgmtStage)?.isHidden == true) {
+        hiddenCount++;
+      }
+    }
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // لوحة اختيار القسم والمرحلة
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppTheme.lightBorder),
+              boxShadow: AppShadows.card,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.school_rounded, color: AppTheme.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'نطاق المقررات الدراسية',
+                      style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: DropdownButtonFormField<String>(
+                        value: _courseMgmtDept,
+                        dropdownColor: Colors.white,
+                        style: AppTypography.body(color: AppTheme.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'القسم الأكاديمي',
+                          labelStyle: AppTypography.caption(color: AppTheme.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          filled: true,
+                          fillColor: AppTheme.lightSurface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
+                          ),
+                        ),
+                        items: AppConstants.departments.map((d) {
+                          return DropdownMenuItem(
+                            value: d,
+                            child: Text(d, style: GoogleFonts.cairo(fontSize: 12)),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _courseMgmtDept = val);
+                            CourseCustomizationService().getOverrides(
+                              department: _courseMgmtDept,
+                              stage: _courseMgmtStage,
+                              forceRefresh: true,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _courseMgmtStage,
+                        dropdownColor: Colors.white,
+                        style: AppTypography.body(color: AppTheme.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'المرحلة',
+                          labelStyle: AppTypography.caption(color: AppTheme.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          filled: true,
+                          fillColor: AppTheme.lightSurface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
+                          ),
+                        ),
+                        items: AppConstants.stages.map((s) {
+                          return DropdownMenuItem(
+                            value: s,
+                            child: Text(s, style: GoogleFonts.cairo(fontSize: 12)),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _courseMgmtStage = val);
+                            CourseCustomizationService().getOverrides(
+                              department: _courseMgmtDept,
+                              stage: _courseMgmtStage,
+                              forceRefresh: true,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // شريط البحث وإحصائيات سريعة
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppTheme.lightBorder),
+              boxShadow: AppShadows.card,
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  style: AppTypography.body(color: AppTheme.textPrimary),
+                  onChanged: (val) => setState(() => _courseMgmtSearchQuery = val),
+                  decoration: InputDecoration(
+                    hintText: 'بحث في المقررات أو الرمز...',
+                    hintStyle: AppTypography.body(color: AppTheme.textMuted),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
+                    suffixIcon: _courseMgmtSearchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () => setState(() => _courseMgmtSearchQuery = ''),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: AppTheme.lightSurface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'إجمالي المقررات: ${allBiometric.length}',
+                      style: GoogleFonts.cairo(fontSize: 11.5, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: hiddenCount > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: hiddenCount > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                        ),
+                      ),
+                      child: Text(
+                        '$hiddenCount مخفي عن الطلاب',
+                        style: GoogleFonts.cairo(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: hiddenCount > 0 ? AppTheme.danger : const Color(0xFF16A34A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // قائمة المقررات الدراسية
+          if (filteredSubjects.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppTheme.lightBorder),
+              ),
+              child: Center(
+                child: Text(
+                  'لا توجد مواد مطابقة للبحث في هذا القسم والمرحلة',
+                  style: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13),
+                ),
+              ),
+            )
+          else
+            ...filteredSubjects.map((origName) {
+              final override = customService.getOverrideFor(
+                origName,
+                department: _courseMgmtDept,
+                stage: _courseMgmtStage,
+              );
+              final subModel = BiometricSubjects.findSubject(
+                origName,
+                department: _courseMgmtDept,
+                stage: _courseMgmtStage,
+              );
+              final isHidden = override?.isHidden ?? false;
+              final dispName = override?.displayName ?? origName;
+              final code = override?.customCode ?? subModel?.code;
+              final hasOverride = override != null;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isHidden ? const Color(0xFFF8FAFC) : Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(
+                    color: isHidden ? const Color(0xFFCBD5E1) : AppTheme.lightBorder,
+                    width: isHidden ? 1.2 : 1.0,
+                  ),
+                  boxShadow: isHidden ? [] : AppShadows.card,
+                ),
+                child: Row(
+                  children: [
+                    AppIconBadge.indigo(
+                      icon: BiometricSubjects.getIconForSubject(origName),
+                      size: 42,
+                      iconSize: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  dispName,
+                                  style: AppTypography.h3(
+                                    color: isHidden ? const Color(0xFF64748B) : AppTheme.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (code != null) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Text(
+                                    code,
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (dispName != origName) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'الاسم المرجعي بالبصمة: $origName',
+                              style: AppTypography.tiny(color: AppTheme.textMuted),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isHidden ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isHidden ? 'مخفي عن الطلاب' : 'مرئي للطلاب',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isHidden ? AppTheme.danger : const Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch.adaptive(
+                      value: !isHidden,
+                      activeColor: AppTheme.primary,
+                      onChanged: (visible) async {
+                        if (_currentUser != null) {
+                          await CourseCustomizationService().toggleHideCourse(
+                            originalName: origName,
+                            isHidden: !visible,
+                            department: _courseMgmtDept,
+                            stage: _courseMgmtStage,
+                            user: _currentUser!,
+                            currentCustomName: override?.displayName,
+                            currentCustomCode: override?.customCode,
+                          );
+                          setState(() {});
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.edit_note_rounded,
+                        color: hasOverride ? AppTheme.primary : AppTheme.textSecondary,
+                        size: 22,
+                      ),
+                      tooltip: 'تخصيص المقرر',
+                      onPressed: () {
+                        if (_currentUser != null) {
+                          CourseCustomizationSheet.show(
+                            context: context,
+                            originalName: origName,
+                            defaultCode: subModel?.code,
+                            department: _courseMgmtDept,
+                            stage: _courseMgmtStage,
+                            user: _currentUser!,
+                            currentOverride: override,
+                            onSaved: () => setState(() {}),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
       ),
     );
   }
@@ -964,7 +1392,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
                 decoration: BoxDecoration(
-                  color: AppTheme.darkCard,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: AppTheme.primaryLight.withValues(alpha: 0.4),
@@ -1026,7 +1454,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.darkCard,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.success.withValues(alpha: 0.5), width: 1.5),
               ),
@@ -1105,7 +1533,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           if (_currentUser?.isAdmin == true) ...[
             DropdownButtonFormField<String>(
               value: _selectedLectureDept,
-              dropdownColor: AppTheme.darkCard,
+              dropdownColor: Colors.white,
               style: GoogleFonts.cairo(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
                 labelText: 'القسم الأكاديمي المستهدف',
@@ -1130,7 +1558,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _selectedLectureStage,
-                    dropdownColor: AppTheme.darkCard,
+                    dropdownColor: Colors.white,
                     style: GoogleFonts.cairo(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'المرحلة الدراسية',
@@ -1153,7 +1581,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     decoration: BoxDecoration(
-                      color: AppTheme.darkCard,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
                     ),
@@ -1182,7 +1610,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 : (_availableLectureSubjects.contains(_selectedBiometricSubject)
                     ? _selectedBiometricSubject
                     : (_availableLectureSubjects.isNotEmpty ? _availableLectureSubjects.first : null)),
-            dropdownColor: AppTheme.darkCard,
+            dropdownColor: Colors.white,
             style: GoogleFonts.cairo(color: AppTheme.textPrimary),
             decoration: InputDecoration(
               labelText: 'المادة الدراسية الرسمية (نظام البصمة - ${_availableLectureSubjects.length} مادة)',
@@ -1421,7 +1849,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           if (_currentUser?.isAdmin == true) ...[
             DropdownButtonFormField<String>(
               value: _selectedAnnounceDept,
-              dropdownColor: AppTheme.darkCard,
+              dropdownColor: Colors.white,
               style: GoogleFonts.cairo(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
                 labelText: 'القسم الموجه له الإعلان',
@@ -1445,7 +1873,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             DropdownButtonFormField<String>(
               value: _selectedAnnounceStage,
-              dropdownColor: AppTheme.darkCard,
+              dropdownColor: Colors.white,
               style: GoogleFonts.cairo(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
                 labelText: 'المرحلة الدراسية المستهدفة',
@@ -1468,7 +1896,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
             DropdownButtonFormField<String>(
               value: _selectedAnnounceSection,
-              dropdownColor: AppTheme.darkCard,
+              dropdownColor: Colors.white,
               style: GoogleFonts.cairo(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
                 labelText: 'الشعبة المستهدفة لنشر التبليغ',
@@ -1491,7 +1919,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // ── 2. المادة المرتبطة بالإعلان (نظام البصمة) ──
           DropdownButtonFormField<String>(
             value: _selectedAnnouncementSubject ?? '__GENERAL__',
-            dropdownColor: AppTheme.darkCard,
+            dropdownColor: Colors.white,
             style: GoogleFonts.cairo(color: AppTheme.textPrimary),
             decoration: InputDecoration(
               labelText: 'المادة المرتبطة بالإعلان (نظام البصمة)',
@@ -1551,7 +1979,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
           DropdownButtonFormField<String>(
             value: _selectedAnnounceCategory,
-            dropdownColor: AppTheme.darkCard,
+            dropdownColor: Colors.white,
             style: GoogleFonts.cairo(color: AppTheme.textPrimary),
             decoration: const InputDecoration(
               labelText: 'تصنيف الإعلان',
@@ -1711,7 +2139,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.darkCard,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white10),
             ),
@@ -1746,7 +2174,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.25)),
       ),
@@ -1853,7 +2281,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: AppTheme.darkCard,
+                        backgroundColor: Colors.white,
                         title: Text('تأكيد حذف المحاضرة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
                         content: Text('هل تريد بالتأكيد حذف "${l.title}" نهائياً من المنظومة؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
                         actions: [
@@ -1969,7 +2397,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.darkCard,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white10),
             ),
@@ -2004,7 +2432,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25)),
       ),
@@ -2119,7 +2547,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: AppTheme.darkCard,
+                        backgroundColor: Colors.white,
                         title: Text(a.title, style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                         content: SingleChildScrollView(
                           child: Text(a.displayContent, style: GoogleFonts.cairo(color: const Color(0xFFCBD5E1), fontSize: 12, height: 1.5)),
@@ -2141,7 +2569,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: AppTheme.darkCard,
+                        backgroundColor: Colors.white,
                         title: Text('تأكيد حذف التبليغ', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
                         content: Text('هل تريد بالتأكيد حذف "${a.title}" نهائياً من المنظومة؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
                         actions: [
@@ -2178,9 +2606,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.darkBorder),
+        border: Border.all(color: AppTheme.lightBorder),
       ),
       child: Center(
         child: Text(
@@ -2442,9 +2870,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.darkCard,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppTheme.darkBorder),
+              border: Border.all(color: AppTheme.lightBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2505,9 +2933,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.darkCard,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppTheme.darkBorder),
+              border: Border.all(color: AppTheme.lightBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2584,10 +3012,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
               prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.accent, size: 20),
               filled: true,
-              fillColor: AppTheme.darkCard,
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppTheme.darkBorder),
+                borderSide: const BorderSide(color: AppTheme.lightBorder),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
@@ -2699,7 +3127,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isLecture ? AppTheme.primaryLight.withValues(alpha: 0.3) : AppTheme.accent.withValues(alpha: 0.3),
@@ -2855,7 +3283,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          backgroundColor: AppTheme.darkCard,
+                          backgroundColor: Colors.white,
                           title: Text(item.title, style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                           content: Text(item.content ?? '', style: GoogleFonts.cairo(color: const Color(0xFFCBD5E1), fontSize: 12)),
                           actions: [
@@ -2883,7 +3311,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.darkCard,
+        backgroundColor: Colors.white,
         title: Text('تأكيد الحذف الإشرافي', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
         content: Text('هل تريد بالتأكيد حذف "${item.title}" المنشورة بواسطة ${item.actorName}؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
         actions: [
@@ -2983,7 +3411,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               gradient: LinearGradient(
                 colors: [
                   AppTheme.primary.withValues(alpha: 0.15),
-                  AppTheme.darkCard,
+                  Colors.white,
                 ],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
@@ -3024,7 +3452,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       flex: 3,
                       child: DropdownButtonFormField<String>(
                         value: _selectedRepDept,
-                        dropdownColor: AppTheme.darkCard,
+                        dropdownColor: Colors.white,
                         style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'القسم الأكاديمي',
@@ -3046,7 +3474,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       flex: 2,
                       child: DropdownButtonFormField<String>(
                         value: _selectedRepStage,
-                        dropdownColor: AppTheme.darkCard,
+                        dropdownColor: Colors.white,
                         style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textPrimary),
                         decoration: InputDecoration(
                           labelText: 'المرحلة',
@@ -3103,8 +3531,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ),
                                 selected: isSel,
                                 selectedColor: AppTheme.accent,
-                                backgroundColor: AppTheme.darkCard,
-                                side: BorderSide(color: isSel ? AppTheme.accent : AppTheme.darkBorder),
+                                backgroundColor: Colors.white,
+                                side: BorderSide(color: isSel ? AppTheme.accent : AppTheme.lightBorder),
                                 onSelected: (s) {
                                   if (s) setState(() => _selectedRepSection = sec);
                                 },
@@ -3114,7 +3542,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         ),
                       ),
 
-                const Divider(color: AppTheme.darkBorder, height: 24),
+                const Divider(color: AppTheme.lightBorder, height: 24),
 
                 // 3. ممثلو الشعبة الحالية والزر المباشر للتكليف
                 Builder(
@@ -3164,7 +3592,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppTheme.darkBorder),
+                              border: Border.all(color: AppTheme.lightBorder),
                             ),
                             child: Row(
                               children: [
@@ -3186,7 +3614,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 margin: const EdgeInsets.only(bottom: 6),
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.darkCard,
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
                                 ),
@@ -3315,10 +3743,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
               prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.accent, size: 20),
               filled: true,
-              fillColor: AppTheme.darkCard,
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppTheme.darkBorder),
+                borderSide: const BorderSide(color: AppTheme.lightBorder),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
@@ -3430,12 +3858,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isAdmin
               ? Colors.greenAccent.withValues(alpha: 0.4)
-              : (isRep ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.darkBorder),
+              : (isRep ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.lightBorder),
         ),
       ),
       child: Column(
@@ -3590,7 +4018,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ],
 
-          const Divider(color: AppTheme.darkBorder, height: 16),
+          const Divider(color: AppTheme.lightBorder, height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -3671,7 +4099,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             }).toList();
 
             return AlertDialog(
-              backgroundColor: AppTheme.darkCard,
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3744,7 +4172,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.darkBorder),
+                          border: Border.all(color: AppTheme.lightBorder),
                         ),
                         child: filteredStudents.isEmpty
                             ? Center(
@@ -3753,7 +4181,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               )
                             : ListView.separated(
                                 itemCount: filteredStudents.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.darkBorder),
+                                separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.lightBorder),
                                 itemBuilder: (ctx, i) {
                                   final st = filteredStudents[i];
                                   final isSelected = selectedStudent?.id == st.id;
@@ -3889,7 +4317,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.darkCard,
+        backgroundColor: Colors.white,
         title: Text('سحب التكليف من الممثل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary)),
         content: Text('هل تريد بالتأكيد إلغاء صفة الممثل عن "${rep.name}" وإعادته طالباً عادياً؟', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFFCBD5E1))),
         actions: [
@@ -4095,10 +4523,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
               prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.accent, size: 20),
               filled: true,
-              fillColor: AppTheme.darkCard,
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppTheme.darkBorder),
+                borderSide: const BorderSide(color: AppTheme.lightBorder),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
@@ -4193,7 +4621,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: typeColor.withValues(alpha: 0.3)),
       ),
@@ -4354,7 +4782,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.darkCard,
+        backgroundColor: Colors.white,
         title: Text(
           'تأكيد حذف المحتوى الإشرافي',
           style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
@@ -4602,10 +5030,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.darkCard,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: _selectedBannerImage != null ? AppTheme.success : AppTheme.darkBorder,
+                  color: _selectedBannerImage != null ? AppTheme.success : AppTheme.lightBorder,
                   width: _selectedBannerImage != null ? 1.5 : 1,
                 ),
               ),
@@ -4670,9 +5098,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               labelText: 'عنوان الإعلان أو البوستر *',
               labelStyle: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 12),
               filled: true,
-              fillColor: AppTheme.darkCard,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryLight)),
             ),
           ),
@@ -4686,9 +5114,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               labelText: 'تفاصيل إضافية أو نص التبليغ (اختياري)',
               labelStyle: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 12),
               filled: true,
-              fillColor: AppTheme.darkCard,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryLight)),
             ),
           ),
@@ -4699,14 +5127,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _selectedBannerDept,
-                  dropdownColor: AppTheme.darkCard,
+                  dropdownColor: Colors.white,
                   style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
                   decoration: InputDecoration(
                     labelText: 'القسم المستهدف',
                     labelStyle: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 11),
                     filled: true,
-                    fillColor: AppTheme.darkCard,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                   ),
                   items: ['ALL', ...AppConstants.departments].map((dept) {
                     return DropdownMenuItem(
@@ -4721,14 +5149,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _selectedBannerStage,
-                  dropdownColor: AppTheme.darkCard,
+                  dropdownColor: Colors.white,
                   style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 12),
                   decoration: InputDecoration(
                     labelText: 'المرحلة المستهدفة',
                     labelStyle: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 11),
                     filled: true,
-                    fillColor: AppTheme.darkCard,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.darkBorder)),
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                   ),
                   items: ['ALL', ...AppConstants.stages].map((stg) {
                     return DropdownMenuItem(
@@ -4782,9 +5210,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.darkCard,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.darkBorder),
+                border: Border.all(color: AppTheme.lightBorder),
               ),
               child: Center(
                 child: Text('لا توجد بوسترات مخصصة حالياً (تُعرض الصور الافتراضية)', style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF94A3B8))),
@@ -4802,9 +5230,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.darkCard,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.darkBorder),
+        border: Border.all(color: AppTheme.lightBorder),
       ),
       child: Row(
         children: [

@@ -295,51 +295,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return SafeArea(
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // شريط الترويسة الأكاديمية الرسمي (بدون تكرار بيانات الطالب المحفوظة في حسابي)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      AppIconBadge.indigo(
-                        icon: Icons.account_balance_rounded,
-                        size: 42,
-                        iconSize: 22,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppConstants.appName,
-                            style: GoogleFonts.cairo(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          if (_user?.department != null && _user!.department.isNotEmpty)
-                            Text(
-                              _user!.department,
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // شاشة الإعلانات بالصور المتحركة والكاروسيل التفاعلي
-              _buildAnnouncementsMovingCarousel(),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // شاشة الإعلانات بالصور المتحركة والكاروسيل التفاعلي
+            _buildAnnouncementsMovingCarousel(),
               const SizedBox(height: 18),
 
               // بطاقات الوصول السريع (المقررات والجدول)

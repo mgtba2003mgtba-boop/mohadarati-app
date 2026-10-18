@@ -24,6 +24,8 @@ import '../services/admin_preview_service.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final String subjectName;
+  final String? displayName;
+  final String? customCode;
   final SubjectAttendanceStats? attendanceStats;
   final String? department;
   final String? stage;
@@ -32,6 +34,8 @@ class SubjectDetailScreen extends StatefulWidget {
   const SubjectDetailScreen({
     super.key,
     required this.subjectName,
+    this.displayName,
+    this.customCode,
     this.attendanceStats,
     this.department,
     this.stage,
@@ -136,6 +140,25 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     super.dispose();
   }
 
+  bool _matchesSubject(String? name) {
+    if (name == null || name.trim().isEmpty) return false;
+    final clean = name.trim();
+    if (AppConstants.arabicEquals(clean, widget.subjectName) ||
+        AppConstants.arabicContains(clean, widget.subjectName) ||
+        AppConstants.arabicContains(widget.subjectName, clean)) {
+      return true;
+    }
+    if (widget.displayName != null && widget.displayName!.trim().isNotEmpty) {
+      final disp = widget.displayName!.trim();
+      if (AppConstants.arabicEquals(clean, disp) ||
+          AppConstants.arabicContains(clean, disp) ||
+          AppConstants.arabicContains(disp, clean)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _loadSubjectData({bool forceRefresh = false, bool showSpinner = false}) async {
     if (showSpinner || (_subjectLectures.isEmpty && _subjectAnnouncements.isEmpty)) {
       setState(() => _isLoading = true);
@@ -148,20 +171,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final stage = _effectiveStage;
       final userSection = _effectiveSection;
 
-      // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي)
+      // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي المزدوج)
       final allLectures = await service.fetchLectures(
         department: dept,
         stage: stage,
         section: userSection,
         forceRefresh: forceRefresh,
       );
-      _subjectLectures = allLectures.where((l) {
-        return AppConstants.arabicEquals(l.subjectName, widget.subjectName) ||
-            AppConstants.arabicContains(l.subjectName, widget.subjectName) ||
-            AppConstants.arabicContains(widget.subjectName, l.subjectName);
-      }).toList();
+      _subjectLectures = allLectures.where((l) => _matchesSubject(l.subjectName)).toList();
 
-      // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي)
+      // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي المزدوج)
       final allAnnouncements = await service.fetchAnnouncements(
         department: dept,
         stage: stage,
@@ -170,22 +189,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       );
       _subjectAnnouncements = allAnnouncements.where((a) {
         if (a.subjectName != null && a.subjectName!.trim().isNotEmpty && a.subjectName != 'عام') {
-          return AppConstants.arabicEquals(a.subjectName, widget.subjectName) ||
-              AppConstants.arabicContains(a.subjectName, widget.subjectName) ||
-              AppConstants.arabicContains(widget.subjectName, a.subjectName);
+          return _matchesSubject(a.subjectName);
         }
-        return AppConstants.arabicContains(a.title, widget.subjectName) ||
-            AppConstants.arabicContains(a.content, widget.subjectName);
+        return _matchesSubject(a.title) || _matchesSubject(a.content);
       }).toList();
 
       // 3. جلب سجلات الحضور الخاصة بهذه المادة
       if (_user != null) {
         final records = await service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh);
-        _subjectAttendanceRecords = records.where((r) {
-          return r.subjectName != null &&
-              (AppConstants.arabicEquals(r.subjectName, widget.subjectName) ||
-               AppConstants.arabicContains(r.subjectName, widget.subjectName));
-        }).toList();
+        _subjectAttendanceRecords = records.where((r) => _matchesSubject(r.subjectName)).toList();
       }
     } catch (e) {
       debugPrint('[-] Error loading subject hub: $e');
@@ -328,6 +340,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       stage: _effectiveStage,
     );
 
+    final effectiveDisplayName = widget.displayName ?? widget.subjectName;
+    final effectiveCode = widget.customCode ?? subModel?.code;
+
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
@@ -337,26 +352,32 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.subjectName,
+              effectiveDisplayName,
               style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (subModel?.code != null || subModel?.units != null)
-              Row(
-                children: [
-                  if (subModel?.code != null)
-                    Text(
-                      'كود: ${subModel!.code}  ',
-                      style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
-                  if (subModel?.units != null)
-                    Text(
-                      '•  ${subModel!.units} وحدات',
-                      style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
-                    ),
-                ],
-              ),
+            Row(
+              children: [
+                if (effectiveCode != null)
+                  Text(
+                    'كود: $effectiveCode  ',
+                    style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                if (effectiveDisplayName != widget.subjectName)
+                  Text(
+                    '• رسمياً: ${widget.subjectName}  ',
+                    style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textMuted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (subModel?.units != null)
+                  Text(
+                    '•  ${subModel!.units} وحدات',
+                    style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
+                  ),
+              ],
+            ),
           ],
         ),
         actions: [
