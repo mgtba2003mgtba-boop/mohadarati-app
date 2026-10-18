@@ -377,29 +377,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'محاضراتي',
-                  style: GoogleFonts.cairo(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                    height: 1.2,
-                  ),
-                ),
-                Text(
-                  'المنصة الأكاديمية الرسمية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primary,
-                    height: 1.1,
-                  ),
-                ),
-              ],
+            Text(
+              'محاضراتي',
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+                letterSpacing: -0.2,
+              ),
             ),
           ],
         ),
@@ -619,14 +604,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'بوابة المحاضرات والجداول الأكاديمية الرسمية',
-                  style: GoogleFonts.cairo(
-                    fontSize: 10,
-                    color: const Color(0xFF94A3B8),
-                  ),
-                ),
               ],
             ),
           ),
@@ -694,7 +671,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
                         Text(
-                          '${_subjectNames.length} مادة دراسية',
+                          '${_subjectNames.length} مادة',
                           style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -741,7 +718,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
                         Text(
-                          'المواعيد والامتحانات',
+                          'المواعيد',
                           style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -783,7 +760,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 children: [
                   Text(
-                    'عرض كل المقررات',
+                    'عرض الكل',
                     style: AppTypography.captionStrong(color: AppTheme.primary),
                   ),
                   const SizedBox(width: 4),

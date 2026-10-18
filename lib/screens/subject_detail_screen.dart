@@ -883,7 +883,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   const Icon(Icons.forum_outlined, size: 16, color: AppTheme.primary),
                   const SizedBox(width: 8),
                   Text(
-                    'استفسارات وملاحظات المحاضرة',
+                    'استفسارات المحاضرة',
                     style: GoogleFonts.cairo(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -891,15 +891,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    'مناقشة أكاديمية 💬',
-                    style: GoogleFonts.cairo(
-                      fontSize: 10,
-                      color: AppTheme.textMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
                   const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppTheme.textMuted),
                 ],
               ),
@@ -1965,7 +1956,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'استفسارات وملاحظات المحاضرة',
+                        'استفسارات المحاضرة',
                         style: GoogleFonts.cairo(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -2015,16 +2006,16 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                               ),
                               const SizedBox(height: 14),
                               Text(
-                                'لا توجد استفسارات لهذه المحاضرة بعد',
+                                'لا توجد استفسارات بعد',
                                 style: GoogleFonts.cairo(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.textPrimary,
                                 ),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Text(
-                                'اطرح أول سؤال أو شارك ملاحظة مهمة ليستفيد منها زملائك في الشعبة',
+                                'كن أول من يطرح سؤالاً',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.cairo(
                                   fontSize: 11,
@@ -2070,13 +2061,13 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (comment.isPinned) ...[
+                                  if (comment.isPinned) ...[
                                   Row(
                                     children: [
                                       const Icon(Icons.push_pin_rounded, size: 14, color: Color(0xFFCA8A04)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'ملاحظة مثبتة من الممثل الأكاديمي',
+                                        'ملاحظة مثبتة 📌',
                                         style: GoogleFonts.cairo(
                                           fontSize: 10.5,
                                           fontWeight: FontWeight.bold,
@@ -2136,7 +2127,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                                                     border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
                                                   ),
                                                   child: Text(
-                                                    'ممثل الشعبة ⭐',
+                                                    'الممثل ⭐',
                                                     style: GoogleFonts.cairo(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.bold,
@@ -2153,7 +2144,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                                                     borderRadius: BorderRadius.circular(6),
                                                   ),
                                                   child: Text(
-                                                    'إشراف عام 🛡️',
+                                                    'إشراف 🛡️',
                                                     style: GoogleFonts.cairo(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.bold,
@@ -2264,7 +2255,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                     maxLines: 3,
                     style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
                     decoration: InputDecoration(
-                      hintText: 'اكتب سؤالك أو ملاحظتك الأكاديمية...',
+                      hintText: 'اكتب استفسارك...',
                       hintStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),

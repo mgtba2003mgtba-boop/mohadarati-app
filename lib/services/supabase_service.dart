@@ -865,30 +865,49 @@ class SupabaseService {
     String? section,
   }) async {
     try {
-      final encodedContent = LectureCommentModel.encodeContent(text: text);
+      final normStage = AppConstants.normalizeStage(stage);
+      final sec = (section != null && section.isNotEmpty && section != 'null')
+          ? section.trim().toUpperCase()
+          : (user.section ?? 'ALL').trim().toUpperCase();
+
+      String encodedContent = LectureCommentModel.encodeContent(text: text);
+      if (!encodedContent.contains('[SECTION:')) {
+        encodedContent = '$encodedContent [SECTION:$sec]';
+      }
+
       final payload = {
         'title': lectureId,
         'content': encodedContent,
         'category': 'academic',
         'subject_name': 'LECTURE_NOTE',
         'department': department,
-        'stage': AppConstants.normalizeStage(stage),
-        'section': section ?? user.section ?? 'ALL',
+        'stage': normStage,
         'author_id': user.studentId.isNotEmpty ? user.studentId : user.id,
         'author_name': user.name,
         'author_role': user.role,
-        'created_at': DateTime.now().toIso8601String(),
+        'is_pinned': false,
       };
 
       final res = await client
           .from('announcements')
           .insert(payload)
           .select('*')
-          .single();
+          .maybeSingle();
 
       invalidateCachePattern('lecture_comments_$lectureId');
-      final ann = AnnouncementModel.fromJson(res);
-      return LectureCommentModel.fromAnnouncement(ann);
+      if (res != null) {
+        final ann = AnnouncementModel.fromJson(res);
+        return LectureCommentModel.fromAnnouncement(ann);
+      }
+      return LectureCommentModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        lectureId: lectureId,
+        authorId: user.studentId.isNotEmpty ? user.studentId : user.id,
+        authorName: user.name,
+        authorRole: user.role,
+        content: text,
+        createdAt: DateTime.now(),
+      );
     } catch (e) {
       debugPrint('[-] Error adding lecture comment: $e');
       return null;
