@@ -1951,6 +1951,123 @@ void main() {
       expect(canModerate(normalStudent), false, reason: 'الطالب العادي لا يستطيع تثبيت الملاحظات');
       expect(canModerate(repUser), true, reason: 'ممثل الشعبة يستطيع تثبيت وتوجيه الملاحظات للطلبة');
     });
+
+    test('اختبار فك تشفير تعليقات المحاضرات المحقونة بوسوم متعددة وتطهيرها من JSON الخام', () {
+      final rawMultiTagContent =
+          '[LECTURE_NOTE_V1]{"text":"شنو هاي","is_pinned":false,"helpful_users":[]} [SECTION:ALL]';
+
+      final ann = AnnouncementModel(
+        id: 'ann_comment_01',
+        title: 'lec_id_999',
+        content: rawMultiTagContent,
+        category: 'academic',
+        subjectName: 'LECTURE_NOTE',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        authorId: 'ST-001',
+        authorName: 'مجتبى عواد',
+        authorRole: 'student',
+        createdAt: DateTime.now(),
+      );
+
+      final comment = LectureCommentModel.fromAnnouncement(ann);
+      expect(comment, isNotNull);
+      expect(comment!.content, 'شنو هاي', reason: 'يجب استخراج نص التعليق حصراً وتجريده من كود JSON والوسوم');
+      expect(comment.displayContent, 'شنو هاي', reason: 'displayContent يجب أن يكون خالياً تماماً من أي وسوم');
+      expect(comment.isPinned, false);
+      expect(comment.section, 'ALL');
+      expect(comment.content.contains('{'), false, reason: 'ممنوع تسريب أقواس JSON إلى النص');
+      expect(comment.content.contains('[SECTION:'), false, reason: 'ممنوع تسريب وسم الشعبة إلى النص');
+    });
+
+    test('اختبار استعادة التعليق بأمان ومنع تسريب JSON حتى عند تشوه البنية البرمجية', () {
+      final brokenJsonContent =
+          '[LECTURE_NOTE_V1]{"text":"سؤال بخصوص الامتحان", "broken_key": } [SECTION:B]';
+
+      final ann = AnnouncementModel(
+        id: 'ann_comment_02',
+        title: 'lec_id_888',
+        content: brokenJsonContent,
+        category: 'academic',
+        subjectName: 'LECTURE_NOTE',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        authorId: 'ST-002',
+        authorName: 'طالب',
+        authorRole: 'student',
+        createdAt: DateTime.now(),
+      );
+
+      final comment = LectureCommentModel.fromAnnouncement(ann);
+      expect(comment, isNotNull);
+      expect(comment!.content, 'سؤال بخصوص الامتحان');
+      expect(comment.displayContent, 'سؤال بخصوص الامتحان');
+      expect(comment.section, 'B');
+      expect(comment.displayContent.contains('{'), false);
+    });
+
+    test('اختبار عزل واستبعاد تعليقات المحاضرات وتخصيصات المقررات من تبليغات المواد', () {
+      final announcements = [
+        AnnouncementModel(
+          id: '1',
+          title: 'تبليغ رسمي',
+          content: 'غداً عطلة رسمية لمادة الرياضيات',
+          subjectName: 'الرياضيات',
+          authorId: 'REP-01',
+          authorName: 'الممثل',
+          authorRole: 'representative',
+          createdAt: DateTime.now(),
+        ),
+        AnnouncementModel(
+          id: '2',
+          title: 'lec_101',
+          content: '[LECTURE_NOTE_V1]{"text":"استفسار عن المحاضرة"} [SECTION:A]',
+          subjectName: 'LECTURE_NOTE',
+          authorId: 'ST-01',
+          authorName: 'طالب',
+          authorRole: 'student',
+          createdAt: DateTime.now(),
+        ),
+        AnnouncementModel(
+          id: '3',
+          title: 'Course Config',
+          content: '[COURSE_OVERRIDE:{"active":true}]',
+          subjectName: 'COURSE_OVERRIDE',
+          authorId: 'ADMIN',
+          authorName: 'المشرف',
+          authorRole: 'admin',
+          createdAt: DateTime.now(),
+        ),
+        AnnouncementModel(
+          id: '4',
+          title: '',
+          content: '   ',
+          imageUrl: null,
+          authorId: 'ADMIN',
+          authorName: 'شبح',
+          authorRole: 'admin',
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      // محاكاة فلترة التبليغات الصارمة
+      final validSubjectAnnouncements = announcements.where((a) {
+        if (a.subjectName == 'LECTURE_NOTE' ||
+            a.subjectName == 'COURSE_OVERRIDE' ||
+            a.content.contains('[LECTURE_NOTE_V1]') ||
+            a.content.contains('[COURSE_OVERRIDE')) {
+          return false;
+        }
+        final hasBody = a.displayContent.trim().isNotEmpty ||
+            (a.imageUrl != null && a.imageUrl!.trim().isNotEmpty && a.imageUrl != 'null') ||
+            a.isPoll;
+        return hasBody;
+      }).toList();
+
+      expect(validSubjectAnnouncements.length, 1);
+      expect(validSubjectAnnouncements.first.id, '1');
+      expect(validSubjectAnnouncements.first.title, 'تبليغ رسمي');
+    });
   });
 }
 

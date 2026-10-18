@@ -507,7 +507,11 @@ class SupabaseService {
                 a.subjectName == 'SCHEDULE';
             final isCourse = a.content.contains('[COURSE_REGISTRY') ||
                 a.subjectName == 'COURSE';
-            return !isSchedule && !isCourse;
+            final isLectureComment = a.content.contains(LectureCommentModel.tag) ||
+                a.subjectName == 'LECTURE_NOTE';
+            final isCourseOverride = a.content.contains('[COURSE_OVERRIDE') ||
+                a.subjectName == 'COURSE_OVERRIDE';
+            return !isSchedule && !isCourse && !isLectureComment && !isCourseOverride;
           })
           .toList();
 
@@ -939,11 +943,15 @@ class SupabaseService {
         currentUsers.add(studentId);
       }
 
-      final newContent = LectureCommentModel.encodeContent(
+      String newContent = LectureCommentModel.encodeContent(
         text: comment.content,
         isPinned: comment.isPinned,
         helpfulUserIds: currentUsers,
+        section: comment.section,
       );
+      if (comment.section != null && comment.section!.isNotEmpty && !newContent.contains('[SECTION:')) {
+        newContent = '$newContent [SECTION:${comment.section}]';
+      }
 
       await client
           .from('announcements')
@@ -983,11 +991,15 @@ class SupabaseService {
       final comment = LectureCommentModel.fromAnnouncement(ann);
       if (comment == null) return false;
 
-      final newContent = LectureCommentModel.encodeContent(
+      String newContent = LectureCommentModel.encodeContent(
         text: comment.content,
         isPinned: isPinned,
         helpfulUserIds: comment.helpfulUserIds,
+        section: comment.section,
       );
+      if (comment.section != null && comment.section!.isNotEmpty && !newContent.contains('[SECTION:')) {
+        newContent = '$newContent [SECTION:${comment.section}]';
+      }
 
       await client
           .from('announcements')

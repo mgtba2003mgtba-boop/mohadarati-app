@@ -171,6 +171,18 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
   @override
   Widget build(BuildContext context) {
     final announcement = widget.announcement;
+    final hasContent = announcement.displayContent.trim().isNotEmpty;
+    final hasImage = announcement.imageUrl != null &&
+        announcement.imageUrl!.trim().isNotEmpty &&
+        announcement.imageUrl != 'null' &&
+        announcement.imageUrl != 'undefined';
+    final hasPoll = announcement.isPoll;
+
+    // حماية وقائية (Zero-Render): عدم رسم البطاقة نهائياً إن كانت خالية من المحتوى والصور والاستطلاعات
+    if (!hasContent && !hasImage && !hasPoll) {
+      return const SizedBox.shrink();
+    }
+
     final currentStudentId = widget.currentUser?.studentId ?? widget.currentUser?.id;
     final counts = announcement.reactionCounts;
     final totalReactions = announcement.totalReactionsCount;
@@ -313,37 +325,38 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                   ],
                 ),
 
-                const SizedBox(height: 12),
-
-                // 2. فقاعة نص التبليغ مباشرة بنمط قنوات تيليجرام
-                InkWell(
-                  onTap: () => _showAnnouncementModal(context),
-                  onLongPress: () => _showReactionPicker(context),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFF1F5F9)),
-                    ),
-                    child: Text(
-                      announcement.displayContent,
-                      style: GoogleFonts.cairo(
-                        fontSize: 13.5,
-                        color: const Color(0xFF1E293B),
-                        height: 1.6,
-                        fontWeight: FontWeight.w500,
+                // 2. فقاعة نص التبليغ مباشرة بنمط قنوات تيليجرام (فقط إن كان النص غير فارغ)
+                if (hasContent) ...[
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => _showAnnouncementModal(context),
+                    onLongPress: () => _showReactionPicker(context),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFF1F5F9)),
                       ),
-                      maxLines: 6,
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        announcement.displayContent,
+                        style: GoogleFonts.cairo(
+                          fontSize: 13.5,
+                          color: const Color(0xFF1E293B),
+                          height: 1.6,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 6,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                ),
+                ],
 
-                // 4. صورة التبليغ إن وجدت
-                if (announcement.imageUrl != null && announcement.imageUrl!.trim().isNotEmpty) ...[
+                // 4. صورة التبليغ إن وجدت (مع إخفاء الحاوية إن فشل التحميل)
+                if (hasImage) ...[
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: () => _showAnnouncementModal(context),
@@ -355,6 +368,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        errorWidget: const SizedBox.shrink(),
                       ),
                     ),
                   ),

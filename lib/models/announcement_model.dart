@@ -446,6 +446,9 @@ class AnnouncementModel {
         .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[SECTION:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[REACTIONS:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]\{[^{}]*\}'), '')
+        .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]'), '')
+        .replaceAll(RegExp(r'\[COURSE_OVERRIDE:[^\]]+\]'), '')
         .trim();
   }
 

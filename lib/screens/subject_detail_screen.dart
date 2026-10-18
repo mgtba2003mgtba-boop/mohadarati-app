@@ -194,6 +194,17 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         forceRefresh: forceRefresh,
       );
       _subjectAnnouncements = allAnnouncements.where((a) {
+        if (a.subjectName == 'LECTURE_NOTE' ||
+            a.subjectName == 'COURSE_OVERRIDE' ||
+            a.content.contains('[LECTURE_NOTE_V1]') ||
+            a.content.contains('[COURSE_OVERRIDE')) {
+          return false;
+        }
+        final hasBody = a.displayContent.trim().isNotEmpty ||
+            (a.imageUrl != null && a.imageUrl!.trim().isNotEmpty && a.imageUrl != 'null' && a.imageUrl != 'undefined') ||
+            a.isPoll;
+        if (!hasBody) return false;
+
         if (a.subjectName != null && a.subjectName!.trim().isNotEmpty && a.subjectName != 'عام') {
           return _matchesSubject(a.subjectName);
         }
@@ -2185,7 +2196,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                                 ),
                                 const SizedBox(height: 8),
                                 SelectableText(
-                                  comment.content,
+                                  comment.displayContent,
                                   style: GoogleFonts.cairo(
                                     fontSize: 12,
                                     color: AppTheme.textPrimary,
