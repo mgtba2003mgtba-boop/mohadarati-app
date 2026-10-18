@@ -159,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
             department: effectiveDept,
             stage: effectiveStage,
             section: effectiveSection,
-            semester: 1,
+            semester: _user?.semester ?? 1,
             forceRefresh: forceRefresh,
           ),
         ]);
@@ -179,13 +179,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي (الكورس الأول)
+  /// جلب المواد الدراسية الرسمية المعتمدة حصراً من نظام البصمة الجامعي حسب الفصل الدراسي الفعلي للطالب
   List<String> get _subjectNames {
     if (_user == null) return [];
     return BiometricSubjects.getSubjectNames(
       department: _effectiveDept,
       stage: _effectiveStage,
-      semester: 1,
+      semester: _user?.semester ?? 1,
     );
   }
 
@@ -816,6 +816,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         department: _effectiveDept,
                         stage: _effectiveStage,
                         section: _effectiveSection,
+                        semester: lec.semester != 0 ? lec.semester : (_user?.semester ?? 1),
                       ),
                     ),
                   ).then((_) => _loadData());

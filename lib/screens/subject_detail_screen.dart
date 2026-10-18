@@ -30,6 +30,7 @@ class SubjectDetailScreen extends StatefulWidget {
   final String? department;
   final String? stage;
   final String? section;
+  final int? semester;
 
   const SubjectDetailScreen({
     super.key,
@@ -40,6 +41,7 @@ class SubjectDetailScreen extends StatefulWidget {
     this.department,
     this.stage,
     this.section,
+    this.semester,
   });
 
   @override
@@ -170,12 +172,14 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final dept = _effectiveDepartment;
       final stage = _effectiveStage;
       final userSection = _effectiveSection;
+      final activeSemester = widget.semester ?? _user?.semester ?? 1;
 
       // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي المزدوج)
       final allLectures = await service.fetchLectures(
         department: dept,
         stage: stage,
         section: userSection,
+        semester: activeSemester,
         forceRefresh: forceRefresh,
       );
       _subjectLectures = allLectures.where((l) => _matchesSubject(l.subjectName)).toList();
@@ -1074,6 +1078,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         department: _effectiveDepartment,
         stage: _effectiveStage,
         section: _effectiveSection,
+        semester: widget.semester ?? _user?.semester ?? 1,
         currentUser: _user,
         initialMode: initialMode,
         onSuccess: (newAnnounce) {
@@ -1159,6 +1164,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
   final String department;
   final String stage;
   final String? section;
+  final int semester;
   final AppUserModel? currentUser;
   final String initialMode;
   final Function(AnnouncementModel? newAnnounce)? onSuccess;
@@ -1168,6 +1174,7 @@ class _PublishToSubjectSheet extends StatefulWidget {
     required this.department,
     required this.stage,
     this.section,
+    this.semester = 1,
     required this.currentUser,
     this.initialMode = 'lecture',
     this.onSuccess,
@@ -1269,7 +1276,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         department: widget.department,
         stage: widget.stage,
         section: 'ALL',
-        semester: 1,
+        semester: widget.semester,
         lectureType: _lectureType,
         description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
         uploaderId: widget.currentUser?.studentId ?? 'ADMIN',

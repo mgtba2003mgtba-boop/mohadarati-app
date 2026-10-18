@@ -114,6 +114,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
     final service = SupabaseService();
     _user = service.currentUser;
 
+    // للطلاب العاديين: يُعرض فصل دراسي واحد فقط مطابق للفصل المحول له من الداشبورد
+    if (!_canManageCourses && _user != null) {
+      _selectedSemester = _user!.semester;
+    }
+
     if (_user != null) {
       try {
         final results = await Future.wait([
@@ -249,6 +254,28 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 ),
               ),
             ),
+            if (!_canManageCourses) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _selectedSemester == 2 ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: _selectedSemester == 2 ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  _selectedSemester == 2 ? 'الفصل الثاني' : 'الفصل الأول',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: _selectedSemester == 2 ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -324,8 +351,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   ),
                 ),
 
-                // مبدل الفصل الدراسي الأول / الفصل الدراسي الثاني
-                Container(
+                // مبدل الفصل الدراسي الأول / الفصل الدراسي الثاني (حصري للإدارة والممثلين - مخفي تماماً عن الطلاب)
+                if (_canManageCourses)
+                  Container(
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: Container(
@@ -476,6 +504,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
       item.originalName,
       department: _effectiveDept,
       stage: _effectiveStage,
+      semester: _selectedSemester,
     );
 
     final hasOverride = item.override != null;
@@ -505,6 +534,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                 department: _effectiveDept,
                 stage: _effectiveStage,
                 section: _effectiveSection,
+                semester: _selectedSemester,
               ),
             ),
           ).then((_) => _loadCourses(forceRefresh: true));

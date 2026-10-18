@@ -174,7 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return BiometricSubjects.getSubjectNames(
       department: _selectedLectureDept,
       stage: _selectedLectureStage,
-      semester: 1,
+      semester: _selectedLectureSemester,
     );
   }
 
@@ -185,7 +185,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return BiometricSubjects.getSubjectNames(
       department: _selectedAnnounceDept,
       stage: _selectedAnnounceStage,
-      semester: 1,
     );
   }
 
@@ -551,6 +550,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     String selectedRole = user.role;
     bool canLectures = user.canPublishLectures;
     bool canAnnouncements = user.canPublishAnnouncements;
+    int selectedSemester = user.semester;
     final sectionController = TextEditingController(text: user.section ?? '');
 
     showDialog(
@@ -633,6 +633,53 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    Text('الفصل الدراسي المخصص للطالب:', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Center(
+                              child: Text(
+                                'الفصل الأول (1)',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: selectedSemester == 1 ? Colors.white : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                            selected: selectedSemester == 1,
+                            selectedColor: AppTheme.primary,
+                            onSelected: (s) {
+                              if (s) setDialogState(() => selectedSemester = 1);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Center(
+                              child: Text(
+                                'الفصل الثاني (2)',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: selectedSemester == 2 ? Colors.white : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                            selected: selectedSemester == 2,
+                            selectedColor: AppTheme.primary,
+                            onSelected: (s) {
+                              if (s) setDialogState(() => selectedSemester = 2);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 10),
 
                     // مفاتيح الصلاحيات المخصصة
@@ -668,8 +715,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       canPublishAnnouncements: canAnnouncements,
                       section: sectionController.text.trim().toUpperCase(),
                     );
+                    if (selectedSemester != user.semester) {
+                      await SupabaseService().updateUserSemester(
+                        studentId: user.studentId,
+                        semester: selectedSemester,
+                      );
+                    }
                     if (ok) {
-                      _showSnackbar('تم تعديل صلاحيات (${user.name}) بنجاح');
+                      _showSnackbar('تم تعديل صلاحيات وفصل (${user.name}) بنجاح');
                       _loadDashboardData();
                     } else {
                       _showSnackbar('فشل تعديل الصلاحيات', isError: true);

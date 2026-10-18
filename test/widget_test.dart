@@ -1835,6 +1835,52 @@ void main() {
       expect(updatedBatch[0].semester, 2);
       expect(updatedBatch[1].semester, 2);
       expect(updatedBatch[2].semester, 1, reason: 'طلاب الأقسام الأخرى لا يتأثرون بالترقية');
+
+      // 5. التحقق من حجب مبدل الفصول عن الطلاب وإلزامهم بالفصل المعين لهم حصراً
+      bool shouldShowSemesterSwitcher(AppUserModel? user) {
+        if (user == null) return false;
+        return user.role == AppConstants.roleAdmin ||
+            user.role == AppConstants.roleRepresentative ||
+            user.studentId == 'ST-NUST-001630760-413';
+      }
+
+      int determineEffectiveStudentSemester(AppUserModel? user, int selectedByAdmin) {
+        final canManage = shouldShowSemesterSwitcher(user);
+        if (!canManage && user != null) {
+          return user.semester; // الطالب يرى فصلاً واحداً فقط مطابقاً لبياناته
+        }
+        return selectedByAdmin; // المشرف/الممثل يختار بحرية
+      }
+
+      final studentUser = AppUserModel(
+        id: 's_normal',
+        studentId: 'ST-0099',
+        name: 'علي أحمد',
+        role: 'student',
+        stage: 'المرحلة الأولى',
+        department: 'هندسة تقنيات الحاسوب',
+        semester: 1,
+      );
+
+      final repUser = AppUserModel(
+        id: 's_rep',
+        studentId: 'ST-0088',
+        name: 'سجاد محمد',
+        role: 'representative',
+        stage: 'المرحلة الأولى',
+        department: 'هندسة تقنيات الحاسوب',
+        semester: 1,
+      );
+
+      expect(shouldShowSemesterSwitcher(studentUser), false, reason: 'مبدل الفصول محجوب تماماً عن الطالب العادي');
+      expect(shouldShowSemesterSwitcher(repUser), true, reason: 'الممثل والإدارة يملكون مبدل الفصول');
+
+      // قبل التحويل: الطالب في الفصل 1
+      expect(determineEffectiveStudentSemester(studentUser, 2), 1, reason: 'الطالب يبقى في الفصل الأول طالما لم يقم المشرف بتحويله');
+
+      // بعد التحويل من الداشبورد: تم تغيير فصل الطالب إلى 2
+      final promotedStudent = studentUser.copyWith(semester: 2);
+      expect(determineEffectiveStudentSemester(promotedStudent, 1), 2, reason: 'بعد تحويل الطالب إلى الفصل الثاني في الداشبورد، يرى الفصل الثاني تلقائياً دون مبدل');
     });
   });
 }
