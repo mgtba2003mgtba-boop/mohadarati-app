@@ -49,7 +49,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   List<String> _coursesList = [];
   OverallAttendanceSummary? _attendanceSummary;
   String _searchQuery = '';
-  final int _selectedSemester = 1; // الكورس الأول حصراً
+  int _selectedSemester = 1;
 
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
@@ -86,6 +86,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   void initState() {
     super.initState();
     _user = SupabaseService().currentUser;
+    _selectedSemester = _user?.semester ?? 1;
     AdminPreviewService().addListener(_onAdminPreviewChanged);
     CourseCustomizationService().addListener(_onCustomizationChanged);
     _loadCourses();
@@ -158,7 +159,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
     final biometricList = BiometricSubjects.getSubjectNames(
       department: _effectiveDept,
       stage: _effectiveStage,
-      semester: 1,
+      semester: _selectedSemester,
     );
 
     final customService = CourseCustomizationService();
@@ -169,6 +170,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         origName,
         department: _effectiveDept,
         stage: _effectiveStage,
+        semester: _selectedSemester,
       );
 
       final isHidden = override?.isHidden ?? false;
@@ -182,6 +184,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
         origName,
         department: _effectiveDept,
         stage: _effectiveStage,
+        semester: _selectedSemester,
       );
 
       final displayName = override?.displayName ?? origName;
@@ -317,6 +320,103 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         borderRadius: BorderRadius.circular(AppRadius.md),
                         borderSide: const BorderSide(color: AppTheme.lightBorder),
                       ),
+                    ),
+                  ),
+                ),
+
+                // مبدل الفصل الدراسي الأول / الفصل الدراسي الثاني
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightSurface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.lightBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: AppTactileBounce(
+                            lowerBound: 0.94,
+                            onTap: () {
+                              if (_selectedSemester != 1) {
+                                HapticFeedback.selectionClick();
+                                setState(() => _selectedSemester = 1);
+                                _loadCourses(forceRefresh: true);
+                              }
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedSemester == 1 ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _selectedSemester == 1
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'الفصل الدراسي الأول',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    fontWeight: _selectedSemester == 1 ? FontWeight.bold : FontWeight.w600,
+                                    color: _selectedSemester == 1 ? AppTheme.primary : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: AppTactileBounce(
+                            lowerBound: 0.94,
+                            onTap: () {
+                              if (_selectedSemester != 2) {
+                                HapticFeedback.selectionClick();
+                                setState(() => _selectedSemester = 2);
+                                _loadCourses(forceRefresh: true);
+                              }
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedSemester == 2 ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _selectedSemester == 2
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'الفصل الدراسي الثاني',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    fontWeight: _selectedSemester == 2 ? FontWeight.bold : FontWeight.w600,
+                                    color: _selectedSemester == 2 ? AppTheme.primary : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -537,6 +637,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                       defaultCode: subModel?.code,
                       department: _effectiveDept,
                       stage: _effectiveStage,
+                      semester: _selectedSemester,
                       user: _user!,
                       currentOverride: item.override,
                       onSaved: () => _loadCourses(forceRefresh: true),

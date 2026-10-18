@@ -8,6 +8,7 @@ import 'supabase_service.dart';
 
 /// خدمة التخصيص والمزامنة السحابية للمقررات الدراسية
 /// تتيح إخفاء المواد وتعديل أسمائها ورموزها مع الحفاظ التام على سلامة العلاقات مع المحاضرات القديمة
+/// وتدعم الفصلين الدراسيين الأول والثاني باستقلالية تامة
 class CourseCustomizationService extends ChangeNotifier {
   static final CourseCustomizationService _instance = CourseCustomizationService._internal();
   factory CourseCustomizationService() => _instance;
@@ -15,9 +16,17 @@ class CourseCustomizationService extends ChangeNotifier {
 
   final Map<String, Map<String, CourseOverrideModel>> _cache = {};
 
-  String _cacheKey(String department, String stage) {
+  static String buildCacheKey({
+    required String department,
+    required String stage,
+    required int semester,
+  }) {
     final normStage = AppConstants.normalizeStage(stage);
-    return 'course_overrides_${department}_$normStage';
+    return 'course_overrides_${department}_${normStage}_S$semester';
+  }
+
+  String _cacheKey(String department, String stage, int semester) {
+    return buildCacheKey(department: department, stage: stage, semester: semester);
   }
 
   /// جلب كافة التخصيصات لقسم ومرحلة وفصل دراسي معين
@@ -27,7 +36,7 @@ class CourseCustomizationService extends ChangeNotifier {
     int semester = 1,
     bool forceRefresh = false,
   }) async {
-    final key = _cacheKey(department, stage);
+    final key = _cacheKey(department, stage, semester);
 
     // 1. فحص ذاكرة الوصول السريع RAM
     if (!forceRefresh && _cache.containsKey(key)) {
@@ -45,7 +54,7 @@ class CourseCustomizationService extends ChangeNotifier {
         for (final item in list) {
           if (item is Map<String, dynamic>) {
             final model = CourseOverrideModel.fromJson(item);
-            if (model.originalName.isNotEmpty) {
+            if (model.originalName.isNotEmpty && model.semester == semester) {
               localMap[model.originalName] = model;
             }
           }
@@ -72,7 +81,7 @@ class CourseCustomizationService extends ChangeNotifier {
       for (final row in (response as List<dynamic>)) {
         final content = row['content']?.toString() ?? '';
         final model = CourseOverrideModel.fromAnnouncementContent(content);
-        if (model != null && model.originalName.isNotEmpty) {
+        if (model != null && model.originalName.isNotEmpty && model.semester == semester) {
           cloudMap[model.originalName] = model;
         }
       }
@@ -89,13 +98,14 @@ class CourseCustomizationService extends ChangeNotifier {
     return Map.unmodifiable(localMap);
   }
 
-  /// فحص مباشر إذا كان المقرر لديه تخصيص مسجل
+  /// فحص مباشر إذا كان المقرر لديه تخصيص مسجل في هذا الفصل
   CourseOverrideModel? getOverrideFor(
     String originalName, {
     required String department,
     required String stage,
+    int semester = 1,
   }) {
-    final key = _cacheKey(department, stage);
+    final key = _cacheKey(department, stage, semester);
     return _cache[key]?[originalName];
   }
 
@@ -104,7 +114,7 @@ class CourseCustomizationService extends ChangeNotifier {
     CourseOverrideModel override, {
     required AppUserModel user,
   }) async {
-    final key = _cacheKey(override.department, override.stage);
+    final key = _cacheKey(override.department, override.stage, override.semester);
     final normStage = AppConstants.normalizeStage(override.stage);
 
     // 1. التحديث الفوري في الذاكرة والكاش المحلي
@@ -116,7 +126,7 @@ class CourseCustomizationService extends ChangeNotifier {
     try {
       final supabase = SupabaseService();
 
-      // حذف أي سجلات تخصيص قديمة للمادة نفسها في هذا القسم والمرحلة
+      // حذف أي سجلات تخصيص قديمة للمادة نفسها في هذا القسم والمرحلة والفصل
       try {
         final existing = await supabase.client
             .from('announcements')
@@ -127,7 +137,10 @@ class CourseCustomizationService extends ChangeNotifier {
 
         for (final row in (existing as List<dynamic>)) {
           final content = row['content']?.toString() ?? '';
-          if (content.contains(override.originalName)) {
+          final oldModel = CourseOverrideModel.fromAnnouncementContent(content);
+          if (oldModel != null &&
+              oldModel.originalName == override.originalName &&
+              oldModel.semester == override.semester) {
             await supabase.client.from('announcements').delete().eq('id', row['id']);
           }
         }
@@ -161,9 +174,10 @@ class CourseCustomizationService extends ChangeNotifier {
     required String originalName,
     required String department,
     required String stage,
+    int semester = 1,
     required AppUserModel user,
   }) async {
-    final key = _cacheKey(department, stage);
+    final key = _cacheKey(department, stage, semester);
     final normStage = AppConstants.normalizeStage(stage);
 
     if (_cache.containsKey(key)) {
@@ -183,7 +197,8 @@ class CourseCustomizationService extends ChangeNotifier {
 
       for (final row in (existing as List<dynamic>)) {
         final content = row['content']?.toString() ?? '';
-        if (content.contains(originalName)) {
+        final model = CourseOverrideModel.fromAnnouncementContent(content);
+        if (model != null && model.originalName == originalName && model.semester == semester) {
           await supabase.client.from('announcements').delete().eq('id', row['id']);
         }
       }
@@ -200,16 +215,18 @@ class CourseCustomizationService extends ChangeNotifier {
     required bool isHidden,
     required String department,
     required String stage,
+    int semester = 1,
     required AppUserModel user,
     String? currentCustomName,
     String? currentCustomCode,
   }) async {
-    final existing = getOverrideFor(originalName, department: department, stage: stage);
+    final existing = getOverrideFor(originalName, department: department, stage: stage, semester: semester);
     final updated = (existing != null)
         ? existing.copyWith(
             isHidden: isHidden,
             displayName: currentCustomName ?? existing.displayName,
             customCode: currentCustomCode ?? existing.customCode,
+            semester: semester,
             updatedAt: DateTime.now(),
             updatedBy: user.name,
           )
@@ -220,6 +237,7 @@ class CourseCustomizationService extends ChangeNotifier {
             isHidden: isHidden,
             department: department,
             stage: stage,
+            semester: semester,
             updatedAt: DateTime.now(),
             updatedBy: user.name,
           );

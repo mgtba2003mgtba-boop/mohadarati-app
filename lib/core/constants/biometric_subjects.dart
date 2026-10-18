@@ -1505,6 +1505,7 @@ class BiometricSubjects {
     String name, {
     String? department,
     String? stage,
+    int? semester,
   }) {
     final cleanName = name.trim().toLowerCase();
     final normStage = stage != null && stage != 'ALL' ? AppConstants.normalizeStage(stage) : null;
@@ -1522,12 +1523,16 @@ class BiometricSubjects {
               normStage.contains(s.stageName);
           if (!matchStage) continue;
         }
+        if (semester != null && semester != 0) {
+          if (s.semester != semester) continue;
+        }
         return s;
       }
     }
     // Fallback search by substring or code
     for (final s in allSubjects) {
       if (s.name.contains(name) || (s.code != null && s.code!.toLowerCase() == cleanName)) {
+        if (semester != null && semester != 0 && s.semester != semester) continue;
         return s;
       }
     }

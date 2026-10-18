@@ -35,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<AnnouncementModel> _announcements = [];
   List<LectureModel> _lectures = [];
 
+  final ScrollController _homeScrollController = ScrollController();
+
   // متحكمات كاروسيل الإعلانات بالصور المتحركة
   late final PageController _bannerController;
   Timer? _bannerTimer;
@@ -109,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
     _bannerTimer?.cancel();
     _bannerController.dispose();
+    _homeScrollController.dispose();
     super.dispose();
   }
 
@@ -294,27 +297,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return SafeArea(
       child: SingleChildScrollView(
+        controller: _homeScrollController,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // شعار التطبيق فوك يمين
+            _buildBrandHeader(),
+            const SizedBox(height: 12),
+
             // شاشة الإعلانات بالصور المتحركة والكاروسيل التفاعلي
             _buildAnnouncementsMovingCarousel(),
-              const SizedBox(height: 18),
+            const SizedBox(height: 18),
 
-              // بطاقات الوصول السريع (المقررات والجدول)
-              _buildQuickActionCards(),
-              const SizedBox(height: 20),
+            // بطاقات الوصول السريع (المقررات والجدول)
+            _buildQuickActionCards(),
+            const SizedBox(height: 20),
 
-              // أحدث المحاضرات المضافة حديثاً
-              _buildRecentLecturesSection(),
-              const SizedBox(height: 16),
+            // أحدث المحاضرات المضافة حديثاً
+            _buildRecentLecturesSection(),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// شعار التطبيق الأنيق أعلى اليمين مع استجابة لمسية وحركة للصعود للأعلى
+  Widget _buildBrandHeader() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: AppTactileBounce(
+        lowerBound: 0.90,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (_homeScrollController.hasClients) {
+            _homeScrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        },
+        child: Container(
+          width: 44,
+          height: 44,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppTheme.lightBorder.withValues(alpha: 0.8),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: Image.asset(
+              'assets/images/app_logo.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.school_rounded,
+                color: AppTheme.primary,
+                size: 24,
+              ),
+            ),
+          ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
   /// بانر الإعلانات والبوسترات الرسمية بصور حقيقية (ممنوع أي صور عشوائية)
   Widget _buildAnnouncementsMovingCarousel() {

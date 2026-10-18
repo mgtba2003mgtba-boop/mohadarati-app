@@ -1489,6 +1489,68 @@ class SupabaseService {
     }
   }
 
+  /// ── تحديث الفصل الدراسي لطالب محدد ──────────────────────────────────────
+  Future<bool> updateUserSemester({
+    required String studentId,
+    required int semester,
+  }) async {
+    try {
+      await client.from('app_users').update({
+        'semester': semester,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('student_id', studentId);
+
+      invalidateCachePattern('users');
+
+      if (_currentUser != null && _currentUser!.studentId == studentId) {
+        _currentUser = _currentUser!.copyWith(semester: semester);
+        await _saveUserSession(_currentUser!);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error updating user semester: $e');
+      return false;
+    }
+  }
+
+  /// ── ترقية جماعية لدفعة كاملة إلى الفصل الدراسي الثاني ────────────────────
+  Future<bool> batchUpdateSemester({
+    required String department,
+    required String stage,
+    required int semester,
+  }) async {
+    try {
+      final normStage = AppConstants.normalizeStage(stage);
+      var query = client.from('app_users').update({
+        'semester': semester,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      if (department != 'ALL') {
+        query = query.eq('department', department);
+      }
+      if (stage != 'ALL') {
+        query = query.eq('stage', normStage);
+      }
+
+      await query;
+      invalidateCachePattern('users');
+
+      if (_currentUser != null) {
+        final matchDept = department == 'ALL' || _currentUser!.department == department;
+        final matchStage = stage == 'ALL' || _currentUser!.stage == normStage;
+        if (matchDept && matchStage) {
+          _currentUser = _currentUser!.copyWith(semester: semester);
+          await _saveUserSession(_currentUser!);
+        }
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[-] Error batch updating semester: $e');
+      return false;
+    }
+  }
+
   /// ── إدارة الجلسة المحلية الفورية (Shared Preferences) ───────────────────
   Future<void> _saveUserSession(AppUserModel user) async {
     _currentUser = user;

@@ -13,6 +13,7 @@ class CourseCustomizationSheet extends StatefulWidget {
   final String department;
   final String stage;
   final AppUserModel user;
+  final int semester;
   final CourseOverrideModel? currentOverride;
   final VoidCallback? onSaved;
 
@@ -23,6 +24,7 @@ class CourseCustomizationSheet extends StatefulWidget {
     required this.department,
     required this.stage,
     required this.user,
+    this.semester = 1,
     this.currentOverride,
     this.onSaved,
   });
@@ -34,6 +36,7 @@ class CourseCustomizationSheet extends StatefulWidget {
     required String department,
     required String stage,
     required AppUserModel user,
+    int semester = 1,
     CourseOverrideModel? currentOverride,
     VoidCallback? onSaved,
   }) {
@@ -49,6 +52,7 @@ class CourseCustomizationSheet extends StatefulWidget {
           department: department,
           stage: stage,
           user: user,
+          semester: semester,
           currentOverride: currentOverride,
           onSaved: onSaved,
         ),
@@ -111,6 +115,7 @@ class _CourseCustomizationSheetState extends State<CourseCustomizationSheet> {
       isHidden: _isHidden,
       department: widget.department,
       stage: widget.stage,
+      semester: widget.semester,
       updatedAt: DateTime.now(),
       updatedBy: widget.user.name,
     );
@@ -186,6 +191,7 @@ class _CourseCustomizationSheetState extends State<CourseCustomizationSheet> {
       originalName: widget.originalName,
       department: widget.department,
       stage: widget.stage,
+      semester: widget.semester,
       user: widget.user,
     );
 
@@ -259,7 +265,7 @@ class _CourseCustomizationSheetState extends State<CourseCustomizationSheet> {
                       ),
                     ),
                     Text(
-                      'الاسم المرجعي بالبصمة: ${widget.originalName}',
+                      'الاسم المرجعي: ${widget.originalName} • الفصل ${widget.semester == 2 ? "الثاني" : "الأول"}',
                       style: GoogleFonts.cairo(
                         fontSize: 11,
                         color: AppTheme.textMuted,

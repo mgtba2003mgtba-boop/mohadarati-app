@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
@@ -156,6 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // ── إدارة المقررات وتخصيص الأسماء والرموز والإخفاء ──
   String _courseMgmtDept = AppConstants.departments.first;
   String _courseMgmtStage = AppConstants.stages.first;
+  int _courseMgmtSemester = 1;
   String _courseMgmtSearchQuery = '';
   int _courseAndUserSegmentIndex = 0; // 0 = المقررات, 1 = الطلاب والترقيات
   int _radarAndModerationSegmentIndex = 0; // 0 = رادار النشاط والنبض, 1 = إدارة وحذف المحتوى
@@ -948,7 +950,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final allBiometric = BiometricSubjects.getSubjectNames(
       department: _courseMgmtDept,
       stage: _courseMgmtStage,
-      semester: 1,
+      semester: _courseMgmtSemester,
     );
 
     final customService = CourseCustomizationService();
@@ -956,15 +958,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final filteredSubjects = allBiometric.where((name) {
       if (_courseMgmtSearchQuery.isEmpty) return true;
       final q = _courseMgmtSearchQuery.toLowerCase().trim();
-      final override = customService.getOverrideFor(name, department: _courseMgmtDept, stage: _courseMgmtStage);
+      final override = customService.getOverrideFor(
+        name,
+        department: _courseMgmtDept,
+        stage: _courseMgmtStage,
+        semester: _courseMgmtSemester,
+      );
       final disp = override?.displayName ?? name;
-      final code = override?.customCode ?? BiometricSubjects.findSubject(name, department: _courseMgmtDept, stage: _courseMgmtStage)?.code;
+      final code = override?.customCode ?? BiometricSubjects.findSubject(
+        name,
+        department: _courseMgmtDept,
+        stage: _courseMgmtStage,
+        semester: _courseMgmtSemester,
+      )?.code;
       return disp.toLowerCase().contains(q) || name.toLowerCase().contains(q) || (code != null && code.toLowerCase().contains(q));
     }).toList();
 
     int hiddenCount = 0;
     for (final name in allBiometric) {
-      if (customService.getOverrideFor(name, department: _courseMgmtDept, stage: _courseMgmtStage)?.isHidden == true) {
+      if (customService.getOverrideFor(
+        name,
+        department: _courseMgmtDept,
+        stage: _courseMgmtStage,
+        semester: _courseMgmtSemester,
+      )?.isHidden == true) {
         hiddenCount++;
       }
     }
@@ -1033,6 +1050,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             CourseCustomizationService().getOverrides(
                               department: _courseMgmtDept,
                               stage: _courseMgmtStage,
+                              semester: _courseMgmtSemester,
                               forceRefresh: true,
                             );
                           }
@@ -1073,6 +1091,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             CourseCustomizationService().getOverrides(
                               department: _courseMgmtDept,
                               stage: _courseMgmtStage,
+                              semester: _courseMgmtSemester,
                               forceRefresh: true,
                             );
                           }
@@ -1080,6 +1099,94 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+
+                // محدد الفصل الدراسي الأول / الفصل الدراسي الثاني
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.lightBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: AppTactileBounce(
+                          lowerBound: 0.94,
+                          onTap: () {
+                            if (_courseMgmtSemester != 1) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _courseMgmtSemester = 1);
+                              CourseCustomizationService().getOverrides(
+                                department: _courseMgmtDept,
+                                stage: _courseMgmtStage,
+                                semester: 1,
+                                forceRefresh: true,
+                              );
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            decoration: BoxDecoration(
+                              color: _courseMgmtSemester == 1 ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: _courseMgmtSemester == 1 ? AppShadows.subtle : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                'الفصل الدراسي الأول',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  fontWeight: _courseMgmtSemester == 1 ? FontWeight.bold : FontWeight.w600,
+                                  color: _courseMgmtSemester == 1 ? AppTheme.primary : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: AppTactileBounce(
+                          lowerBound: 0.94,
+                          onTap: () {
+                            if (_courseMgmtSemester != 2) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _courseMgmtSemester = 2);
+                              CourseCustomizationService().getOverrides(
+                                department: _courseMgmtDept,
+                                stage: _courseMgmtStage,
+                                semester: 2,
+                                forceRefresh: true,
+                              );
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            decoration: BoxDecoration(
+                              color: _courseMgmtSemester == 2 ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: _courseMgmtSemester == 2 ? AppShadows.subtle : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                'الفصل الدراسي الثاني',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11.5,
+                                  fontWeight: _courseMgmtSemester == 2 ? FontWeight.bold : FontWeight.w600,
+                                  color: _courseMgmtSemester == 2 ? AppTheme.primary : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1178,11 +1285,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 origName,
                 department: _courseMgmtDept,
                 stage: _courseMgmtStage,
+                semester: _courseMgmtSemester,
               );
               final subModel = BiometricSubjects.findSubject(
                 origName,
                 department: _courseMgmtDept,
                 stage: _courseMgmtStage,
+                semester: _courseMgmtSemester,
               );
               final isHidden = override?.isHidden ?? false;
               final dispName = override?.displayName ?? origName;
@@ -1289,6 +1398,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             isHidden: !visible,
                             department: _courseMgmtDept,
                             stage: _courseMgmtStage,
+                            semester: _courseMgmtSemester,
                             user: _currentUser!,
                             currentCustomName: override?.displayName,
                             currentCustomCode: override?.customCode,
@@ -1312,6 +1422,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             defaultCode: subModel?.code,
                             department: _courseMgmtDept,
                             stage: _courseMgmtStage,
+                            semester: _courseMgmtSemester,
                             user: _currentUser!,
                             currentOverride: override,
                             onSaved: () => setState(() {}),
@@ -3672,18 +3783,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'دليل الطلاب والمسجلين في التطبيق',
-                    style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'دليل الطلاب والمسجلين في التطبيق',
+                      style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                    Text(
+                      '${filtered.length} مستخدم معروض من إجمالي ${_allUsers.length} طالب',
+                      style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent),
+                    ),
+                  ],
+                ),
+              ),
+              AppTactileBounce(
+                lowerBound: 0.92,
+                onTap: _showBatchPromotionDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primary, Color(0xFF6366F1)],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: AppShadows.subtle,
                   ),
-                  Text(
-                    '${filtered.length} مستخدم معروض من إجمالي ${_allUsers.length} طالب',
-                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.accent),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.school_rounded, color: Colors.white, size: 15),
+                      const SizedBox(width: 5),
+                      Text(
+                        'ترقية دفعة إلى الفصل 2 🎓',
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -3903,6 +4047,90 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: avatarColor),
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        AppTactileBounce(
+                          lowerBound: 0.92,
+                          onTap: () async {
+                            final nextSemester = rep.semester == 1 ? 2 : 1;
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: Text('تحويل الفصل الدراسي', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
+                                content: Text(
+                                  'هل تريد تحويل الطالب (${rep.name}) إلى الفصل الدراسي ${nextSemester == 2 ? "الثاني" : "الأول"}؟',
+                                  style: GoogleFonts.cairo(fontSize: 13),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: Text('إلغاء', style: GoogleFonts.cairo(color: AppTheme.textSecondary)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: Text('تأكيد التحويل', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              final success = await SupabaseService().updateUserSemester(
+                                studentId: rep.studentId,
+                                semester: nextSemester,
+                              );
+                              if (success) {
+                                setState(() {
+                                  final idx = _allUsers.indexWhere((u) => u.studentId == rep.studentId);
+                                  if (idx != -1) {
+                                    _allUsers[idx] = _allUsers[idx].copyWith(semester: nextSemester);
+                                  }
+                                });
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('تم تحويل ${rep.name} إلى الفصل $nextSemester بنجاح', style: GoogleFonts.cairo()),
+                                      backgroundColor: const Color(0xFF16A34A),
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: rep.semester == 2 ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: rep.semester == 2 ? const Color(0xFF3B82F6) : const Color(0xFF94A3B8),
+                                width: 0.9,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.swap_horiz_rounded,
+                                  size: 12,
+                                  color: rep.semester == 2 ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  rep.semester == 2 ? 'الفصل 2' : 'الفصل 1',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: rep.semester == 2 ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -4056,6 +4284,256 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
         ],
       ),
+    );
+  }
+
+  void _showBatchPromotionDialog() {
+    String selectedDept = _repDeptFilter != 'ALL' ? _repDeptFilter : AppConstants.departments.first;
+    String selectedStage = _userDirectoryStageFilter != 'ALL' ? _userDirectoryStageFilter : AppConstants.stages.first;
+    int targetSemester = 2;
+    bool isProcessing = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final matchingStudents = _allUsers.where((u) {
+              final deptMatch = u.department == selectedDept || u.department.contains(selectedDept);
+              final stageMatch = AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(selectedStage);
+              return deptMatch && stageMatch;
+            }).toList();
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.school_rounded, color: AppTheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'ترقية دفعة إلى الفصل الدراسي',
+                      style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'اختر القسم والمرحلة المستهدفة لتحويل جميع طلابها دفعة واحدة إلى الفصل الدراسي المطلوب:',
+                      style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // اختيار القسم
+                    DropdownButtonFormField<String>(
+                      value: selectedDept,
+                      dropdownColor: Colors.white,
+                      style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'القسم الأكاديمي',
+                        labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                        filled: true,
+                        fillColor: AppTheme.lightSurface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: AppConstants.departments.map((d) {
+                        return DropdownMenuItem(value: d, child: Text(d, style: GoogleFonts.cairo(fontSize: 12)));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedDept = val);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // اختيار المرحلة
+                    DropdownButtonFormField<String>(
+                      value: selectedStage,
+                      dropdownColor: Colors.white,
+                      style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'المرحلة',
+                        labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                        filled: true,
+                        fillColor: AppTheme.lightSurface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: AppConstants.stages.map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.cairo(fontSize: 12)));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedStage = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // الفصل الدراسي المستهدف
+                    Text(
+                      'الفصل الدراسي المستهدف:',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Center(
+                              child: Text(
+                                'الفصل الثاني (2)',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: targetSemester == 2 ? Colors.white : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                            selected: targetSemester == 2,
+                            selectedColor: AppTheme.primary,
+                            onSelected: (s) {
+                              if (s) setDialogState(() => targetSemester = 2);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Center(
+                              child: Text(
+                                'الفصل الأول (1)',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: targetSemester == 1 ? Colors.white : AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                            selected: targetSemester == 1,
+                            selectedColor: AppTheme.primary,
+                            onSelected: (s) {
+                              if (s) setDialogState(() => targetSemester = 1);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // بطاقة الإحصائية والمعاينة
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: matchingStudents.isEmpty
+                            ? const Color(0xFFFEF2F2)
+                            : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: matchingStudents.isEmpty
+                              ? const Color(0xFFFCA5A5)
+                              : const Color(0xFF86EFAC),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            matchingStudents.isEmpty ? Icons.info_outline : Icons.check_circle_outline_rounded,
+                            color: matchingStudents.isEmpty ? AppTheme.danger : const Color(0xFF16A34A),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              matchingStudents.isEmpty
+                                  ? 'لا يوجد طلاب مسجلين في هذا القسم والمرحلة حالياً.'
+                                  : 'سيتم تحويل ${matchingStudents.length} طالب إلى الفصل الدراسي ($targetSemester).',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: matchingStudents.isEmpty ? AppTheme.danger : const Color(0xFF15803D),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isProcessing ? null : () => Navigator.pop(dialogCtx),
+                  child: Text('إلغاء', style: GoogleFonts.cairo(color: AppTheme.textSecondary)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: (matchingStudents.isEmpty || isProcessing)
+                      ? null
+                      : () async {
+                          setDialogState(() => isProcessing = true);
+                          final count = await SupabaseService().batchUpdateSemester(
+                            department: selectedDept,
+                            stage: selectedStage,
+                            semester: targetSemester,
+                          );
+                          setDialogState(() => isProcessing = false);
+                          if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+
+                          // تحديث الكاش المحلي للمستخدمين المعروضين
+                          setState(() {
+                            for (int i = 0; i < _allUsers.length; i++) {
+                              final u = _allUsers[i];
+                              if ((u.department == selectedDept || u.department.contains(selectedDept)) &&
+                                  AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(selectedStage)) {
+                                _allUsers[i] = u.copyWith(semester: targetSemester);
+                              }
+                            }
+                          });
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'تمت ترقية $count طالب في قسم $selectedDept ($selectedStage) إلى الفصل $targetSemester بنجاح',
+                                  style: GoogleFonts.cairo(),
+                                ),
+                                backgroundColor: const Color(0xFF16A34A),
+                              ),
+                            );
+                          }
+                        },
+                  child: isProcessing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          'تأكيد الترقية والتحويل',
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

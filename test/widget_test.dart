@@ -16,6 +16,7 @@ import 'package:nust_student_portal/services/auto_update_service.dart';
 import 'package:nust_student_portal/services/telegram_uploader_service.dart';
 import 'package:nust_student_portal/services/app_notification_service.dart';
 import 'package:nust_student_portal/models/course_override_model.dart';
+import 'package:nust_student_portal/services/course_customization_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -1717,6 +1718,123 @@ void main() {
 
       expect(matchesLecture(historicalLecture, override.originalName, override.displayName), true,
           reason: 'المحاضرات القديمة لا تُفقد عند تخصيص اسم المقرر');
+    });
+
+    test('اختبار تخصيص مقررات الفصل الثاني وترقية وتحويل الطلاب بين الفصول (Semester 2 Course Customization & Student Transition Engine)', () {
+      // 1. اختبار نموذج المستخدم والفصل الدراسي الافتراضي والترقية
+      final studentS1 = AppUserModel(
+        id: 'user_s1',
+        studentId: 'ST-001',
+        name: 'علي كريم',
+        role: 'student',
+        stage: 'المرحلة الثانية',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        semester: 1,
+      );
+
+      expect(studentS1.semester, 1);
+      final jsonS1 = studentS1.toJson();
+      expect(jsonS1['semester'], 1);
+
+      final restoredS1 = AppUserModel.fromJson(jsonS1);
+      expect(restoredS1.semester, 1);
+
+      // الترقية إلى الفصل الثاني عبر copyWith
+      final studentS2 = studentS1.copyWith(semester: 2);
+      expect(studentS2.semester, 2);
+      expect(studentS2.studentId, studentS1.studentId);
+      expect(studentS2.department, studentS1.department);
+
+      // 2. اختبار عزل تخصيص المقررات حسب الفصل الدراسي (Semester Partitioning)
+      final overrideS1 = CourseOverrideModel(
+        originalName: 'الدوائر الإلكترونية',
+        displayName: 'دوائر إلكترونية - كورس أول',
+        customCode: 'ELEC201',
+        isHidden: false,
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        semester: 1,
+      );
+
+      final overrideS2 = CourseOverrideModel(
+        originalName: 'الدوائر الإلكترونية II',
+        displayName: 'دوائر إلكترونية متقدمة - كورس ثاني',
+        customCode: 'ELEC202',
+        isHidden: true,
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        semester: 2,
+      );
+
+      final cacheKeyS1 = CourseCustomizationService.buildCacheKey(
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        semester: 1,
+      );
+      final cacheKeyS2 = CourseCustomizationService.buildCacheKey(
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثانية',
+        semester: 2,
+      );
+
+      expect(cacheKeyS1, isNot(equals(cacheKeyS2)));
+      expect(cacheKeyS1.contains('S1'), true);
+      expect(cacheKeyS2.contains('S2'), true);
+
+      // 3. التحقق من توفر مقررات الفصل الثاني الرسمية بنظام البصمة
+      final s2Subjects = BiometricSubjects.getSubjectNames(
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الأولى',
+        semester: 2,
+      );
+      expect(s2Subjects.isNotEmpty, true, reason: 'مقررات الفصل الثاني لقسم هندسة تقنيات الحاسوب متوفرة بالبصمة');
+
+      // 4. اختبار منطق الترقية الجماعية لدفعة مرحلة معينة (Batch Cohort Promotion)
+      final allStudents = [
+        AppUserModel(
+          id: '1',
+          studentId: 'ST-001',
+          name: 'طالب 1',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'المرحلة الأولى',
+          role: 'student',
+          semester: 1,
+        ),
+        AppUserModel(
+          id: '2',
+          studentId: 'ST-002',
+          name: 'طالب 2',
+          department: 'هندسة تقنيات الحاسوب',
+          stage: 'المرحلة الأولى',
+          role: 'student',
+          semester: 1,
+        ),
+        AppUserModel(
+          id: '3',
+          studentId: 'ST-003',
+          name: 'طالب قسم آخر',
+          department: 'هندسة تقنيات الأجهزة الطبية',
+          stage: 'المرحلة الأولى',
+          role: 'student',
+          semester: 1,
+        ),
+      ];
+
+      // ترقية مرحلة أولى هندسة حاسوب إلى الفصل 2
+      final targetDept = 'هندسة تقنيات الحاسوب';
+      final targetStage = 'المرحلة الأولى';
+      final targetSemester = 2;
+
+      final updatedBatch = allStudents.map((u) {
+        if (u.department == targetDept && AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(targetStage)) {
+          return u.copyWith(semester: targetSemester);
+        }
+        return u;
+      }).toList();
+
+      expect(updatedBatch[0].semester, 2);
+      expect(updatedBatch[1].semester, 2);
+      expect(updatedBatch[2].semester, 1, reason: 'طلاب الأقسام الأخرى لا يتأثرون بالترقية');
     });
   });
 }
