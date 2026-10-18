@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../models/announcement_model.dart';
 import '../models/app_user_model.dart';
 import '../services/supabase_service.dart';
+import 'app_tactile_bounce.dart';
 
 /// بطاقة استطلاع الرأي الأكاديمي بنمط تيليجرام التفاعلي
 /// التصويت سري ومجهول للطلاب، مع حصرية كشف المصوتين للمشرف العام مجتبى عواد فقط
@@ -207,18 +208,12 @@ class _TelegramPollCardState extends State<TelegramPollCard> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: isClosed ? const Color(0xFFE2E8F0) : AppTheme.primary.withValues(alpha: 0.35),
+          color: isClosed ? AppTheme.lightBorder : AppTheme.primary.withValues(alpha: 0.35),
           width: isClosed ? 1.0 : 1.4,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,9 +396,10 @@ class _TelegramPollCardState extends State<TelegramPollCard> {
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 9),
-                    child: InkWell(
-                      onTap: isClosed ? null : () => _handleVote(index),
+                    child: AppTactileBounce(
+                      lowerBound: 0.96,
                       borderRadius: BorderRadius.circular(12),
+                      onTap: isClosed ? null : () => _handleVote(index),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOut,

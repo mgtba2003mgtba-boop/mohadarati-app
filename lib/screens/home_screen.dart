@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_network_image.dart';
+import '../widgets/app_tactile_bounce.dart';
 import 'courses_screen.dart';
 import 'schedule_screen.dart';
 import 'profile_screen.dart';
@@ -205,46 +206,79 @@ class _HomeScreenState extends State<HomeScreen> {
               index: _currentIndex,
               children: pages,
             ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, -2),
-            ),
-          ],
+      bottomNavigationBar: _buildModernBottomNav(),
+    );
+  }
+
+  Widget _buildModernBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.lightBorder.withValues(alpha: 0.9),
+            width: 1.0,
+          ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          backgroundColor: Colors.white,
-          selectedItemColor: AppTheme.primary,
-          unselectedItemColor: const Color(0xFF94A3B8),
-          elevation: 0,
-          onTap: (index) {
-            if (_currentIndex != index) {
-              HapticFeedback.selectionClick();
-              setState(() => _currentIndex = index);
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'الرئيسية',
+        boxShadow: AppShadows.elevated,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'الرئيسية'),
+              _buildNavItem(1, Icons.menu_book_rounded, Icons.menu_book_outlined, 'المقررات'),
+              _buildNavItem(2, Icons.calendar_month_rounded, Icons.calendar_month_outlined, 'الجدول'),
+              _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'حسابي'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
+    final isSelected = _currentIndex == index;
+    return AppTactileBounce(
+      lowerBound: 0.92,
+      onTap: () {
+        if (_currentIndex != index) {
+          HapticFeedback.selectionClick();
+          setState(() => _currentIndex = index);
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primarySubtle : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : inactiveIcon,
+              color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
+              size: 21,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book_rounded),
-              label: 'المقررات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_rounded),
-              label: 'الجدول',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: 'حسابي',
-            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primary,
+                  height: 1.3,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -576,43 +610,40 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       children: [
         Expanded(
-          child: InkWell(
+          child: AppTactileBounce(
             onTap: () => setState(() => _currentIndex = 1),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Colors.white, Color(0xFFFBFDFF)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(color: AppTheme.lightBorder),
-                boxShadow: AppTheme.cardShadow,
+                boxShadow: AppShadows.card,
               ),
               child: Row(
                 children: [
                   AppIconBadge.indigo(
                     icon: Icons.menu_book_rounded,
-                    size: 40,
-                    iconSize: 20,
+                    size: 42,
+                    iconSize: 21,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'المقررات',
-                          style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
-                          ),
+                          style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
                         Text(
                           '${_subjectNames.length} مادة دراسية',
-                          style: GoogleFonts.cairo(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
+                          style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -626,43 +657,40 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: InkWell(
+          child: AppTactileBounce(
             onTap: () => setState(() => _currentIndex = 2),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Colors.white, Color(0xFFFFFDFB)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(color: AppTheme.lightBorder),
-                boxShadow: AppTheme.cardShadow,
+                boxShadow: AppShadows.card,
               ),
               child: Row(
                 children: [
                   AppIconBadge.amber(
                     icon: Icons.calendar_month_rounded,
-                    size: 40,
-                    iconSize: 20,
+                    size: 42,
+                    iconSize: 21,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'الجدول',
-                          style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
-                          ),
+                          style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
                         Text(
                           'المواعيد والامتحانات',
-                          style: GoogleFonts.cairo(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
+                          style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -694,11 +722,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'أحدث المحاضرات',
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
+                  style: AppTypography.h3(color: AppTheme.textPrimary),
                 ),
               ],
             ),
@@ -708,11 +732,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'عرض كل المقررات',
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primary,
-                    ),
+                    style: AppTypography.captionStrong(color: AppTheme.primary),
                   ),
                   const SizedBox(width: 4),
                   const Icon(Icons.arrow_back_ios_new_rounded, size: 11, color: AppTheme.primary),
@@ -728,7 +748,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(color: AppTheme.lightBorder),
             ),
             child: Column(
@@ -737,21 +757,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'لا توجد محاضرات مضافة حديثاً',
-                  style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textSecondary),
+                  style: AppTypography.body(color: AppTheme.textSecondary),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () => setState(() => _currentIndex = 1),
                   icon: const Icon(Icons.menu_book_rounded, size: 16),
                   label: Text(
                     'تصفح المقررات الدراسية',
-                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                    style: AppTypography.captionStrong(color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                   ),
                 ),
               ],
@@ -765,7 +785,7 @@ class _HomeScreenState extends State<HomeScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final lec = recentLectures[index];
-              return InkWell(
+              return AppTactileBounce(
                 onTap: () {
                   Navigator.push(
                     context,
@@ -779,14 +799,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ).then((_) => _loadData());
                 },
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(color: AppTheme.lightBorder),
-                    boxShadow: AppTheme.cardShadow,
+                    boxShadow: AppShadows.subtle,
                   ),
                   child: Row(
                     children: [
@@ -794,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: AppTheme.primarySubtle,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                         ),
                         child: const Icon(
                           Icons.description_outlined,
@@ -811,19 +831,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               lec.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.cairo(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
+                              style: AppTypography.bodyStrong(color: AppTheme.textPrimary),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${lec.subjectName} • ${lec.typeLabel}',
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                color: AppTheme.textSecondary,
-                              ),
+                              style: AppTypography.caption(color: AppTheme.textSecondary),
                             ),
                           ],
                         ),

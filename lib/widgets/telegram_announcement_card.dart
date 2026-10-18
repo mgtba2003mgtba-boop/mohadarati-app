@@ -5,6 +5,7 @@ import '../models/announcement_model.dart';
 import '../models/app_user_model.dart';
 import 'app_fullscreen_modal.dart';
 import 'app_network_image.dart';
+import 'app_tactile_bounce.dart';
 
 /// بطاقة التبليغات الكلاسيكية المستوحاة من قنوات تيليجرام الرسمية
 /// تدعم التفاعلات الأكاديمية المجهولة للطلاب، مع حصرية كشف المتفاعلين للمشرف العام مجتبى عواد
@@ -178,18 +179,12 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: announcement.isPinned ? AppTheme.primary.withValues(alpha: 0.6) : const Color(0xFFE2E8F0),
+          color: announcement.isPinned ? AppTheme.primary.withValues(alpha: 0.6) : AppTheme.lightBorder,
           width: announcement.isPinned ? 1.5 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,7 +386,8 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                     final count = counts[emoji] ?? 0;
                                     final hasReacted = announcement.hasUserReacted(currentStudentId, emoji);
 
-                                    return InkWell(
+                                    return AppTactileBounce(
+                                      lowerBound: 0.92,
                                       borderRadius: BorderRadius.circular(20),
                                       onTap: () {
                                         if (widget.onReactionToggled != null) {
@@ -399,7 +395,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                         }
                                       },
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
+                                        duration: const Duration(milliseconds: 180),
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                                         decoration: BoxDecoration(
                                           color: hasReacted
@@ -436,7 +432,8 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                                   }),
 
                                   // زر إضافة تفاعل إضافي
-                                  InkWell(
+                                  AppTactileBounce(
+                                    lowerBound: 0.92,
                                     borderRadius: BorderRadius.circular(20),
                                     onTap: () => _showReactionPicker(context),
                                     child: Container(

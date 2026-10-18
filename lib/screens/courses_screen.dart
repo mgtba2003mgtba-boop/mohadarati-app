@@ -11,6 +11,7 @@ import '../services/supabase_service.dart';
 import '../services/attendance_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_icon_badge.dart';
+import '../widgets/app_tactile_bounce.dart';
 import 'subject_detail_screen.dart';
 import 'dashboard_screen.dart';
 import '../services/admin_preview_service.dart';
@@ -182,23 +183,32 @@ class _CoursesScreenState extends State<CoursesScreen> {
         ],
       ),
       floatingActionButton: canPublish
-          ? FloatingActionButton.extended(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              elevation: 4,
-              icon: const Icon(Icons.upload_file_rounded),
-              label: Text(
-                'رفع محاضرة',
-                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DashboardScreen(initialTabIndex: 0),
+          ? AppTactileBounce(
+              lowerBound: 0.94,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  boxShadow: AppShadows.primaryGlow,
+                ),
+                child: FloatingActionButton.extended(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  icon: const Icon(Icons.upload_file_rounded),
+                  label: Text(
+                    'رفع محاضرة',
+                    style: AppTypography.captionStrong(color: Colors.white),
                   ),
-                ).then((_) => _loadCourses());
-              },
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DashboardScreen(initialTabIndex: 0),
+                      ),
+                    ).then((_) => _loadCourses());
+                  },
+                ),
+              ),
             )
           : null,
       body: _isLoading
@@ -210,24 +220,28 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     color: Colors.white,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: TextField(
-                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
+                      style: AppTypography.body(color: AppTheme.textPrimary),
                       onChanged: (val) => setState(() => _searchQuery = val),
                       decoration: InputDecoration(
-                        hintText: 'بحث في المواد...',
-                        hintStyle: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13),
+                        hintText: 'بحث في المواد الدراسية...',
+                        hintStyle: AppTypography.body(color: AppTheme.textMuted),
                         prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
                         suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
-                                onPressed: () => setState(() => _searchQuery = ''),
+                            ? AppTactileBounce(
+                                onTap: () => setState(() => _searchQuery = ''),
+                                child: const Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
                               )
                             : null,
                         filled: true,
                         fillColor: AppTheme.lightSurface,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            borderSide: const BorderSide(color: AppTheme.lightBorder),
                         ),
                       ),
                     ),
@@ -292,115 +306,104 @@ class _CoursesScreenState extends State<CoursesScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppTheme.lightBorder),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: AppShadows.card,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SubjectDetailScreen(
-                  subjectName: subjectName,
-                  attendanceStats: stats,
-                  department: _effectiveDept,
-                  stage: _effectiveStage,
-                  section: _effectiveSection,
-                ),
+      child: AppTactileBounce(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SubjectDetailScreen(
+                subjectName: subjectName,
+                attendanceStats: stats,
+                department: _effectiveDept,
+                stage: _effectiveStage,
+                section: _effectiveSection,
               ),
-            ).then((_) => _loadCourses());
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                AppIconBadge.indigo(
-                  icon: BiometricSubjects.getIconForSubject(subjectName),
-                  size: 48,
-                  iconSize: 24,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
+            ),
+          ).then((_) => _loadCourses());
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              AppIconBadge.indigo(
+                icon: BiometricSubjects.getIconForSubject(subjectName),
+                size: 48,
+                iconSize: 24,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            subjectName,
+                            style: AppTypography.h3(color: AppTheme.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (subModel?.code != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
                             child: Text(
-                              subjectName,
+                              subModel!.code!,
                               style: GoogleFonts.cairo(
-                                fontSize: 14,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                                color: AppTheme.primary,
+                                letterSpacing: 0.5,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (subModel?.code != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Text(
-                                subModel!.code!,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
+                        ],
+                      ],
+                    ),
+                    if (subModel?.units != null) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${subModel!.units} وحدات',
+                                  style: AppTypography.tiny(color: const Color(0xFF475569)),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                      if (subModel?.units != null) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${subModel!.units} وحدات',
-                                    style: GoogleFonts.cairo(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF475569),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
-                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF94A3B8)),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Color(0xFF94A3B8)),
+            ],
           ),
         ),
       ),

@@ -9,6 +9,7 @@ import '../models/schedule_model.dart';
 import '../services/supabase_service.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
+import '../widgets/app_tactile_bounce.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/telegram_uploader_service.dart';
 import '../services/admin_preview_service.dart';
@@ -659,44 +660,53 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildScheduleSectionChip(String type, String sectionKey, String label, int count) {
     final isSelected = _selectedScheduleSection == sectionKey;
-    return ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          if (count > 0) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: GoogleFonts.cairo(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : const Color(0xFF475569),
-                ),
+    return AppTactileBounce(
+      lowerBound: 0.94,
+      onTap: () {
+        setState(() => _selectedScheduleSection = sectionKey);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0F172A) : AppTheme.lightBorder,
+          ),
+          boxShadow: isSelected ? AppShadows.subtle : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: AppTypography.captionStrong(
+                color: isSelected ? const Color(0xFF38BDF8) : AppTheme.textSecondary,
               ),
             ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
-      ),
-      selected: isSelected,
-      onSelected: (s) => setState(() => _selectedScheduleSection = sectionKey),
-      selectedColor: const Color(0xFF0F172A),
-      backgroundColor: Colors.white,
-      labelStyle: GoogleFonts.cairo(
-        color: isSelected ? const Color(0xFF38BDF8) : AppTheme.textSecondary,
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-        side: BorderSide(
-          color: isSelected ? const Color(0xFF0F172A) : AppTheme.lightBorder,
         ),
       ),
     );
@@ -761,12 +771,12 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final isPdf = schedule.isPdf;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppTheme.lightBorder),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -779,13 +789,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               children: [
                 // أيقونة شارة مستند مميزة
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: isPdf
                         ? const Color(0xFFFEF2F2)
                         : (isExam ? const Color(0xFFFFFBEB) : const Color(0xFFEEF2FF)),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(
                       color: isPdf
                           ? const Color(0xFFFCA5A5)
@@ -815,11 +825,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           Expanded(
                             child: Text(
                               schedule.title,
-                              style: GoogleFonts.cairo(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
+                              style: AppTypography.h3(color: AppTheme.textPrimary),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -894,19 +900,13 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           Expanded(
                             child: Text(
                               '${schedule.department} • ${schedule.stage}',
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                color: AppTheme.textSecondary,
-                              ),
+                              style: AppTypography.caption(color: AppTheme.textSecondary),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
                             schedule.formattedDate,
-                            style: GoogleFonts.cairo(
-                              fontSize: 10.5,
-                              color: AppTheme.textMuted,
-                            ),
+                            style: AppTypography.tiny(color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -916,12 +916,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
                 // زر الحذف للمشرفين وممثلي الدفعة
                 if (_user?.canManageLectures == true || _user?.isAdmin == true)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
-                    tooltip: 'حذف',
-                    padding: const EdgeInsets.all(4),
-                    constraints: const BoxConstraints(),
-                    onPressed: () async {
+                  AppTactileBounce(
+                    onTap: () async {
                       final ok = await SupabaseService().deleteSchedule(schedule.id);
                       if (ok && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -934,6 +930,17 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         _loadSchedules();
                       }
                     },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.dangerSubtle,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -948,32 +955,47 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               children: [
                 // زر معاينة
                 Expanded(
-                  child: SizedBox(
-                    height: 38,
-                    child: OutlinedButton.icon(
-                      onPressed: schedule.fileUrl != null
-                          ? () {
-                              AppMediaPreviewModal.show(
-                                context: context,
-                                title: schedule.title,
-                                subtitle: '${schedule.department} • ${schedule.stage}',
-                                url: _resolveUrl(schedule.fileUrl!),
-                                downloadUrl: _resolveUrl(schedule.fileUrl!),
-                                fileName: schedule.fileName ?? schedule.title,
-                                mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
-                              );
-                            }
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: const BorderSide(color: AppTheme.primary, width: 1.2),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.visibility_rounded, size: 16),
-                      label: Text(
-                        'معاينة سريعة',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+                  child: AppTactileBounce(
+                    onTap: schedule.fileUrl != null
+                        ? () {
+                            AppMediaPreviewModal.show(
+                              context: context,
+                              title: schedule.title,
+                              subtitle: '${schedule.department} • ${schedule.stage}',
+                              url: _resolveUrl(schedule.fileUrl!),
+                              downloadUrl: _resolveUrl(schedule.fileUrl!),
+                              fileName: schedule.fileName ?? schedule.title,
+                              mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                            );
+                          }
+                        : null,
+                    child: SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: schedule.fileUrl != null
+                            ? () {
+                                AppMediaPreviewModal.show(
+                                  context: context,
+                                  title: schedule.title,
+                                  subtitle: '${schedule.department} • ${schedule.stage}',
+                                  url: _resolveUrl(schedule.fileUrl!),
+                                  downloadUrl: _resolveUrl(schedule.fileUrl!),
+                                  fileName: schedule.fileName ?? schedule.title,
+                                  mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                                );
+                              }
+                            : null,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: const BorderSide(color: AppTheme.primary, width: 1.2),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                        ),
+                        icon: const Icon(Icons.visibility_rounded, size: 16),
+                        label: Text(
+                          'معاينة سريعة',
+                          style: AppTypography.captionStrong(color: AppTheme.primary),
+                        ),
                       ),
                     ),
                   ),
@@ -982,21 +1004,24 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
                 // زر تنزيل
                 Expanded(
-                  child: SizedBox(
-                    height: 38,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
-                      label: Text(
-                        'تنزيل رسمي',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+                  child: AppTactileBounce(
+                    onTap: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
+                    child: SizedBox(
+                      height: 42,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                        ),
+                        icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          'تنزيل رسمي',
+                          style: AppTypography.captionStrong(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),

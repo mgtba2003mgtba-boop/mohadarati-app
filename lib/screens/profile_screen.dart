@@ -8,6 +8,7 @@ import '../services/supabase_service.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_screen.dart';
 import '../services/admin_preview_service.dart';
+import '../widgets/app_tactile_bounce.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -136,76 +137,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             // بطاقة الدخول إلى لوحة التحكم والإدارة الأكاديمية (للمشرف العام والممثلين)
             if (_user!.isAdmin || _user!.canManageLectures || _user!.canManageAnnouncements) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.primary, AppTheme.primaryDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.25),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
+              AppTactileBounce(
+                lowerBound: 0.95,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primary, AppTheme.primaryDark],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    boxShadow: AppShadows.primaryGlow,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
-                                      ? 'داش بورد مجتبى (المشرف العام)'
-                                      : 'لوحة ممثل الدفعة',
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
-                                      ? 'مراقبة نشاط الممثلين وإدارة كافة تفاصيل النظام'
-                                      : 'إدارة المحاضرات والتبليغات',
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 10.5,
-                                    color: const Color(0xFFE0E7FF),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
+                                    ? 'داش بورد مجتبى (المشرف العام)'
+                                    : 'لوحة ممثل الدفعة',
+                                style: AppTypography.h3(color: Colors.white),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
+                                    ? 'مراقبة نشاط الممثلين وإدارة كافة تفاصيل النظام'
+                                    : 'إدارة المحاضرات والتبليغات',
+                                style: AppTypography.caption(color: const Color(0xFFE0E7FF)),
+                              ),
+                            ],
                           ),
-                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 14),
-                        ],
-                      ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 14),
+                      ],
                     ),
                   ),
                 ),
