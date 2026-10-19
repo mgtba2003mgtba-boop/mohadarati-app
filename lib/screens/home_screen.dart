@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _bannerTimer;
   int _currentBannerPage = 0;
 
-  // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد والجداول)
+  // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد وصور التبليغات والجداول)
   List<AnnouncementModel> get _carouselBanners {
     return _announcements.where((a) {
       if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
@@ -51,12 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
           a.subjectName == 'COURSE') {
         return false;
       }
-      if (a.subjectName != null &&
-          a.subjectName!.isNotEmpty &&
-          a.subjectName != 'BANNER' &&
-          a.subjectName != 'GENERAL' &&
-          a.subjectName != 'ALL' &&
-          a.subjectName != 'عام') {
+      // التمييز الصارم: بوستر البانر يجب أن يكون مصنفاً صراحة كبوستر للواجهة الرئيسية
+      final isHomeBanner = a.category == 'banner' ||
+          a.subjectName == 'BANNER' ||
+          a.content.contains('[HOME_BANNER]');
+      if (!isHomeBanner) {
         return false;
       }
       return a.imageUrl != null && a.imageUrl!.trim().isNotEmpty;

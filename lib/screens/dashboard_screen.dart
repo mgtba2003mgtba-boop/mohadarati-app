@@ -5611,7 +5611,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Future<void> _loadBanners({bool forceRefresh = false}) async {
     setState(() => _isLoadingBanners = true);
     final all = await SupabaseService().fetchAnnouncements(department: 'ALL', forceRefresh: forceRefresh);
-    final banners = all.where((a) => a.imageUrl != null && a.imageUrl!.isNotEmpty).toList();
+    final banners = all.where((a) =>
+      a.imageUrl != null && a.imageUrl!.isNotEmpty &&
+      (a.category == 'banner' || a.subjectName == 'BANNER' || a.content.contains('[HOME_BANNER]'))
+    ).toList();
     if (mounted) {
       setState(() {
         _existingBanners = banners;
@@ -5676,13 +5679,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final newBanner = AnnouncementModel(
       id: '',
       title: title,
-      content: '$baseContent$tgTag',
+      content: '$baseContent [HOME_BANNER]$tgTag',
       authorId: _currentUser?.studentId ?? 'ST-NUST-001630760-413',
       authorName: _currentUser?.name ?? 'مجتبى عواد',
       authorRole: 'admin',
       department: _selectedBannerDept,
       stage: _selectedBannerStage,
-      category: 'activity',
+      category: 'banner',
+      subjectName: 'BANNER',
       isPinned: true,
       imageUrl: res.fileUrl,
       createdAt: DateTime.now(),

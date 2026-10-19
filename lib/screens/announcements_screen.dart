@@ -108,12 +108,19 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         ? (_supervisorSection == 'ALL' ? null : _supervisorSection)
         : _user?.section;
 
-    _announcements = await service.fetchAnnouncements(
+    final rawList = await service.fetchAnnouncements(
       department: dept,
       stage: stage,
       section: section,
       forceRefresh: forceRefresh,
     );
+
+    // استبعاد بوسترات الواجهة الرئيسية البحتة لتبقى شاشة التبليغات مخصصة للتبليغات الأكاديمية
+    _announcements = rawList.where((a) {
+      final isHomeBannerOnly = (a.category == 'banner' || a.subjectName == 'BANNER' || a.content.contains('[HOME_BANNER]')) &&
+          (a.content.replaceAll(RegExp(r'\[.*?\]'), '').trim().isEmpty);
+      return !isHomeBannerOnly;
+    }).toList();
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -741,6 +748,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
         category: _category,
         isPinned: _isPinned,
         imageUrl: uploadedImageUrl,
+        subjectName: 'ANNOUNCEMENT',
         createdAt: DateTime.now(),
       );
 

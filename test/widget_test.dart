@@ -1080,9 +1080,24 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      final all = [subjectAnnounce, scheduleAnnounce, officialBanner];
+      final announcementWithImage = AnnouncementModel(
+        id: 'ann-img-1',
+        title: 'تبليغ مع صورة توضيحية للمختبر',
+        content: 'يرجى مراجعة الصورة المرفقة للتقرير',
+        authorId: 'rep-1',
+        authorName: 'ممثل الشعبة',
+        authorRole: 'representative',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        category: 'academic',
+        subjectName: 'ANNOUNCEMENT',
+        imageUrl: 'https://example.com/announcement_photo.jpg',
+        createdAt: DateTime.now(),
+      );
 
-      // تطبيق لوجيك تنقية الكاروسيل الجديد
+      final all = [subjectAnnounce, scheduleAnnounce, officialBanner, announcementWithImage];
+
+      // تطبيق لوجيك تنقية الكاروسيل الجديد الصارم
       final filteredBanners = all.where((a) {
         if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
             a.content.contains('[COURSE_REGISTRY') ||
@@ -1090,12 +1105,10 @@ void main() {
             a.subjectName == 'COURSE') {
           return false;
         }
-        if (a.subjectName != null &&
-            a.subjectName!.isNotEmpty &&
-            a.subjectName != 'BANNER' &&
-            a.subjectName != 'GENERAL' &&
-            a.subjectName != 'ALL' &&
-            a.subjectName != 'عام') {
+        final isHomeBanner = a.category == 'banner' ||
+            a.subjectName == 'BANNER' ||
+            a.content.contains('[HOME_BANNER]');
+        if (!isHomeBanner) {
           return false;
         }
         return a.imageUrl != null && a.imageUrl!.trim().isNotEmpty;
@@ -1105,6 +1118,7 @@ void main() {
       expect(filteredBanners.first.id, 'ann-banner-1');
       expect(filteredBanners.contains(subjectAnnounce), false, reason: 'تبليغات المواد يجب ألا تظهر نهائياً في كاروسيل الواجهة الرئيسية');
       expect(filteredBanners.contains(scheduleAnnounce), false, reason: 'الجداول معزولة تماماً');
+      expect(filteredBanners.contains(announcementWithImage), false, reason: 'صور التبليغات يجب ألا تظهر نهائياً في كاروسيل البانر بالواجهة الرئيسية');
     });
 
     test('اختبار خدمة التحديث التلقائي الإجباري ومراقبة دورة الحياة (AutoUpdateService Singleton & Observer)', () {
