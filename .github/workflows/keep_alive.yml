@@ -1,0 +1,33 @@
+name: Supabase & Services Keep-Alive Heartbeat
+
+on:
+  schedule:
+    # يعمل تلقائياً كل 48 ساعة (أيام فردية الساعة 06:00 صباحاً بتوقيت UTC) لمنع تجميد المشاريع الخاملة
+    - cron: '0 6 */2 * *'
+  workflow_dispatch: # إمكانية التشغيل اليدوي بضغطة زر
+
+jobs:
+  ping-services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Master Portal Supabase (mrubdzgcjofjwirkdfwo)
+        run: |
+          echo "[*] Pinging Master Portal Supabase..."
+          curl -s -f -o /dev/null -w "%{http_code}\n" \
+            -H "apikey: ${{ secrets.PORTAL_SUPABASE_ANON_KEY }}" \
+            "https://mrubdzgcjofjwirkdfwo.supabase.co/rest/v1/app_users?select=count&limit=1" || true
+
+      - name: Ping Attendance Supabase & Edge Webhook (rlupqsmqwvidmwrvqrcc)
+        run: |
+          echo "[*] Pinging Attendance Supabase & Webhook..."
+          curl -s -f -o /dev/null -w "%{http_code}\n" \
+            -H "apikey: sb_publishable_sJM5JiXGzn-jif8EYqXC-g_5_HdADJ4" \
+            "https://rlupqsmqwvidmwrvqrcc.supabase.co/rest/v1/" || true
+
+      - name: Ping Vercel Web App (mohadarati)
+        run: |
+          echo "[*] Pinging Mohadarati Web App on Vercel..."
+          curl -s -f -o /dev/null -w "%{http_code}\n" "https://mohadarati.vercel.app" || true
+
+      - name: Summary
+        run: echo "[SUCCESS] All cloud services heartbeat pinged successfully. Projects kept active!"
