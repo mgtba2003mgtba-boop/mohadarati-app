@@ -202,6 +202,35 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // شريط النشر التفاؤلي اللحظي قيد المزامنة
+          if (announcement.id.startsWith('temp_'))
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(17)),
+                border: Border(bottom: BorderSide(color: Color(0xFFFDE68A), width: 0.8)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFD97706)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'جاري النشر والمزامنة السحابية للطلبة...',
+                    style: GoogleFonts.cairo(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFB45309),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // شريط المنشور المثبت إن وجد
           if (announcement.isPinned)
             Container(

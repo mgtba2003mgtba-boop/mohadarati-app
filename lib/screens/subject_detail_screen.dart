@@ -15,8 +15,6 @@ import '../models/attendance_model.dart';
 import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
-import '../widgets/app_fullscreen_modal.dart';
-import '../widgets/app_icon_badge.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
 import '../widgets/telegram_poll_card.dart';
@@ -783,6 +781,36 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // شريط النشر التفاؤلي اللحظي قيد المزامنة
+          if (lecture.id.startsWith('temp_')) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFFBBF24)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'جاري رفع المحاضرة والمزامنة السحابية للطلبة... ⚡',
+                    style: GoogleFonts.cairo(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFB45309),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -908,6 +936,29 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
                     ),
                     onPressed: () => _launchLectureMedia(lecture, isDownload: true),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          // في حال كانت المحاضرة مرفوعة عبر رابط Google Drive أو سحابي خارجي
+          if (lecture.hasDriveUrl && !lecture.hasTelegramMedia) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F9D58),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.cloud_done_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      'فتح في Google Drive ↗',
+                      style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    onPressed: () => _launchLectureMedia(lecture, isDownload: false),
                   ),
                 ),
               ],
@@ -1158,15 +1209,138 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         semester: widget.semester ?? _user?.semester ?? 1,
         currentUser: _user,
         initialMode: initialMode,
-        onSuccess: (newAnnounce) {
-          if (newAnnounce != null) {
-            setState(() {
-              if (!_subjectAnnouncements.any((a) => a.id == newAnnounce.id)) {
-                _subjectAnnouncements.insert(0, newAnnounce);
+        onOptimisticLecture: (optimisticLecture, file, driveUrl) async {
+          // 1. إدراج فوري تفاؤلي في قائمة محاضرات المادة (استجابة فورية < 16ms)
+          setState(() {
+            _subjectLectures.insert(0, optimisticLecture);
+          });
+          HapticFeedback.lightImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إدراج المحاضرة فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              backgroundColor: AppTheme.primary,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          // 2. المزامنة في الخلفية بأمان
+          try {
+            if (file != null) {
+              final res = await TelegramUploaderService().uploadLecture(
+                file: file,
+                title: optimisticLecture.title,
+                subjectName: optimisticLecture.subjectName,
+                department: optimisticLecture.department,
+                stage: optimisticLecture.stage,
+                section: optimisticLecture.section,
+                semester: optimisticLecture.semester,
+                lectureType: optimisticLecture.type,
+                description: optimisticLecture.description,
+                uploaderId: optimisticLecture.uploaderId,
+                uploaderName: optimisticLecture.uploaderName,
+                uploaderRole: optimisticLecture.uploaderRole,
+              );
+              if (!res.success) {
+                throw Exception(res.message);
               }
-            });
+            } else if (driveUrl != null && driveUrl.isNotEmpty) {
+              final finalLecture = LectureModel(
+                id: '',
+                title: optimisticLecture.title,
+                subjectName: optimisticLecture.subjectName,
+                department: optimisticLecture.department,
+                stage: optimisticLecture.stage,
+                section: optimisticLecture.section,
+                semester: optimisticLecture.semester,
+                type: optimisticLecture.type,
+                driveUrl: driveUrl,
+                description: optimisticLecture.description,
+                uploaderId: optimisticLecture.uploaderId,
+                uploaderName: optimisticLecture.uploaderName,
+                uploaderRole: optimisticLecture.uploaderRole,
+                createdAt: DateTime.now(),
+              );
+              final ok = await SupabaseService().createLecture(finalLecture);
+              if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
+            }
+
+            // 3. تأكيد المزامنة وتحديث البيانات بسلاسة
+            if (mounted) {
+              _loadSubjectData(forceRefresh: true, showSpinner: false);
+            }
+          } catch (e) {
+            debugPrint('[-] Background subject lecture upload error: $e');
+            if (mounted) {
+              setState(() {
+                _subjectLectures.removeWhere((l) => l.id == optimisticLecture.id);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('فشلت مزامنة المحاضرة: $e'), backgroundColor: AppTheme.danger),
+              );
+            }
           }
-          _loadSubjectData(forceRefresh: true, showSpinner: false);
+        },
+        onOptimisticAnnouncement: (optimisticAnnounce, imageFile) async {
+          // 1. إدراج فوري تفاؤلي في تبليغات المادة
+          setState(() {
+            _subjectAnnouncements.insert(0, optimisticAnnounce);
+          });
+          HapticFeedback.lightImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إدراج التبليغ فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              backgroundColor: AppTheme.primary,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          // 2. المزامنة في الخلفية بأمان
+          try {
+            String? uploadedImageUrl;
+            if (imageFile != null) {
+              final uploadRes = await TelegramUploaderService().uploadFileToTelegram(
+                file: imageFile,
+                caption: '${optimisticAnnounce.title} • ${widget.subjectName}',
+                fileType: 'announcement',
+              );
+              if (uploadRes.success && uploadRes.fileUrl != null) {
+                uploadedImageUrl = uploadRes.fileUrl;
+              }
+            }
+
+            final finalAnnounce = AnnouncementModel(
+              id: '',
+              title: optimisticAnnounce.title,
+              content: optimisticAnnounce.content,
+              authorId: optimisticAnnounce.authorId,
+              authorName: optimisticAnnounce.authorName,
+              authorRole: optimisticAnnounce.authorRole,
+              department: optimisticAnnounce.department,
+              stage: optimisticAnnounce.stage,
+              section: optimisticAnnounce.section,
+              category: 'academic',
+              imageUrl: uploadedImageUrl,
+              subjectName: widget.subjectName,
+              createdAt: DateTime.now(),
+            );
+
+            final ok = await SupabaseService().createAnnouncement(finalAnnounce);
+            if (!ok) throw Exception('تعذر حفظ التبليغ في قاعدة البيانات');
+
+            if (mounted) {
+              _loadSubjectData(forceRefresh: true, showSpinner: false);
+            }
+          } catch (e) {
+            debugPrint('[-] Background subject announcement upload error: $e');
+            if (mounted) {
+              setState(() {
+                _subjectAnnouncements.removeWhere((a) => a.id == optimisticAnnounce.id);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('فشلت مزامنة التبليغ: $e'), backgroundColor: AppTheme.danger),
+              );
+            }
+          }
         },
       ),
     );
@@ -1266,7 +1440,8 @@ class _PublishToSubjectSheet extends StatefulWidget {
   final int semester;
   final AppUserModel? currentUser;
   final String initialMode;
-  final Function(AnnouncementModel? newAnnounce)? onSuccess;
+  final Function(LectureModel optimisticLecture, PlatformFile? file, String? driveUrl)? onOptimisticLecture;
+  final Function(AnnouncementModel optimisticAnnounce, PlatformFile? image)? onOptimisticAnnouncement;
 
   const _PublishToSubjectSheet({
     required this.subjectName,
@@ -1276,7 +1451,8 @@ class _PublishToSubjectSheet extends StatefulWidget {
     this.semester = 1,
     required this.currentUser,
     this.initialMode = 'lecture',
-    this.onSuccess,
+    this.onOptimisticLecture,
+    this.onOptimisticAnnouncement,
   });
 
   @override
@@ -1385,8 +1561,9 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
       return;
     }
 
+    String? driveUrl;
     if (_isDriveLinkMode) {
-      final driveUrl = _driveUrlController.text.trim();
+      driveUrl = _driveUrlController.text.trim();
       if (driveUrl.isEmpty) {
         _showSnack('يرجى إدخال رابط Google Drive أو الرابط السحابي للمحاضرة', isError: true);
         return;
@@ -1395,42 +1572,6 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
       if (parsedUri == null || !parsedUri.hasScheme || (!driveUrl.startsWith('https://') && !driveUrl.startsWith('http://'))) {
         _showSnack('يرجى إدخال رابط ويب صالح يبدأ بـ https://', isError: true);
         return;
-      }
-
-      setState(() => _isSubmitting = true);
-      try {
-        final newLecture = LectureModel(
-          id: '',
-          title: title,
-          subjectName: widget.subjectName,
-          department: widget.department,
-          stage: widget.stage,
-          section: _targetSection,
-          semester: widget.semester,
-          type: _lectureType,
-          driveUrl: driveUrl,
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-          uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
-          uploaderRole: widget.currentUser?.role ?? 'representative',
-          createdAt: DateTime.now(),
-        );
-
-        final ok = await SupabaseService().createLecture(newLecture);
-        if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
-
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم نشر رابط المحاضرة السحابي بنجاح')),
-          );
-          widget.onSuccess?.call(null);
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isSubmitting = false);
-          _showSnack('خطأ أثناء النشر: $e', isError: true);
-        }
       }
     } else {
       if (_selectedFile == null) {
@@ -1445,9 +1586,72 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         );
         return;
       }
+    }
 
+    // ── نمط Optimistic UI الفائق: إغلاق النافذة فوراً ونقل المهمة للخلفية ──
+    if (widget.onOptimisticLecture != null) {
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      final optimisticLecture = LectureModel(
+        id: tempId,
+        title: title,
+        subjectName: widget.subjectName,
+        department: widget.department,
+        stage: widget.stage,
+        section: _targetSection,
+        semester: widget.semester,
+        type: _lectureType,
+        driveUrl: _isDriveLinkMode ? (driveUrl ?? '') : '',
+        description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+        uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+        uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
+        uploaderRole: widget.currentUser?.role ?? 'representative',
+        fileName: _selectedFile?.name,
+        fileSizeBytes: _selectedFileSize > 0 ? _selectedFileSize : null,
+        createdAt: DateTime.now(),
+      );
+
+      Navigator.pop(context);
+      widget.onOptimisticLecture!(optimisticLecture, _selectedFile, _isDriveLinkMode ? driveUrl : null);
+      return;
+    }
+
+    if (_isDriveLinkMode) {
       setState(() => _isSubmitting = true);
+      try {
+        final newLecture = LectureModel(
+          id: '',
+          title: title,
+          subjectName: widget.subjectName,
+          department: widget.department,
+          stage: widget.stage,
+          section: _targetSection,
+          semester: widget.semester,
+          type: _lectureType,
+          driveUrl: driveUrl!,
+          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+          uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
+          uploaderRole: widget.currentUser?.role ?? 'representative',
+          createdAt: DateTime.now(),
+        );
 
+        final ok = await SupabaseService().createLecture(newLecture);
+        if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
+
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم نشر رابط المحاضرة السحابي بنجاح')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          _showSnack('خطأ أثناء النشر: $e', isError: true);
+        }
+      }
+    } else {
+      setState(() => _isSubmitting = true);
       try {
         final res = await TelegramUploaderService().uploadLecture(
           file: _selectedFile!,
@@ -1458,7 +1662,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
           section: _targetSection,
           semester: widget.semester,
           lectureType: _lectureType,
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
           uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
           uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
           uploaderRole: widget.currentUser?.role ?? 'representative',
@@ -1469,11 +1673,10 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         }
 
         if (mounted) {
-          Navigator.pop(context);
+          Navigator.pop(context, true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('تم رفع ونشر المحاضرة بنجاح')),
           );
-          widget.onSuccess?.call(null);
         }
       } catch (e) {
         if (mounted) {
@@ -1499,7 +1702,34 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
     final firstLine = content.split('\n').first.trim();
     final autoTitle = firstLine.length > 50
         ? '${firstLine.substring(0, 47)}...'
-        : (firstLine.isNotEmpty ? firstLine : (widget.subjectName ?? 'تبليغ أكاديمي'));
+        : (firstLine.isNotEmpty ? firstLine : widget.subjectName);
+
+    // ── نمط Optimistic UI الفائق للتبليغات: إغلاق فوري للنافذة ونقل الرفع للخلفية ──
+    if (widget.onOptimisticAnnouncement != null) {
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      final announceSection = widget.currentUser?.isAdmin == true
+          ? _targetSection
+          : (widget.currentUser?.section ?? 'ALL');
+      final optimisticAnnounce = AnnouncementModel(
+        id: tempId,
+        title: autoTitle,
+        content: content,
+        authorId: widget.currentUser?.studentId ?? 'ADMIN',
+        authorName: widget.currentUser?.name ?? 'ممثل الشعبة',
+        authorRole: widget.currentUser?.role ?? 'representative',
+        department: widget.department,
+        stage: widget.stage,
+        section: announceSection,
+        category: 'academic',
+        imageUrl: null,
+        subjectName: widget.subjectName,
+        createdAt: DateTime.now(),
+      );
+
+      Navigator.pop(context);
+      widget.onOptimisticAnnouncement!(optimisticAnnounce, _selectedAnnouncementImage);
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -1543,11 +1773,10 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
       if (!ok) throw Exception('تعذر حفظ التبليغ');
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم نشر التبليغ بنجاح')),
         );
-        widget.onSuccess?.call(newAnnounce);
       }
     } catch (e) {
       if (mounted) {

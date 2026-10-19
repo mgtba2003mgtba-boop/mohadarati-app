@@ -473,8 +473,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _subjectNameController.clear();
           _driveUrlController.clear();
           _lectureDescController.clear();
+          setState(() {
+            _allLectures.insert(0, newLecture);
+          });
           _showSnackbar('تم حفظ ونشر رابط المحاضرة بنجاح');
-          _loadDashboardData(forceRefresh: true);
+          _loadDashboardData(forceRefresh: true, showSpinner: false);
         }
       } catch (e) {
         if (mounted) {
@@ -537,13 +540,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
 
     if (result.success) {
-      setState(() => _selectedFile = null);
+      final newLec = LectureModel(
+        id: result.fileId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        subjectName: subject,
+        department: targetDept,
+        stage: targetStage,
+        section: targetSection,
+        semester: _selectedLectureSemester,
+        type: _selectedLectureType,
+        driveUrl: '',
+        telegramFileId: result.fileId,
+        fileName: _selectedFile?.name,
+        fileSizeBytes: _selectedFileSize > 0 ? _selectedFileSize : null,
+        description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
+        uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
+        uploaderName: _currentUser?.name ?? 'ممثل الشعبة',
+        uploaderRole: _currentUser?.role ?? 'representative',
+        createdAt: DateTime.now(),
+      );
+      setState(() {
+        _selectedFile = null;
+        _allLectures.insert(0, newLec);
+      });
       _lectureTitleController.clear();
       _subjectNameController.clear();
       _driveUrlController.clear();
       _lectureDescController.clear();
       _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
-      _loadDashboardData(forceRefresh: true);
+      _loadDashboardData(forceRefresh: true, showSpinner: false);
     } else {
       _showSnackbar('${result.message}. يمكنك استخدام خيار "رابط سحابي / Drive" كبديل مباشر.', isError: true);
     }

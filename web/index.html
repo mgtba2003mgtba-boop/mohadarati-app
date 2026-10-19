@@ -35,6 +35,121 @@
 
   <title>محاضراتي</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- درع الحماية والمراقبة اللحظية (Zero-White-Screen Watchdog)       -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <script>
+    (function() {
+      window._fltRendered = false;
+      var hasFatalError = false;
+      var fatalErrorMessage = '';
+
+      var ua = navigator.userAgent || '';
+      var isInApp = /Telegram|FBAN|FBAV|Instagram|musical_ly|TikTok|wv/i.test(ua);
+      var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var isAndroid = /Android/i.test(ua);
+
+      var hasWasm = false;
+      try {
+        hasWasm = typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function';
+      } catch (_) {}
+
+      var hasWebGL = false;
+      try {
+        var canvas = document.createElement('canvas');
+        hasWebGL = !!(canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+      } catch (_) {}
+
+      window.addEventListener('error', function(e) {
+        if (!window._fltRendered) {
+          hasFatalError = true;
+          fatalErrorMessage = (e && e.message) || 'Error loading application assets';
+          console.warn('[Watchdog Captured Error]:', fatalErrorMessage);
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function(e) {
+        if (!window._fltRendered) {
+          hasFatalError = true;
+          fatalErrorMessage = (e && e.reason && e.reason.message) || String(e ? e.reason : 'Rejection');
+          console.warn('[Watchdog Captured Rejection]:', fatalErrorMessage);
+        }
+      });
+
+      window.addEventListener('flutter-first-frame', function() {
+        window._fltRendered = true;
+        var bar = document.getElementById('in-app-browser-bar');
+        if (bar && !isInApp) bar.style.display = 'none';
+        var card = document.getElementById('client-recovery-card');
+        if (card) card.style.display = 'none';
+      });
+
+      window.triggerEmergencyRecovery = function(reason) {
+        if (window._fltRendered) return;
+        var fltView = document.querySelector('flutter-view') || document.querySelector('flt-glass-pane');
+        if (fltView && (fltView.shadowRoot || fltView.children.length > 0)) return;
+
+        var card = document.getElementById('client-recovery-card');
+        var desc = document.getElementById('crc-desc-text');
+        if (card && desc) {
+          if (!hasWebGL) {
+            desc.innerText = 'محرك الرسوميات (WebGL) غير مفعل أو محجوب في هذا المتصفح. اضغط أدناه لفتح الرابط عبر متصفح Chrome أو Safari الأصلي مباشرة.';
+          } else if (!hasWasm) {
+            desc.innerText = 'هذا المتصفح لا يدعم تقنية WebAssembly. يرجى التحديث أو استخدام متصفح حديث.';
+          } else if (isInApp) {
+            desc.innerText = 'يبدو أن متصفح التطبيق الداخلي يعيق تهيئة الصفحة. اضغط أدناه لفتح المنظومة في متصفحك الأساسي فوراً.';
+          } else if (reason) {
+            desc.innerText = 'حدث بطء في شبكة الاتصال أو تعذر اكتمال تحميل ملفات المنظومة: ' + reason;
+          }
+          card.style.display = 'flex';
+        }
+      };
+
+      setTimeout(function() {
+        if (!window._fltRendered) {
+          if (!hasWebGL || !hasWasm || hasFatalError) {
+            window.triggerEmergencyRecovery(fatalErrorMessage || 'Incompatible Environment');
+          } else {
+            setTimeout(function() {
+              if (!window._fltRendered) {
+                window.triggerEmergencyRecovery('Connection Timeout');
+              }
+            }, 6000);
+          }
+        }
+      }, 9000);
+
+      window.openInExternalBrowser = function() {
+        if (isAndroid) {
+          var cleanHost = window.location.host + window.location.pathname + window.location.search;
+          window.location.href = 'intent://' + cleanHost + '#Intent;scheme=https;package=com.android.chrome;end';
+        } else if (isIOS) {
+          alert('لتجربة سريعة وتثبيت التطبيق:\nاضغط على زر (•••) في الزاوية، ثم اختر "فتح في Safari" (Open in Safari).');
+        } else {
+          window.open(window.location.href, '_blank');
+        }
+      };
+
+      window.dismissInAppNotice = function() {
+        var bar = document.getElementById('in-app-browser-bar');
+        if (bar) bar.style.display = 'none';
+        try { sessionStorage.setItem('iab_dismissed', '1'); } catch (_) {}
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+        if (isInApp && !sessionStorage.getItem('iab_dismissed')) {
+          var bar = document.getElementById('in-app-browser-bar');
+          if (bar) bar.style.display = 'flex';
+        }
+        if (!hasWebGL || !hasWasm) {
+          setTimeout(function() {
+            window.triggerEmergencyRecovery();
+          }, 1200);
+        }
+      });
+    })();
+  </script>
 </head>
   <style>
     html, body, flt-glass-pane, flutter-view {
@@ -153,7 +268,194 @@
     .pwa-close-btn:hover {
       color: #CBD5E1;
     }
+
+    /* ── شريط التوجيه عند الفتح من داخل تطبيقات التواصل (In-App Browser Bar) ── */
+    #in-app-browser-bar {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 460px;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 9999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", sans-serif;
+      direction: rtl;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      animation: iabSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes iabSlideDown {
+      from { transform: translate(-50%, -40px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    .iab-text {
+      color: #E2E8F0;
+      font-size: 11.5px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    .iab-btn {
+      background: linear-gradient(135deg, #1B3FB6, #2563EB);
+      color: #fff;
+      border: none;
+      padding: 7px 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      border-radius: 9px;
+      cursor: pointer;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+    .iab-btn:active {
+      transform: scale(0.96);
+    }
+    .iab-close {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    /* ── بطاقة الإنقاذ الذاتية للتعطل أو بطء الاتصال (Client Recovery Card) ── */
+    #client-recovery-card {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.94);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 99999999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      direction: rtl;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", sans-serif;
+    }
+    .crc-container {
+      max-width: 390px;
+      width: 100%;
+      background: #0F172A;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 22px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);
+      animation: crcFadeIn 0.3s ease-out;
+    }
+    @keyframes crcFadeIn {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .crc-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #EF4444;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+    .crc-title {
+      color: #F8FAFC;
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+    }
+    .crc-desc {
+      color: #94A3B8;
+      font-size: 12.5px;
+      line-height: 1.6;
+      margin: 0 0 20px 0;
+    }
+    .crc-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .crc-btn-primary {
+      background: linear-gradient(135deg, #1B3FB6, #2563EB);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+    .crc-btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: #CBD5E1;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 11px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 12.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .crc-btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
   </style>
+
+  <!-- شريط التوجيه للمتصفح الخارجي عند الفتح من داخل تيليجرام / إنستغرام -->
+  <div id="in-app-browser-bar">
+    <div class="iab-text">
+      <span>🌐</span>
+      <span>للحصول على أفضل سرعة وتثبيت التطبيق:</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="iab-btn" onclick="openInExternalBrowser()">فتح في المتصفح ↗</button>
+      <button class="iab-close" onclick="dismissInAppNotice()" aria-label="إغلاق">✕</button>
+    </div>
+  </div>
+
+  <!-- بطاقة الإنقاذ الذاتية عند تعذر الرسوميات أو بطء الاتصال -->
+  <div id="client-recovery-card">
+    <div class="crc-container">
+      <div class="crc-icon">⚠️</div>
+      <h2 class="crc-title">تعذر تشغيل واجهة الرسوميات</h2>
+      <p class="crc-desc" id="crc-desc-text">يبدو أن المتصفح الحالي يواجه صعوبة في تشغيل محرك الرسوميات أو تم فتحه داخل متصفح تطبيق مقيد.</p>
+      <div class="crc-actions">
+        <button class="crc-btn-primary" onclick="openInExternalBrowser()">
+          <span>فتح في متصفح خارجي (Chrome / Safari) ↗</span>
+        </button>
+        <button class="crc-btn-secondary" onclick="forcePurgeAndReload(Date.now())">
+          <span>إعادة المحاولة وتفريغ الذاكرة المؤقتة 🔄</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="pwa-install-banner">
     <div class="pwa-info">
@@ -244,7 +546,8 @@
       }
 
       // دالة لتفريغ كاش المتصفح فورياً وإعادة تحميل الصفحة بنسخة جديدة قسرياً
-      function forcePurgeAndReload(newBuild) {
+      window.forcePurgeAndReload = function(newBuild) {
+        newBuild = newBuild || Date.now();
         if (window.location.search && window.location.search.indexOf(newBuild) !== -1) {
           return;
         }
@@ -258,7 +561,8 @@
         } catch (_) {}
         var cleanUrl = window.location.origin + window.location.pathname + '?_v=' + newBuild;
         window.location.replace(cleanUrl);
-      }
+      };
+      var forcePurgeAndReload = window.forcePurgeAndReload;
 
       // فحص رقم البناء في السيرفر ومقارنته مع المحفوظ في جهاز الطالب
       function checkServerBuild() {
@@ -268,8 +572,9 @@
             if (data && data.build_number) {
               var current = localStorage.getItem('nust_build_number');
               if (current && current !== String(data.build_number)) {
-                console.log('[*] New build detected:', data.build_number, 'Replacing current:', current);
-                forcePurgeAndReload(data.build_number);
+                console.log('[*] New build detected:', data.build_number, 'Current registered:', current);
+                // حفظ رقم البناء الأحدث بسلاسة دون إعادة تحميل الصفحة أثناء عمل المستخدم
+                localStorage.setItem('nust_build_number', String(data.build_number));
               } else if (!current) {
                 localStorage.setItem('nust_build_number', String(data.build_number));
               }
@@ -280,18 +585,8 @@
           });
       }
 
-      // تنفيذ الفحص الفوري عند بدء تشغيل الصفحة
+      // تنفيذ الفحص لمرة واحدة بهدوء عند بدء تشغيل الصفحة
       checkServerBuild();
-
-      // الاستماع لحدث العودة للتطبيق (عند فتح الآيفون أو الرجوع من تطبيق آخر)
-      document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') {
-          checkServerBuild();
-        }
-      });
-      window.addEventListener('pageshow', function() {
-        checkServerBuild();
-      });
     })();
   </script>
 

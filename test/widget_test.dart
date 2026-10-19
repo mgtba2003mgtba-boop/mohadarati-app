@@ -1783,6 +1783,9 @@ void main() {
         semester: 2,
       );
 
+      expect(overrideS1.semester, 1);
+      expect(overrideS2.semester, 2);
+
       final cacheKeyS1 = CourseCustomizationService.buildCacheKey(
         department: 'هندسة تقنيات الأجهزة الطبية',
         stage: 'المرحلة الثانية',
@@ -2428,6 +2431,46 @@ void main() {
       final tgReconstructed = LectureModel.fromJson(tgDbJson);
       expect(tgReconstructed.section, equals('ALL'));
       expect(tgReconstructed.displayDescription, isEmpty);
+    });
+
+    test('اختبار صلاحيات الممثل الشاملة لرفع المحاضرات وضمان ظهورها لكلا الفصلين', () {
+      // 1. ممثل بدور representative ولكن canPublishLectures لم تُحدد أو false
+      final repUser = AppUserModel(
+        id: 'u-rep-1',
+        studentId: 'ST-REP-001',
+        name: 'علي حسن',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        role: AppConstants.roleRepresentative,
+        canPublishLectures: false, // لم تكن مفعلة في الداتابيز
+        canPublishAnnouncements: false,
+        semester: 2, // بالفصل الثاني
+      );
+
+      // يجب أن تكون صلاحيات الرفع متاحة له حتماً بصفته ممثلاً
+      expect(repUser.isRepresentative, isTrue);
+      expect(repUser.canManageLectures, isTrue);
+      expect(repUser.canManageAnnouncements, isTrue);
+      expect(repUser.canManageCourses, isTrue);
+
+      // 2. طالب عادي بدون صلاحيات لا يملك صلاحية الرفع
+      final studentUser = AppUserModel(
+        id: 'u-st-1',
+        studentId: 'ST-001',
+        name: 'طالب عام',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'A',
+        role: AppConstants.roleStudent,
+        canPublishLectures: false,
+        canPublishAnnouncements: false,
+        semester: 1,
+      );
+
+      expect(studentUser.isRepresentative, isFalse);
+      expect(studentUser.canManageLectures, isFalse);
+      expect(studentUser.canManageAnnouncements, isFalse);
     });
   });
 }

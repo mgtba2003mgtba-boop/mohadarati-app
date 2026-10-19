@@ -46,8 +46,8 @@ class AppUserModel {
   bool get isRepresentative => role == AppConstants.roleRepresentative;
   bool get isStudent => role == AppConstants.roleStudent;
 
-  bool get canManageLectures => isAdmin || (isRepresentative && canPublishLectures);
-  bool get canManageAnnouncements => isAdmin || (isRepresentative && canPublishAnnouncements);
+  bool get canManageLectures => isAdmin || isRepresentative || canPublishLectures;
+  bool get canManageAnnouncements => isAdmin || isRepresentative || canPublishAnnouncements;
   bool get canPromoteUsers => isAdmin;
   bool get canManageCourses => isAdmin || isRepresentative || canManageLectures;
 

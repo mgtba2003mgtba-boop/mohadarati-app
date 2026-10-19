@@ -3,13 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
+import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../widgets/app_media_preview_modal.dart';
-import 'dashboard_screen.dart';
+import 'package:file_picker/file_picker.dart';
 
 class LecturesScreen extends StatefulWidget {
   const LecturesScreen({super.key});
@@ -44,6 +45,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
       _selectedDept = _user!.isAdmin ? 'ALL' : _user!.department;
       _selectedStage = _user!.isAdmin ? 'ALL' : _user!.stage;
       _selectedSection = _user!.isAdmin ? 'ALL' : (_user!.section ?? 'ALL');
+      _selectedSemester = _user!.semester;
     }
 
     _loadLectures();
@@ -166,7 +168,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canPublish = _user?.canManageLectures == true;
+    final canPublish = _user?.canManageLectures == true ||
+        _user?.isAdmin == true ||
+        _user?.isRepresentative == true;
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
@@ -184,13 +188,8 @@ class _LecturesScreenState extends State<LecturesScreen> {
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.upload_file_rounded),
-              label: Text('نشر محاضرة Drive', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 0)),
-                ).then((_) => _loadLectures());
-              },
+              label: Text('نشر محاضرة جديدة 🚀', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              onPressed: () => _showPublishLectureSheet(context),
             )
           : null,
       body: Column(
@@ -223,26 +222,36 @@ class _LecturesScreenState extends State<LecturesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.bookmark_added_rounded, color: AppTheme.primaryLight, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        'الفصل الأول (الكورس 1) 📘',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryLight,
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() {
+                      _selectedSemester = _selectedSemester == 1 ? 2 : 1;
+                    });
+                    _loadLectures(forceRefresh: true);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.swap_horiz_rounded, color: AppTheme.primaryLight, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedSemester == 2 ? 'الفصل الثاني (الكورس 2) 📙' : 'الفصل الأول (الكورس 1) 📘',
+                          style: GoogleFonts.cairo(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryLight,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -276,12 +285,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
                             if (canPublish) ...[
                               const SizedBox(height: 12),
                               OutlinedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 0)),
-                                  ).then((_) => _loadLectures());
-                                },
+                                onPressed: () => _showPublishLectureSheet(context),
                                 icon: const Icon(Icons.add_rounded),
                                 label: const Text('كن أول من ينشر محاضرة'),
                               ),
@@ -334,6 +338,33 @@ class _LecturesScreenState extends State<LecturesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // شريط النشر التفاؤلي اللحظي قيد المزامنة
+          if (lecture.id.startsWith('temp_')) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFFBBF24)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'جاري النشر والمزامنة السحابية للطلبة... ⚡',
+                    style: GoogleFonts.cairo(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // الرأس: نوع المحاضرة وتاريخ الإضافة
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -384,6 +415,49 @@ class _LecturesScreenState extends State<LecturesScreen> {
             ),
           ],
           const SizedBox(height: 12),
+
+          // إذا كانت المحاضرة رابطاً سحابياً / Google Drive
+          if (lecture.hasDriveUrl && !lecture.hasTelegramMedia) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E3A8A).withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_done_rounded, size: 16, color: Color(0xFF60A5FA)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'رابط سحابي مباشر (Google Drive)',
+                    style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF93C5FD)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      'فتح المحاضرة على Google Drive',
+                      style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    onPressed: () => _openMediaStream(lecture),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           // إذا كانت المحاضرة متوفرة عبر سيرفر تيليجرام
           if (lecture.hasTelegramMedia) ...[
@@ -634,6 +708,674 @@ class _LecturesScreenState extends State<LecturesScreen> {
           style: GoogleFonts.cairo(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
           items: items,
           onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  void _showPublishLectureSheet(BuildContext context) {
+    if (_user == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _DirectPublishLectureSheet(
+        currentUser: _user!,
+        initialDepartment: _selectedDept == 'ALL' ? (_user!.department.isNotEmpty ? _user!.department : AppConstants.departments.first) : _selectedDept,
+        initialStage: _selectedStage == 'ALL' ? (_user!.stage.isNotEmpty ? _user!.stage : AppConstants.stages.first) : _selectedStage,
+        initialSemester: _selectedSemester,
+        onOptimisticSubmit: (optimisticLecture, file, driveUrl) async {
+          // 1. إدراج فوري تفاؤلي في القائمة المحلية بنمط Optimistic UI (استجابة فائقة السرعة)
+          setState(() {
+            _lectures.insert(0, optimisticLecture);
+          });
+          HapticFeedback.lightImpact();
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('تم إدراج المحاضرة فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              backgroundColor: AppTheme.primary,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          // 2. المزامنة في الخلفية بأمان
+          try {
+            if (file != null) {
+              final res = await TelegramUploaderService().uploadLecture(
+                file: file,
+                title: optimisticLecture.title,
+                subjectName: optimisticLecture.subjectName,
+                department: optimisticLecture.department,
+                stage: optimisticLecture.stage,
+                section: optimisticLecture.section,
+                semester: optimisticLecture.semester,
+                lectureType: optimisticLecture.type,
+                description: optimisticLecture.description,
+                uploaderId: optimisticLecture.uploaderId,
+                uploaderName: optimisticLecture.uploaderName,
+                uploaderRole: optimisticLecture.uploaderRole,
+              );
+              if (!res.success) {
+                throw Exception(res.message);
+              }
+            } else if (driveUrl != null && driveUrl.isNotEmpty) {
+              final finalLecture = LectureModel(
+                id: '',
+                title: optimisticLecture.title,
+                subjectName: optimisticLecture.subjectName,
+                department: optimisticLecture.department,
+                stage: optimisticLecture.stage,
+                section: optimisticLecture.section,
+                semester: optimisticLecture.semester,
+                type: optimisticLecture.type,
+                driveUrl: driveUrl,
+                description: optimisticLecture.description,
+                uploaderId: optimisticLecture.uploaderId,
+                uploaderName: optimisticLecture.uploaderName,
+                uploaderRole: optimisticLecture.uploaderRole,
+                createdAt: DateTime.now(),
+              );
+              final ok = await SupabaseService().createLecture(finalLecture);
+              if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
+            }
+
+            // 3. تأكيد المزامنة وإعادة التحميل الصامت
+            if (mounted) {
+              _loadLectures(forceRefresh: true);
+            }
+          } catch (e) {
+            debugPrint('[-] Background lecture upload error: $e');
+            if (mounted) {
+              setState(() {
+                _lectures.removeWhere((l) => l.id == optimisticLecture.id);
+              });
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text('فشلت مزامنة المحاضرة: $e'),
+                  backgroundColor: AppTheme.danger,
+                ),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// نافذة النشر المباشر السلسة للمحاضرات (Optimistic UI - بدون إعادة تحميل)
+// ══════════════════════════════════════════════════════════════
+class _DirectPublishLectureSheet extends StatefulWidget {
+  final AppUserModel currentUser;
+  final String initialDepartment;
+  final String initialStage;
+  final int initialSemester;
+  final Function(LectureModel optimisticLecture, PlatformFile? file, String? driveUrl) onOptimisticSubmit;
+
+  const _DirectPublishLectureSheet({
+    required this.currentUser,
+    required this.initialDepartment,
+    required this.initialStage,
+    required this.initialSemester,
+    required this.onOptimisticSubmit,
+  });
+
+  @override
+  State<_DirectPublishLectureSheet> createState() => _DirectPublishLectureSheetState();
+}
+
+class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> {
+  late String _dept;
+  late String _stage;
+  late int _semester;
+  late String _section;
+  String _lectureType = 'theory'; // 'theory', 'practical'
+  bool _isDriveMode = false;
+
+  final _titleController = TextEditingController();
+  final _customSubjectController = TextEditingController();
+  final _driveUrlController = TextEditingController();
+  final _descController = TextEditingController();
+
+  List<String> _availableSubjects = [];
+  String? _selectedSubject;
+  bool _isCustomSubject = false;
+
+  PlatformFile? _selectedFile;
+  int _selectedFileSize = 0;
+  bool _isPickingFile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _dept = widget.initialDepartment;
+    _stage = widget.initialStage;
+    _semester = widget.initialSemester;
+
+    if (widget.currentUser.isAdmin) {
+      _section = 'ALL';
+    } else if (widget.currentUser.assignedSections.isNotEmpty) {
+      _section = widget.currentUser.assignedSections.first;
+    } else if (widget.currentUser.section != null && widget.currentUser.section!.isNotEmpty) {
+      _section = widget.currentUser.section!;
+    } else {
+      _section = 'ALL';
+    }
+
+    _loadSubjectNames();
+  }
+
+  void _loadSubjectNames() {
+    final names = BiometricSubjects.getSubjectNames(
+      department: _dept,
+      stage: _stage,
+      semester: _semester,
+    );
+    setState(() {
+      _availableSubjects = names;
+      if (names.isNotEmpty) {
+        _selectedSubject = names.first;
+        _isCustomSubject = false;
+      } else {
+        _selectedSubject = null;
+        _isCustomSubject = true;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _customSubjectController.dispose();
+    _driveUrlController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    setState(() => _isPickingFile = true);
+    final file = await TelegramUploaderService().pickLectureFile();
+    if (mounted) {
+      if (file != null) {
+        final size = await TelegramUploaderService().getFileSize(file);
+        setState(() {
+          _isPickingFile = false;
+          _selectedFile = file;
+          _selectedFileSize = size;
+          if (_titleController.text.trim().isEmpty) {
+            final nameWithoutExt = file.name.contains('.')
+                ? file.name.substring(0, file.name.lastIndexOf('.'))
+                : file.name;
+            _titleController.text = nameWithoutExt;
+          }
+        });
+      } else {
+        setState(() => _isPickingFile = false);
+      }
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } else if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+  }
+
+  void _submit() {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى كتابة عنوان المحاضرة'), backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+
+    final subject = _isCustomSubject
+        ? _customSubjectController.text.trim()
+        : (_selectedSubject ?? _customSubjectController.text.trim());
+
+    if (subject.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى اختيار المادة أو كتابة اسمها'), backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+
+    String? driveUrl;
+    if (_isDriveMode) {
+      driveUrl = _driveUrlController.text.trim();
+      if (driveUrl.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يرجى إدخال رابط Google Drive أو الرابط السحابي'), backgroundColor: AppTheme.danger),
+        );
+        return;
+      }
+      final parsed = Uri.tryParse(driveUrl);
+      if (parsed == null || !parsed.hasScheme || (!driveUrl.startsWith('http://') && !driveUrl.startsWith('https://'))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يرجى إدخال رابط ويب صالح يبدأ بـ https://'), backgroundColor: AppTheme.danger),
+        );
+        return;
+      }
+    } else {
+      if (_selectedFile == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يرجى اختيار ملف المحاضرة (PDF / مستند / صورة)'), backgroundColor: AppTheme.danger),
+        );
+        return;
+      }
+      if (_selectedFileSize > 50 * 1024 * 1024) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حجم الملف (${_formatFileSize(_selectedFileSize)}) يتجاوز حد تيليجرام المباشر (50MB). يرجى التبديل لخيار "رابط سحابي / Drive".'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+        return;
+      }
+    }
+
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final optimisticLecture = LectureModel(
+      id: tempId,
+      title: title,
+      subjectName: subject,
+      department: _dept,
+      stage: _stage,
+      section: _section,
+      semester: _semester,
+      type: _lectureType,
+      driveUrl: _isDriveMode ? (driveUrl ?? '') : '',
+      description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+      uploaderId: widget.currentUser.studentId.isNotEmpty ? widget.currentUser.studentId : 'ADMIN',
+      uploaderName: widget.currentUser.name.isNotEmpty ? widget.currentUser.name : 'ممثل الشعبة',
+      uploaderRole: widget.currentUser.role,
+      fileName: _selectedFile?.name,
+      fileSizeBytes: _selectedFileSize > 0 ? _selectedFileSize : null,
+      createdAt: DateTime.now(),
+    );
+
+    // إغلاق النافذة فورياً بنمط وتجربة التطبيقات العالمية دون انتظار الرفع السحابي
+    Navigator.pop(context);
+    widget.onOptimisticSubmit(optimisticLecture, _selectedFile, _isDriveMode ? driveUrl : null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin = widget.currentUser.isAdmin;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        top: 12,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // مقبض السحب
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // رأس النافذة
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primarySubtle,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.upload_file_rounded, color: AppTheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'نشر محاضرة دراسية جديدة',
+                        style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '$_dept • $_stage • الفصل $_semester',
+                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // عنوان المحاضرة
+            TextField(
+              controller: _titleController,
+              style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'عنوان المحاضرة',
+                hintText: 'مثال: المحاضرة 1 - مقدمة عامة',
+                labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                hintStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.title_rounded, size: 20, color: AppTheme.primary),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // المادة الدراسية
+            if (!_isCustomSubject && _availableSubjects.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                value: _selectedSubject,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'المادة الدراسية الرسمية',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.menu_book_rounded, size: 20, color: AppTheme.primary),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: [
+                  ..._availableSubjects.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                  const DropdownMenuItem(value: '__CUSTOM__', child: Text('✍️ مادة أخرى... (إدخال يدوي)')),
+                ],
+                onChanged: (val) {
+                  if (val == '__CUSTOM__') {
+                    setState(() {
+                      _isCustomSubject = true;
+                      _selectedSubject = null;
+                    });
+                  } else if (val != null) {
+                    setState(() => _selectedSubject = val);
+                  }
+                },
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customSubjectController,
+                      style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'اسم المادة الدراسية',
+                        hintText: 'اكتب اسم المادة هنا...',
+                        labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.edit_note_rounded, size: 20, color: AppTheme.primary),
+                      ),
+                    ),
+                  ),
+                  if (_availableSubjects.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.list_alt_rounded, color: AppTheme.primary),
+                      tooltip: 'العودة للقائمة الرسمية',
+                      onPressed: () {
+                        setState(() {
+                          _isCustomSubject = false;
+                          _selectedSubject = _availableSubjects.first;
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+
+            // نوع المحاضرة ونمط الرفع
+            Row(
+              children: [
+                Text('نوع المحاضرة: ', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('نظري'),
+                  selected: _lectureType == 'theory',
+                  onSelected: (s) => setState(() => _lectureType = 'theory'),
+                  selectedColor: AppTheme.primary,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _lectureType == 'theory' ? Colors.white : AppTheme.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: const Text('عملي ومختبر'),
+                  selected: _lectureType == 'practical',
+                  onSelected: (s) => setState(() => _lectureType = 'practical'),
+                  selectedColor: AppTheme.accent,
+                  labelStyle: GoogleFonts.cairo(
+                    color: _lectureType == 'practical' ? Colors.white : AppTheme.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // التبديل بين رفع ملف مباشر ورابط سحابي / درايف
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: !_isDriveMode ? AppTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
+                      side: BorderSide(color: !_isDriveMode ? AppTheme.primary : Colors.grey.shade300, width: !_isDriveMode ? 1.5 : 1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => setState(() => _isDriveMode = false),
+                    icon: Icon(Icons.attach_file_rounded, size: 16, color: !_isDriveMode ? AppTheme.primary : AppTheme.textSecondary),
+                    label: Text(
+                      'ملف مباشر (أقل من 50MB)',
+                      style: GoogleFonts.cairo(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: !_isDriveMode ? AppTheme.primary : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: _isDriveMode ? AppTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
+                      side: BorderSide(color: _isDriveMode ? AppTheme.accent : Colors.grey.shade300, width: _isDriveMode ? 1.5 : 1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    onPressed: () => setState(() => _isDriveMode = true),
+                    icon: Icon(Icons.link_rounded, size: 16, color: _isDriveMode ? AppTheme.accent : AppTheme.textSecondary),
+                    label: Text(
+                      'رابط سحابي / Drive',
+                      style: GoogleFonts.cairo(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _isDriveMode ? AppTheme.accent : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // محتوى الملف أو الرابط السحابي
+            if (_isDriveMode) ...[
+              TextField(
+                controller: _driveUrlController,
+                style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'رابط Google Drive أو الرابط السحابي للمحاضرة',
+                  hintText: 'https://drive.google.com/file/d/... أو أي رابط ويب',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  hintStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.cloud_done_rounded, color: AppTheme.accent, size: 20),
+                  helperText: 'يدعم الفيديوهات والملفات الكبيرة ومصادر المحاضرات الخارجية بكل سهولة وبدون قيود حجم',
+                  helperStyle: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                ),
+              ),
+            ] else ...[
+              if (_selectedFile == null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: _isPickingFile
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
+                  label: Text(
+                    'اختر ملف المحاضرة (PDF / مستند / صورة)',
+                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                  onPressed: _isPickingFile ? null : _pickFile,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primarySubtle,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFile!.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              _formatFileSize(_selectedFileSize),
+                              style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
+                        onPressed: () => setState(() {
+                          _selectedFile = null;
+                          _selectedFileSize = 0;
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            const SizedBox(height: 12),
+
+            // الشعبة المستهدفة
+            if (isAdmin || widget.currentUser.assignedSections.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                value: (isAdmin || widget.currentUser.assignedSections.contains(_section) || _section == 'ALL')
+                    ? _section
+                    : (widget.currentUser.assignedSections.isNotEmpty ? widget.currentUser.assignedSections.first : 'ALL'),
+                dropdownColor: Colors.white,
+                style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'الشعبة المستهدفة بالمحاضرة',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.primary),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: [
+                  const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                  if (isAdmin) ...const [
+                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                    DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
+                    DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                  ] else ...[
+                    for (final s in widget.currentUser.assignedSections)
+                      DropdownMenuItem(value: s, child: Text('🏷️ شعبة $s')),
+                  ],
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _section = val);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // ملاحظات وتفاصيل إضافية
+            TextField(
+              controller: _descController,
+              maxLines: 2,
+              style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'ملاحظات وتفاصيل إضافية (اختياري)',
+                hintText: 'مثال: ملخص الفصل أو واجبات وملاحظات للأستاذ...',
+                labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                hintStyle: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.notes_rounded, size: 20),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _submit,
+              icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+              label: Text(
+                _isDriveMode ? 'نشر رابط المحاضرة السحابي 🚀' : 'نشر المحاضرة للطلبة 🚀',
+                style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
     );

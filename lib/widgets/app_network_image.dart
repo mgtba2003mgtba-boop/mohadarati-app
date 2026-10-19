@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
-import '../core/theme/app_theme.dart';
 
 /// ويدجت ذكي وموحد لعرض الصور السحابية بدون مشاكل CORS
 class AppNetworkImage extends StatelessWidget {

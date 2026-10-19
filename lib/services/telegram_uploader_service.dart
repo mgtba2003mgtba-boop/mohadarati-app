@@ -11,6 +11,7 @@ class UploadLectureResult {
   final bool success;
   final String message;
   final int? telegramMessageId;
+  final String? fileId;
   final String? fileName;
   final int? fileSizeBytes;
 
@@ -18,6 +19,7 @@ class UploadLectureResult {
     required this.success,
     required this.message,
     this.telegramMessageId,
+    this.fileId,
     this.fileName,
     this.fileSizeBytes,
   });
@@ -50,11 +52,24 @@ class TelegramUploaderService {
   TelegramUploaderService._internal();
 
   /// اختيار ملف محاضرة من ذاكرة الجهاز (مستند PDF/Office أو صورة توضيحية)
-  Future<PlatformFile?> pickLectureFile() async {
+  Future<PlatformFile?> pickLectureFile({bool allowAny = false}) async {
+    if (allowAny) {
+      try {
+        final List<PlatformFile> files = await FilePicker.pickFiles(type: FileType.any);
+        return files.isNotEmpty ? files.first : null;
+      } catch (e) {
+        debugPrint('[-] FilePicker (any) error: $e');
+        return null;
+      }
+    }
+
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'rar'],
+        allowedExtensions: [
+          'pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip',
+          'PDF', 'DOCX', 'DOC', 'PPTX', 'PPT', 'PNG', 'JPG', 'JPEG', 'WEBP', 'ZIP',
+        ],
       );
 
       if (files.isNotEmpty) {
@@ -62,8 +77,14 @@ class TelegramUploaderService {
       }
       return null;
     } catch (e) {
-      debugPrint('[-] FilePicker error: $e');
-      return null;
+      debugPrint('[-] FilePicker custom error: $e - falling back to FileType.any');
+      try {
+        final List<PlatformFile> fallbackFiles = await FilePicker.pickFiles(type: FileType.any);
+        return fallbackFiles.isNotEmpty ? fallbackFiles.first : null;
+      } catch (e2) {
+        debugPrint('[-] FilePicker fallback error: $e2');
+        return null;
+      }
     }
   }
 
@@ -72,7 +93,10 @@ class TelegramUploaderService {
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'pdf'],
+        allowedExtensions: [
+          'png', 'jpg', 'jpeg', 'webp', 'pdf',
+          'PNG', 'JPG', 'JPEG', 'WEBP', 'PDF',
+        ],
       );
 
       if (files.isNotEmpty) {
@@ -80,17 +104,22 @@ class TelegramUploaderService {
       }
       return null;
     } catch (e) {
-      debugPrint('[-] FilePicker error: $e');
-      return null;
+      debugPrint('[-] FilePicker error: $e - attempting fallback');
+      try {
+        final List<PlatformFile> fallback = await FilePicker.pickFiles(type: FileType.any);
+        return fallback.isNotEmpty ? fallback.first : null;
+      } catch (_) {
+        return null;
+      }
     }
   }
 
-  /// اختيار صورة فقط (لبنل البوسترات والإعلانات المصورة)
+  /// اختيار صورة فقط من المعرض / الستوديو (لبنل البوسترات والإعلانات المصورة)
+  /// يوجّه النظام مباشرة إلى تطبيق الستوديو (Photo Gallery) على أندرويد وiOS والويب
   Future<PlatformFile?> pickImageOnly() async {
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+        type: FileType.image,
       );
 
       if (files.isNotEmpty) {
@@ -98,8 +127,17 @@ class TelegramUploaderService {
       }
       return null;
     } catch (e) {
-      debugPrint('[-] FilePicker error: $e');
-      return null;
+      debugPrint('[-] FilePicker (image) error: $e - attempting custom fallback');
+      try {
+        final List<PlatformFile> fallback = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'PNG', 'JPG', 'JPEG', 'WEBP'],
+        );
+        return fallback.isNotEmpty ? fallback.first : null;
+      } catch (e2) {
+        debugPrint('[-] FilePicker fallback error: $e2');
+        return null;
+      }
     }
   }
 
@@ -110,6 +148,10 @@ class TelegramUploaderService {
 
   /// حساب حجم الملف بالبايت
   Future<int> getFileSize(PlatformFile file) async {
+    final syncLen = file.lengthSync();
+    if (syncLen != null && syncLen > 0) {
+      return syncLen;
+    }
     try {
       final len = await file.length();
       if (len != null) return len;
@@ -545,6 +587,7 @@ class TelegramUploaderService {
             success: true,
             message: 'تم نشر ورفع المحاضرة إلى السحابة بنجاح ومزامنتها للطلبة',
             telegramMessageId: msgId,
+            fileId: fileId,
             fileName: file.name,
             fileSizeBytes: fileBytes.length,
           );

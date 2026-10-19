@@ -2,17 +2,11 @@
 import 'dart:html' as html;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js_util' as js_util;
 
 /// طلب إذن الإشعارات من متصفح الآيفون أو الأندرويد في بيئة الويب PWA
 Future<bool> requestWebNotificationPermission() async {
   try {
-    if (js.context.hasProperty('requestAppNotificationPermission')) {
-      final promise = js.context.callMethod('requestAppNotificationPermission');
-      final result = await js_util.promiseToFuture(promise);
-      return result == true;
-    } else if (html.Notification.supported) {
+    if (html.Notification.supported) {
       final perm = await html.Notification.requestPermission();
       return perm == 'granted';
     }

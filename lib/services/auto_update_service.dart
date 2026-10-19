@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'web_reload_helper.dart';
 
 /// ── خدمة التحديث التلقائي الإجباري (Auto-Update Service) ────────────────
 /// ترصد دورة حياة التطبيق عند كل فتح وعند العودة إليه من الخلفية،
@@ -18,30 +17,36 @@ class AutoUpdateService with WidgetsBindingObserver {
   String? _currentBuildNumber;
   DateTime _lastCheckTime = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// مؤشر لمنع أي إعادة تحميل إجبارية أثناء تفاعل المستخدم، كتابة التبليغات، أو اختيار الملفات
+  static bool isUserBusy = false;
+
   void initialize() {
     if (_initialized) return;
     _initialized = true;
     try {
       WidgetsBinding.instance.addObserver(this);
     } catch (_) {}
-    // فحص فوري عند بدء تشغيل التطبيق
+    // فحص هادئ عند بدء تشغيل التطبيق
     checkUpdate();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // فحص عند عودة الطالب للتطبيق من الخلفية
-      checkUpdate();
+      // فحص بهدوء دون إجبار على التحديث الفوري إذا كان المستخدم يعمل
+      if (!isUserBusy) {
+        checkUpdate();
+      }
     }
   }
 
   Future<void> checkUpdate() async {
     if (!kIsWeb) return;
+    if (isUserBusy) return;
 
-    // منع تكرار الفحص في فترات أقل من 15 ثانية لتوفير استهلاك الشبكة
+    // منع تكرار الفحص في فترات أقل من 30 ثانية لتوفير استهلاك الشبكة
     final now = DateTime.now();
-    if (now.difference(_lastCheckTime).inSeconds < 15) return;
+    if (now.difference(_lastCheckTime).inSeconds < 30) return;
     _lastCheckTime = now;
 
     try {
@@ -64,8 +69,10 @@ class AutoUpdateService with WidgetsBindingObserver {
             // وُجد تحديث جديد تم رفعه!
             debugPrint('[+] New version detected: $serverBuild (was: $_currentBuildNumber)');
             await prefs.setString('nust_build_number', serverBuild);
-            // إعادة تحميل إجبارية فورية
-            triggerWebReload();
+            // لا نعيد تحميل المتصفح إطلاقاً إذا كان المستخدم داخل جلسة عمل نشطة
+            if (!isUserBusy) {
+              debugPrint('[*] Version registered quietly for next session.');
+            }
           }
         }
       }

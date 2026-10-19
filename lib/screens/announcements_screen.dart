@@ -207,13 +207,69 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _DirectPublishAnnouncementSheet(
         currentUser: _user!,
-        onSuccess: (newAnnounce) {
+        onOptimisticSubmit: (optimisticAnnounce, selectedImage) async {
+          // 1. استجابة لحظية فائقة السرعة بنمط Optimistic UI (إدراج فوري دون انتظار الشبكة)
           setState(() {
-            if (!_announcements.any((a) => a.id == newAnnounce.id)) {
-              _announcements.insert(0, newAnnounce);
-            }
+            _announcements.insert(0, optimisticAnnounce);
           });
-          _loadAnnouncements(forceRefresh: true, showSpinner: false);
+          HapticFeedback.lightImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إدراج التبليغ فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              backgroundColor: AppTheme.primary,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          // 2. المزامنة في الخلفية بأمان
+          try {
+            String? uploadedImageUrl;
+            if (selectedImage != null) {
+              final res = await TelegramUploaderService().uploadFileToTelegram(
+                file: selectedImage,
+                caption: optimisticAnnounce.title,
+                fileType: 'announcement',
+              );
+              if (res.success && res.fileUrl != null) {
+                uploadedImageUrl = res.fileUrl;
+              }
+            }
+
+            final finalAnnounce = AnnouncementModel(
+              id: '',
+              title: optimisticAnnounce.title,
+              content: optimisticAnnounce.content,
+              authorId: optimisticAnnounce.authorId,
+              authorName: optimisticAnnounce.authorName,
+              authorRole: optimisticAnnounce.authorRole,
+              department: optimisticAnnounce.department,
+              stage: optimisticAnnounce.stage,
+              section: optimisticAnnounce.section,
+              category: optimisticAnnounce.category,
+              isPinned: optimisticAnnounce.isPinned,
+              imageUrl: uploadedImageUrl ?? optimisticAnnounce.imageUrl,
+              subjectName: optimisticAnnounce.subjectName,
+              createdAt: DateTime.now(),
+            );
+
+            final ok = await SupabaseService().createAnnouncement(finalAnnounce);
+            if (!ok) throw Exception('تعذر حفظ التبليغ في قاعدة البيانات');
+
+            // 3. تأكيد المزامنة واستبدال الكارت المؤقت
+            if (mounted) {
+              _loadAnnouncements(forceRefresh: true, showSpinner: false);
+            }
+          } catch (e) {
+            debugPrint('[-] Optimistic announcement sync error: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('تنبيه: تعذر إكمال المزامنة السحابية للتبليغ: $e'),
+                  backgroundColor: AppTheme.danger,
+                ),
+              );
+            }
+          }
         },
       ),
     );
@@ -636,11 +692,11 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 /// نافذة نشر تبليغ مباشر مع إرفاق الصور والكتب الرسمية من خانة التبليغات
 class _DirectPublishAnnouncementSheet extends StatefulWidget {
   final AppUserModel currentUser;
-  final Function(AnnouncementModel newAnnounce) onSuccess;
+  final Function(AnnouncementModel optimisticAnnounce, PlatformFile? selectedImage) onOptimisticSubmit;
 
   const _DirectPublishAnnouncementSheet({
     required this.currentUser,
-    required this.onSuccess,
+    required this.onOptimisticSubmit,
   });
 
   @override
@@ -652,7 +708,6 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
   PlatformFile? _selectedImage;
   int _selectedImageSize = 0;
   bool _isPickingImage = false;
-  bool _isSubmitting = false;
 
   late String _dept;
   late String _stage;
@@ -704,7 +759,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
     }
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     final content = _contentController.text.trim();
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -718,58 +773,27 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
         ? '${firstLine.substring(0, 47)}...'
         : (firstLine.isNotEmpty ? firstLine : 'تبليغ أكاديمي');
 
-    setState(() => _isSubmitting = true);
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final optimisticAnnounce = AnnouncementModel(
+      id: tempId,
+      title: autoTitle,
+      content: content,
+      authorId: widget.currentUser.studentId.isNotEmpty ? widget.currentUser.studentId : 'ADMIN',
+      authorName: widget.currentUser.name.isNotEmpty ? widget.currentUser.name : 'إدارة الكلية',
+      authorRole: widget.currentUser.role,
+      department: _dept,
+      stage: _stage,
+      section: _section,
+      category: _category,
+      isPinned: _isPinned,
+      imageUrl: null,
+      subjectName: 'ANNOUNCEMENT',
+      createdAt: DateTime.now(),
+    );
 
-    try {
-      String? uploadedImageUrl;
-      if (_selectedImage != null) {
-        final res = await TelegramUploaderService().uploadFileToTelegram(
-          file: _selectedImage!,
-          caption: autoTitle,
-          fileType: 'announcement',
-        );
-
-        if (!res.success || res.fileUrl == null) {
-          throw Exception(res.message.isNotEmpty ? res.message : 'فشل رفع الصورة إلى سحابة تيليجرام');
-        }
-        uploadedImageUrl = res.fileUrl;
-      }
-
-      final newAnnounce = AnnouncementModel(
-        id: '',
-        title: autoTitle,
-        content: content,
-        authorId: widget.currentUser.studentId.isNotEmpty ? widget.currentUser.studentId : 'ADMIN',
-        authorName: widget.currentUser.name.isNotEmpty ? widget.currentUser.name : 'إدارة الكلية',
-        authorRole: widget.currentUser.role,
-        department: _dept,
-        stage: _stage,
-        section: _section,
-        category: _category,
-        isPinned: _isPinned,
-        imageUrl: uploadedImageUrl,
-        subjectName: 'ANNOUNCEMENT',
-        createdAt: DateTime.now(),
-      );
-
-      final ok = await SupabaseService().createAnnouncement(newAnnounce);
-      if (!ok) throw Exception('تعذر حفظ بيانات التبليغ');
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم نشر التبليغ بنجاح')),
-        );
-        widget.onSuccess(newAnnounce);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ أثناء النشر: $e'), backgroundColor: AppTheme.danger),
-        );
-      }
-    }
+    // إغلاق النافذة فورياً بنمط وتجربة التطبيقات العالمية دون انتظار الرفع السحابي
+    Navigator.pop(context);
+    widget.onOptimisticSubmit(optimisticAnnounce, _selectedImage);
   }
 
   @override
@@ -1023,12 +1047,10 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _isSubmitting ? null : _submit,
-              icon: _isSubmitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+              onPressed: _submit,
+              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
               label: Text(
-                _isSubmitting ? 'جاري الرفع والنشر...' : 'إرسال ونشر التبليغ للطلبة',
+                'إرسال ونشر التبليغ للطلبة 🚀',
                 style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),

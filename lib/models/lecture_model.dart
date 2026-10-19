@@ -56,6 +56,62 @@ class LectureModel {
     this.thumbnailUrl,
   });
 
+  LectureModel copyWith({
+    String? id,
+    String? title,
+    String? subjectName,
+    String? subjectCode,
+    String? department,
+    String? stage,
+    String? section,
+    int? semester,
+    String? type,
+    String? driveUrl,
+    String? description,
+    String? professorName,
+    String? uploaderId,
+    String? uploaderName,
+    String? uploaderRole,
+    int? downloadCount,
+    DateTime? createdAt,
+    int? telegramChannelId,
+    int? telegramMessageId,
+    String? telegramFileId,
+    String? fileName,
+    int? fileSizeBytes,
+    String? mimeType,
+    int? durationSeconds,
+    String? thumbnailUrl,
+  }) {
+    return LectureModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subjectName: subjectName ?? this.subjectName,
+      subjectCode: subjectCode ?? this.subjectCode,
+      department: department ?? this.department,
+      stage: stage ?? this.stage,
+      section: section ?? this.section,
+      semester: semester ?? this.semester,
+      type: type ?? this.type,
+      driveUrl: driveUrl ?? this.driveUrl,
+      description: description ?? this.description,
+      professorName: professorName ?? this.professorName,
+      uploaderId: uploaderId ?? this.uploaderId,
+      uploaderName: uploaderName ?? this.uploaderName,
+      uploaderRole: uploaderRole ?? this.uploaderRole,
+      downloadCount: downloadCount ?? this.downloadCount,
+      createdAt: createdAt ?? this.createdAt,
+      telegramChannelId: telegramChannelId ?? this.telegramChannelId,
+      telegramMessageId: telegramMessageId ?? this.telegramMessageId,
+      telegramFileId: telegramFileId ?? this.telegramFileId,
+      fileName: fileName ?? this.fileName,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      mimeType: mimeType ?? this.mimeType,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+    );
+  }
+
   bool get isPractical => type == 'practical';
   String get typeLabel => isPractical ? 'مختبر وعملي' : 'نظري';
 

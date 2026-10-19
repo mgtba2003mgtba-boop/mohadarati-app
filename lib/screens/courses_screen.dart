@@ -217,7 +217,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canPublish = _user?.canManageLectures == true || _user?.isAdmin == true;
+    final canPublish = _user?.canManageLectures == true ||
+        _user?.isAdmin == true ||
+        _user?.isRepresentative == true;
     final courses = _displayCourses;
 
     return Scaffold(

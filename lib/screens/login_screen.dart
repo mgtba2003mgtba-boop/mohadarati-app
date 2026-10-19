@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         _lockoutUntil = null;
         _failedAttempts = 0;
-        SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => null);
+        SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => false);
       }
     }
 
@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null) {
       _failedAttempts = 0;
       _lockoutUntil = null;
-      SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => null);
+      SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => false);
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_failedAttempts >= 5) {
         final lockTime = DateTime.now().add(const Duration(seconds: 30));
         _lockoutUntil = lockTime;
-        SharedPreferences.getInstance().then((p) => p.setInt('login_lockout_until', lockTime.millisecondsSinceEpoch)).catchError((_) => null);
+        SharedPreferences.getInstance().then((p) => p.setInt('login_lockout_until', lockTime.millisecondsSinceEpoch)).catchError((_) => false);
         setState(() {
           _isLoading = false;
           _errorMessage = 'تم قفل محاولات تسجيل الدخول مؤقتاً لمدة 30 ثانية لحماية الحساب من التخمين.';

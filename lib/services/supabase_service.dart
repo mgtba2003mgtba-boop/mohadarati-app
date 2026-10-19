@@ -898,7 +898,7 @@ class SupabaseService {
         // إزالة الكاش الفارغ حتى لا يمنع استرجاع أي تعليقات جديدة
         _memoryCache.remove(cacheKey);
         _cacheTimestamps.remove(cacheKey);
-        SharedPreferences.getInstance().then((prefs) => prefs.remove('cache_$cacheKey')).catchError((_) {});
+        SharedPreferences.getInstance().then((prefs) => prefs.remove('cache_$cacheKey')).catchError((_) => false);
       }
       return list;
     } catch (e) {
@@ -1252,7 +1252,7 @@ class SupabaseService {
         if (hasCorruptedIds) {
           _memoryCache.remove(cacheKey);
           _cacheTimestamps.remove(cacheKey);
-          SharedPreferences.getInstance().then((p) => p.remove('cache_$cacheKey')).catchError((_) {});
+          SharedPreferences.getInstance().then((p) => p.remove('cache_$cacheKey')).catchError((_) => false);
         } else {
           final ts = _cacheTimestamps[cacheKey];
           if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
