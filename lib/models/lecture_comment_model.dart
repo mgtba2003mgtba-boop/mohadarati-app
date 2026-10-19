@@ -46,25 +46,30 @@ class LectureCommentModel {
   /// النص النظيف المعروض للمستخدم محصن ضد أي تسريب لرموز برمجية أو وسوم خام
   String get displayContent {
     String clean = content;
-    // إن كان النص يحتوي على بنية JSON خام (مثل السجلات القديمة المشوهة)
-    final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(clean);
-    if (jsonMatch != null) {
-      try {
-        final decoded = jsonDecode(jsonMatch.group(0)!);
-        if (decoded is Map && decoded['text'] != null) {
-          clean = decoded['text'].toString();
-        }
-      } catch (_) {
-        final textMatch = RegExp(r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"').firstMatch(clean);
-        if (textMatch != null) {
-          clean = textMatch.group(1) ?? clean;
-        }
+    // إن كان النص يحتوي على بنية JSON خام أو متداخلة
+    while (clean.contains('"text":')) {
+      final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(clean);
+      if (jsonMatch != null) {
+        try {
+          final decoded = jsonDecode(jsonMatch.group(0)!);
+          if (decoded is Map && decoded['text'] != null) {
+            clean = decoded['text'].toString();
+            continue;
+          }
+        } catch (_) {}
       }
+      final textMatch = RegExp(r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"').firstMatch(clean);
+      if (textMatch != null) {
+        clean = textMatch.group(1) ?? clean;
+        break;
+      }
+      break;
     }
     return clean
         .replaceAll(tag, '')
         .replaceAll(RegExp(r'\[SECTION:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[REACTIONS:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\{[^{}]*\}'), '')
         .trim();
   }
 
@@ -106,6 +111,41 @@ class LectureCommentModel {
     return '$tag${jsonEncode(payload)}';
   }
 
+  /// استخراج نص JSON الصريح مع احتساب الأقواس المتداخلة بدقة
+  static String? extractJson(String text) {
+    final startIndex = text.indexOf('{');
+    if (startIndex == -1) return null;
+    int depth = 0;
+    bool inString = false;
+    bool isEscaped = false;
+    for (int i = startIndex; i < text.length; i++) {
+      final char = text[i];
+      if (isEscaped) {
+        isEscaped = false;
+        continue;
+      }
+      if (char == r'\') {
+        isEscaped = true;
+        continue;
+      }
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char == '{') {
+          depth++;
+        } else if (char == '}') {
+          depth--;
+          if (depth == 0) {
+            return text.substring(startIndex, i + 1);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   /// تحويل إعلان Supabase إلى نموذج تعليق أكاديمي محصن
   static LectureCommentModel? fromAnnouncement(AnnouncementModel a) {
     if (a.subjectName != 'LECTURE_NOTE' && !a.content.contains(tag)) return null;
@@ -123,12 +163,27 @@ class LectureCommentModel {
     }
 
     // 2. عزل كائن الـ JSON بأمان تام بمعزل عن الوسوم السابقة أو اللاحقة
-    final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(raw);
-    if (jsonMatch != null) {
+    final jsonStr = extractJson(raw);
+    if (jsonStr != null) {
       try {
-        final jsonStr = jsonMatch.group(0)!;
         final map = jsonDecode(jsonStr) as Map<String, dynamic>;
         text = map['text']?.toString() ?? '';
+        while (text.contains('"text"') || (text.startsWith('{') && text.endsWith('}'))) {
+          try {
+            final inner = jsonDecode(text);
+            if (inner is Map && inner['text'] != null) {
+              text = inner['text'].toString();
+              continue;
+            }
+          } catch (_) {}
+          final m = RegExp(r'"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"').firstMatch(text);
+          if (m != null) {
+            text = m.group(1) ?? text;
+            text = text.replaceAll(r'\"', '"').replaceAll(r'\n', '\n');
+            continue;
+          }
+          break;
+        }
         pinned = map['is_pinned'] == true;
         if (map['helpful_users'] is List) {
           helpful = (map['helpful_users'] as List)

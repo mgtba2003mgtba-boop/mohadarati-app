@@ -2068,6 +2068,28 @@ void main() {
       expect(validSubjectAnnouncements.first.id, '1');
       expect(validSubjectAnnouncements.first.title, 'تبليغ رسمي');
     });
+
+    test('اختبار فك تداخل JSON المتكرر (Nested JSON Unwrapping)', () {
+      final nestedJsonContent =
+          '[LECTURE_NOTE_V1]{"text":"{\\"text\\":\\"شنو هاي\\",\\"is_pinned\\":false,\\"helpful_users\\":[]}","is_pinned":false,"helpful_users":["ST-01"],"section":"ALL"} [SECTION:ALL]';
+
+      final ann = AnnouncementModel(
+        id: 'ann_nested_01',
+        title: 'lec_nested_1',
+        content: nestedJsonContent,
+        category: 'academic',
+        subjectName: 'LECTURE_NOTE',
+        authorId: 'ST-01',
+        authorName: 'علي',
+        authorRole: 'student',
+        createdAt: DateTime.now(),
+      );
+
+      final comment = LectureCommentModel.fromAnnouncement(ann);
+      expect(comment, isNotNull);
+      expect(comment!.content, 'شنو هاي');
+      expect(comment.displayContent, 'شنو هاي');
+    });
   });
 }
 

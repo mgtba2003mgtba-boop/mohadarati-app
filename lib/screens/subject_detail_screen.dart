@@ -147,17 +147,23 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   bool _matchesSubject(String? name) {
     if (name == null || name.trim().isEmpty) return false;
     final clean = name.trim();
-    if (AppConstants.arabicEquals(clean, widget.subjectName) ||
-        AppConstants.arabicContains(clean, widget.subjectName) ||
-        AppConstants.arabicContains(widget.subjectName, clean)) {
+    final normClean = AppConstants.normalizeArabic(clean);
+    final normSubject = AppConstants.normalizeArabic(widget.subjectName);
+    if (normClean.isEmpty || normSubject.isEmpty) return false;
+
+    if (normClean == normSubject ||
+        normClean.contains(normSubject) ||
+        (normClean.length >= 4 && normSubject.contains(normClean))) {
       return true;
     }
     if (widget.displayName != null && widget.displayName!.trim().isNotEmpty) {
-      final disp = widget.displayName!.trim();
-      if (AppConstants.arabicEquals(clean, disp) ||
-          AppConstants.arabicContains(clean, disp) ||
-          AppConstants.arabicContains(disp, clean)) {
-        return true;
+      final normDisp = AppConstants.normalizeArabic(widget.displayName!.trim());
+      if (normDisp.isNotEmpty) {
+        if (normClean == normDisp ||
+            normClean.contains(normDisp) ||
+            (normClean.length >= 4 && normDisp.contains(normClean))) {
+          return true;
+        }
       }
     }
     return false;
@@ -205,10 +211,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             a.isPoll;
         if (!hasBody) return false;
 
+        // تبليغات المادة حصراً: التبليغات العامة لا تنتمي إلى تبويب المادة
         if (a.subjectName != null && a.subjectName!.trim().isNotEmpty && a.subjectName != 'عام') {
           return _matchesSubject(a.subjectName);
         }
-        return _matchesSubject(a.title) || _matchesSubject(a.content);
+        return false;
       }).toList();
 
       // 3. جلب سجلات الحضور الخاصة بهذه المادة
