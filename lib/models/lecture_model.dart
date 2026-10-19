@@ -174,13 +174,21 @@ class LectureModel {
     );
   }
 
+  /// تحويل المحاضرة إلى صيغة تخزين الكاش المحلي مع الحفاظ التام على المعرف الفريد وتاريخ الإنشاء
+  Map<String, dynamic> toCacheJson() {
+    final map = toJson();
+    if (id.isNotEmpty) map['id'] = id;
+    map['created_at'] = createdAt.toIso8601String();
+    return map;
+  }
+
   Map<String, dynamic> toJson() {
     String descWithSection = (description ?? '').trim();
     if (!descWithSection.contains('[SECTION:')) {
       descWithSection = '$descWithSection [SECTION:$section]'.trim();
     }
 
-    return {
+    final map = <String, dynamic>{
       'title': title,
       'subject_name': subjectName,
       'subject_code': subjectCode,
@@ -202,5 +210,10 @@ class LectureModel {
       'duration_seconds': durationSeconds,
       'thumbnail_url': thumbnailUrl,
     };
+
+    if (id.isNotEmpty) {
+      map['id'] = id;
+    }
+    return map;
   }
 }

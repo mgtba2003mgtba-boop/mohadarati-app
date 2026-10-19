@@ -2240,6 +2240,36 @@ void main() {
       final remainingCacheKeys = prefs.getKeys().where((k) => k.startsWith('cache_')).toList();
       expect(remainingCacheKeys.isEmpty, isTrue, reason: 'يجب تفريغ كافة مفاتيح الكاش عند الخروج لضمان عدم تسريب البيانات بين الحسابات');
     });
+
+    test('اختبار الحفاظ الدائم على معرّف المحاضرة ومنع اختفاء التعليقات (Lecture ID Preservation & Comment Binding)', () async {
+      final now = DateTime.now();
+      final lecture = LectureModel(
+        id: 'uuid-lec-9988-7766',
+        title: 'محاضرة الإلكترونيات الرقمية',
+        subjectName: 'إلكترونيات',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الثالثة',
+        driveUrl: 'https://drive.google.com/test',
+        uploaderId: 'ST-001',
+        uploaderName: 'علي كمال',
+        createdAt: now,
+      );
+
+      // 1. فحص الحفظ في الكاش مع المعرف
+      final cacheJson = lecture.toCacheJson();
+      expect(cacheJson['id'], 'uuid-lec-9988-7766', reason: 'يجب الحفاظ على معرّف المحاضرة في الكاش لمنع توليد معرّف فارغ يضيع التعليقات');
+      expect(cacheJson['created_at'], isNotNull);
+
+      // 2. فحص استعادة المحاضرة من الكاش
+      final restored = LectureModel.fromJson(cacheJson);
+      expect(restored.id, 'uuid-lec-9988-7766');
+      expect(restored.title, 'محاضرة الإلكترونيات الرقمية');
+
+      // 3. فحص الحماية من المعرفات الفارغة في خدمة التعليقات
+      final service = SupabaseService();
+      final emptyResult = await service.fetchLectureComments(lectureId: '   ');
+      expect(emptyResult.isEmpty, isTrue, reason: 'يجب منع الاستعلام بمعرّف فارغ حتى لا تختلط التعليقات أو تسجل كبيانات مجهولة');
+    });
   });
 }
 

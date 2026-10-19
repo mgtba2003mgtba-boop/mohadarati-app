@@ -1206,6 +1206,14 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   void _openLectureCommentsSheet(LectureModel lecture) {
+    if (lecture.id.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('جاري مزامنة بيانات المحاضرة، يرجى المحاولة بعد ثوانٍ')),
+      );
+      _loadSubjectData(forceRefresh: true);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1955,9 +1963,12 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
   AppUserModel? get _effectiveUser => widget.currentUser ?? SupabaseService().currentUser;
 
   Future<void> _loadComments({bool forceRefresh = false}) async {
+    final cleanLecId = widget.lecture.id.trim();
+    if (cleanLecId.isEmpty) return;
+
     // 1. فحص الكاش وعرضه فورياً (0ms) إن وجد لتفادي أي انتظار أو شاشة تحميل
     if (!forceRefresh) {
-      final cached = await SupabaseService().getCachedLectureComments(widget.lecture.id);
+      final cached = await SupabaseService().getCachedLectureComments(cleanLecId);
       if (cached != null && cached.isNotEmpty && mounted) {
         setState(() {
           _comments = cached;
@@ -1969,12 +1980,14 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
 
     // 2. جلب مباشر وفوري من السحابة لضمان التزامن الكامل عند التبديل بين الحسابات
     final fresh = await SupabaseService().fetchLectureComments(
-      lectureId: widget.lecture.id,
+      lectureId: cleanLecId,
       forceRefresh: true,
     );
     if (mounted) {
       setState(() {
-        _comments = fresh;
+        if (fresh.isNotEmpty || _comments.isEmpty) {
+          _comments = fresh;
+        }
         _isLoading = false;
       });
       _scrollToBottom(animated: false);

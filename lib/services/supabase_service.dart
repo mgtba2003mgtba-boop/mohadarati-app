@@ -815,7 +815,9 @@ class SupabaseService {
 
   /// ── استرجاع استفسارات المحاضرة من الكاش المحلي ─────────────────────────
   Future<List<LectureCommentModel>?> getCachedLectureComments(String lectureId) async {
-    final cacheKey = 'lecture_comments_$lectureId';
+    final cleanLecId = lectureId.trim();
+    if (cleanLecId.isEmpty) return null;
+    final cacheKey = 'lecture_comments_$cleanLecId';
     return await _getCachedData<List<LectureCommentModel>>(
       key: cacheKey,
       fromJson: (json) => (json as List).map((i) {
@@ -830,22 +832,24 @@ class SupabaseService {
     required String lectureId,
     bool forceRefresh = false,
   }) async {
-    final cacheKey = 'lecture_comments_$lectureId';
+    final cleanLecId = lectureId.trim();
+    if (cleanLecId.isEmpty) return [];
+    final cacheKey = 'lecture_comments_$cleanLecId';
 
     // 1. استرجاع فوري من الكاش إن وجد ولم يُطلب التحديث الإجباري
     if (!forceRefresh) {
-      final cached = await getCachedLectureComments(lectureId);
+      final cached = await getCachedLectureComments(cleanLecId);
       if (cached != null && cached.isNotEmpty) {
         // تحديث صامت بالخلفية إن مضى أكثر من دقيقة
         final ts = _cacheTimestamps[cacheKey];
         if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 1)) {
-          _fetchFreshLectureComments(lectureId, cacheKey).catchError((_) => <LectureCommentModel>[]);
+          _fetchFreshLectureComments(cleanLecId, cacheKey).catchError((_) => <LectureCommentModel>[]);
         }
         return cached;
       }
     }
 
-    return await _fetchFreshLectureComments(lectureId, cacheKey);
+    return await _fetchFreshLectureComments(cleanLecId, cacheKey);
   }
 
   Future<List<LectureCommentModel>> _fetchFreshLectureComments(
@@ -903,6 +907,12 @@ class SupabaseService {
     required String stage,
     String? section,
   }) async {
+    final cleanLecId = lectureId.trim();
+    if (cleanLecId.isEmpty) {
+      debugPrint('[-] Cannot add lecture comment: lectureId is empty');
+      return null;
+    }
+
     try {
       final normStage = AppConstants.normalizeStage(stage);
       final sec = (section != null && section.isNotEmpty && section != 'null')
@@ -915,7 +925,7 @@ class SupabaseService {
       }
 
       final payload = {
-        'title': lectureId,
+        'title': cleanLecId,
         'content': encodedContent,
         'category': 'academic',
         'subject_name': 'LECTURE_NOTE',
@@ -933,7 +943,7 @@ class SupabaseService {
           .select('*')
           .maybeSingle();
 
-      invalidateCachePattern('lecture_comments_$lectureId');
+      invalidateCachePattern('lecture_comments_$cleanLecId');
       if (res != null) {
         final ann = AnnouncementModel.fromJson(res);
         return LectureCommentModel.fromAnnouncement(ann);
@@ -1221,24 +1231,32 @@ class SupabaseService {
   }) async {
     final cacheKey = 'lectures_${department ?? "ALL"}_${stage ?? "ALL"}_${section ?? "ALL"}_${semester ?? 0}';
 
-    // 1. عرض فوري في 0.01 ثانية من الكاش المحلي
+    // 1. عرض فوري في 0.01 ثانية من الكاش المحلي مع فحص سلامة المعرفات
     if (!forceRefresh) {
       final cached = await _getCachedData<List<LectureModel>>(
         key: cacheKey,
         fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
       );
       if (cached != null && cached.isNotEmpty) {
-        final ts = _cacheTimestamps[cacheKey];
-        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
-          _fetchFreshLecturesAndCache(
-            department: department,
-            stage: stage,
-            section: section,
-            semester: semester,
-            cacheKey: cacheKey,
-          ).catchError((_) => <LectureModel>[]);
+        // حماية من الكاش القديم المشوه: إذا كانت هناك محاضرات بلا معرّف ID سحابي، نتخلص من الكاش فوراً
+        final hasCorruptedIds = cached.any((l) => l.id.trim().isEmpty);
+        if (hasCorruptedIds) {
+          _memoryCache.remove(cacheKey);
+          _cacheTimestamps.remove(cacheKey);
+          SharedPreferences.getInstance().then((p) => p.remove('cache_$cacheKey')).catchError((_) {});
+        } else {
+          final ts = _cacheTimestamps[cacheKey];
+          if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+            _fetchFreshLecturesAndCache(
+              department: department,
+              stage: stage,
+              section: section,
+              semester: semester,
+              cacheKey: cacheKey,
+            ).catchError((_) => <LectureModel>[]);
+          }
+          return cached;
         }
-        return cached;
       }
     }
 
@@ -1286,7 +1304,7 @@ class SupabaseService {
       await _setCachedData(
         key: cacheKey,
         rawData: list,
-        toJson: () => list.map((l) => l.toJson()).toList(),
+        toJson: () => list.map((l) => l.toCacheJson()).toList(),
       );
 
       return list;
