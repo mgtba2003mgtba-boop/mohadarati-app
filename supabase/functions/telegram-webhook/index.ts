@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJTZGrWV7uYQ91nFu_iQMzNtLJBUIkCAAKirAACgMywSgxOZpTDwGpAPQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJUfmrWq3PDErGBonQ017bCmeILlRRxAAK8rgACgMywSp9XZYWwc9zcPQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
