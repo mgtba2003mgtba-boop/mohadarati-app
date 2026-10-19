@@ -587,9 +587,8 @@ class SupabaseService {
       if (json['image_url'] == null || json['image_url'].toString().trim().isEmpty) {
         json.remove('image_url');
       }
-      if (json['subject_name'] == null || json['subject_name'].toString().trim().isEmpty) {
-        json.remove('subject_name');
-      }
+      // عمود subject_name غير موجود في جدول announcements بقاعدة البيانات؛ يتم حفظ التصنيف دلالياً داخل content
+      json.remove('subject_name');
       await client.from('announcements').insert(json);
       invalidateCachePattern('announcements_');
       return true;
@@ -1211,7 +1210,6 @@ class SupabaseService {
         'author_id': schedule.uploaderId ?? 'REP',
         'author_role': 'representative',
         'is_pinned': true,
-        'subject_name': 'SCHEDULE',
       };
       await client.from('announcements').insert(payload);
       invalidateCachePattern('schedules_');

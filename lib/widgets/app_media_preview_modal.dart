@@ -58,6 +58,23 @@ class AppMediaPreviewModal extends StatefulWidget {
 class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
   final TransformationController _transformController = TransformationController();
   double _rotationAngle = 0; // 0, 90, 180, 270
+  bool _useFallback = false;
+  int _retryKey = 0;
+
+  String get _currentImageUrl {
+    final raw = widget.rawUrl.trim();
+    final resolved = AppConstants.resolveImageUrl(raw);
+    if (!_useFallback) {
+      return resolved;
+    }
+    // مسار بديل عند تعثر الاتصال: التبديل بين البروكسي والاتصال المباشر تلقائياً
+    if (resolved.contains('/api/proxy?url=')) {
+      return raw;
+    } else {
+      final enc = Uri.encodeComponent(raw);
+      return 'https://mohadarati.vercel.app/api/proxy?url=$enc';
+    }
+  }
 
   bool get _isPdf {
     final lowerName = (widget.fileName ?? '').toLowerCase();
@@ -197,7 +214,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedImageUrl = AppConstants.resolveImageUrl(widget.rawUrl);
+    final resolvedImageUrl = _currentImageUrl;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -283,7 +300,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     );
   }
 
-  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan)
+  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan) مع دعم التبديل السحابي الآلي (Failover)
   Widget _buildImageViewer(String imageUrl) {
     return Container(
       color: const Color(0xFF0F172A),
@@ -296,6 +313,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
             quarterTurns: (_rotationAngle / 90).round(),
             child: Image.network(
               imageUrl,
+              key: ValueKey('preview_img_${_retryKey}_$imageUrl'),
               fit: BoxFit.contain,
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
@@ -306,14 +324,41 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                       const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
                       const SizedBox(height: 14),
                       Text(
-                        'جاري فتح ومعاينة الصورة...',
+                        _useFallback
+                            ? 'جاري فتح الصورة عبر المسار السحابي البديل...'
+                            : 'جاري فتح ومعاينة الصورة...',
                         style: GoogleFonts.cairo(color: Colors.white70, fontSize: 13),
                       ),
                     ],
                   ),
                 );
               },
-              errorBuilder: (context, error, stackTrace) => _buildErrorState('تعذر فتح الصورة في المعاينة'),
+              errorBuilder: (context, error, stackTrace) {
+                if (!_useFallback) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _useFallback = true;
+                        _retryKey++;
+                      });
+                    }
+                  });
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+                        const SizedBox(height: 14),
+                        Text(
+                          'تذبذب في الشبكة، جاري التحويل للمسار البديل...',
+                          style: GoogleFonts.cairo(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return _buildErrorState('تعذر فتح الصورة في المعاينة');
+              },
             ),
           ),
         ),
@@ -470,15 +515,36 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
               style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => setState(() {}),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-              label: Text('إعادة المحاولة', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => setState(() {
+                    _useFallback = false;
+                    _retryKey++;
+                  }),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                  label: Text('إعادة المحاولة', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _launchExternal(widget.rawUrl),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white24),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16, color: Colors.white70),
+                  label: Text('فتح في المتصفح', style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12)),
+                ),
+              ],
             ),
           ],
         ),

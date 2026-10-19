@@ -34,7 +34,7 @@ class AppConstants {
     return 'http://192.168.100.25:8050';
   }
 
-  /// تحويل أي رابط صورة سحابي (تيليجرام أو خارجي) إلى رابط مدعوم بـ CORS
+  /// تحويل أي رابط صورة سحابي (تيليجرام أو خارجي) إلى رابط مدعوم بـ CORS ومحمي من حجب مزودي الشبكة في الهواتف
   static String resolveImageUrl(String? url) {
     if (url == null || url.trim().isEmpty) return '';
     final clean = url.trim();
@@ -42,25 +42,31 @@ class AppConstants {
     // إذا كان الرابط base64، يُرجع كما هو
     if (clean.startsWith('data:image')) return clean;
 
-    // على الويب، أي رابط قادم من سحابة تيليجرام يتم توجيهه عبر البروكسي لتجاوز حظر CORS
-    if (kIsWeb) {
-      if (clean.contains('api.telegram.org/file/')) {
+    // الروابط النسبية للبروكسي: إكمالها برابط النطاق الكامل إذا كنا على الهواتف أو الويب
+    if (clean.startsWith('/api/proxy') || clean.startsWith('/api/file/')) {
+      if (kIsWeb) {
         final host = Uri.base.host;
         final port = Uri.base.port;
         final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
-        final encoded = Uri.encodeComponent(clean);
+        if (host.isNotEmpty) {
+          return '${Uri.base.scheme}://$host$portStr$clean';
+        }
+      }
+      return 'https://mohadarati.vercel.app$clean';
+    }
+
+    // روابط سحابة تيليجرام: تمريرها عبر البروكسي السحابي الموثوق لتجاوز حظر CORS على الويب وحجب تيليجرام في شبكات الهاتف
+    if (clean.contains('api.telegram.org/file/')) {
+      final encoded = Uri.encodeComponent(clean);
+      if (kIsWeb) {
+        final host = Uri.base.host;
+        final port = Uri.base.port;
+        final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
         if (host.isNotEmpty) {
           return '${Uri.base.scheme}://$host$portStr/api/proxy?url=$encoded';
         }
-        return '/api/proxy?url=$encoded';
       }
-      if (clean.contains('/api/file/')) {
-        final pathPart = clean.substring(clean.indexOf('/api/file/'));
-        final host = Uri.base.host;
-        final port = Uri.base.port;
-        final portStr = (port == 80 || port == 443 || port == 0) ? '' : ':$port';
-        return '${Uri.base.scheme}://$host$portStr$pathPart';
-      }
+      return 'https://mohadarati.vercel.app/api/proxy?url=$encoded';
     }
 
     return clean;

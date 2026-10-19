@@ -2284,6 +2284,33 @@ void main() {
       final emptyResult = await service.fetchLectureComments(lectureId: '   ');
       expect(emptyResult.isEmpty, isTrue, reason: 'يجب منع الاستعلام بمعرّف فارغ حتى لا تختلط التعليقات أو تسجل كبيانات مجهولة');
     });
+
+    test('اختبار معالجة روابط الصور السحابية وتجاوز حجب مزودي الشبكة للهواتف (Cloud Media Proxy & Schedule Payload Resilience)', () {
+      // 1. فحص توجيه روابط تيليجرام عبر البروكسي
+      final tgUrl = 'https://api.telegram.org/file/bot12345/photos/file_99.jpg';
+      final resolvedTg = AppConstants.resolveImageUrl(tgUrl);
+      expect(resolvedTg.contains('/api/proxy?url='), isTrue, reason: 'يجب توجيه روابط تيليجرام عبر البروكسي دائماً لتجاوز الحجب وضعف الاتصال');
+
+      // 2. فحص تحويل الروابط النسبية للبروكسي إلى روابط كاملة صالحة للهواتف
+      final relativeProxy = '/api/proxy?url=https%3A%2F%2Fexample.com%2Fimage.png';
+      final resolvedRelative = AppConstants.resolveImageUrl(relativeProxy);
+      expect(resolvedRelative.startsWith('http'), isTrue, reason: 'الروابط النسبية يجب أن تكتمل برابط النطاق لتجنب تعذر فتح الصورة في الهاتف');
+
+      // 3. فحص اشتقاق subjectName من الوسوم الدلالية بدون الاعتماد على عمود قاعدة البيانات
+      final scheduleAnnounce = AnnouncementModel.fromJson({
+        'id': 'sch-101',
+        'title': 'جدول المحاضرات الأسبوعي',
+        'content': '[SCHEDULE_TIMETABLE] [SECTION:B] جدول',
+        'department': 'هندسة تقنيات الأجهزة الطبية',
+        'stage': 'المرحلة الرابعة',
+      });
+      expect(scheduleAnnounce.subjectName, 'SCHEDULE', reason: 'يجب اشتقاق نوع الجدول تلقائياً من وسم SCHEDULE_TIMETABLE');
+
+      // 4. فحص خلو حمولة قاعدة البيانات toDbJson من عمود subject_name غير الموجود
+      final dbPayload = scheduleAnnounce.toDbJson();
+      expect(dbPayload.containsKey('subject_name'), isFalse, reason: 'يجب عدم إرسال عمود subject_name لتجنب خطأ 400 PGRST204 في Supabase');
+      expect(dbPayload['content'].contains('[SCHEDULE_TIMETABLE]'), isTrue);
+    });
   });
 }
 

@@ -467,6 +467,19 @@ class AnnouncementModel {
       sec = match?.group(1) ?? 'ALL';
     }
 
+    String? derivedSubject = json['subject_name']?.toString();
+    if (derivedSubject == null || derivedSubject.isEmpty) {
+      if (rawContent.contains('[SCHEDULE_TIMETABLE]')) {
+        derivedSubject = 'SCHEDULE';
+      } else if (rawContent.contains('[HOME_BANNER]')) {
+        derivedSubject = 'BANNER';
+      } else if (rawContent.contains('[ANNOUNCEMENT]')) {
+        derivedSubject = 'ANNOUNCEMENT';
+      } else if (rawContent.contains('[COURSE')) {
+        derivedSubject = 'COURSE';
+      }
+    }
+
     return AnnouncementModel(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
@@ -480,7 +493,7 @@ class AnnouncementModel {
       category: json['category']?.toString() ?? 'academic',
       isPinned: json['is_pinned'] == true,
       imageUrl: json['image_url']?.toString(),
-      subjectName: json['subject_name']?.toString(),
+      subjectName: derivedSubject,
       createdAt: created,
     );
   }
@@ -489,6 +502,14 @@ class AnnouncementModel {
     String tagContent = content.trim();
     if (!tagContent.contains('[SECTION:')) {
       tagContent = '$tagContent [SECTION:$section]'.trim();
+    }
+
+    if (subjectName == 'ANNOUNCEMENT' && !tagContent.contains('[ANNOUNCEMENT]')) {
+      tagContent = '$tagContent [ANNOUNCEMENT]'.trim();
+    } else if (subjectName == 'BANNER' && !tagContent.contains('[HOME_BANNER]')) {
+      tagContent = '$tagContent [HOME_BANNER]'.trim();
+    } else if (subjectName == 'SCHEDULE' && !tagContent.contains('[SCHEDULE_TIMETABLE]')) {
+      tagContent = '$tagContent [SCHEDULE_TIMETABLE]'.trim();
     }
 
     return {
@@ -504,6 +525,13 @@ class AnnouncementModel {
       'image_url': imageUrl,
       'subject_name': subjectName,
     };
+  }
+
+  /// حمولة قاعدة البيانات الصافية المستبعد منها الأعمدة غير المتوفرة في جدول announcements
+  Map<String, dynamic> toDbJson() {
+    final json = toJson();
+    json.remove('subject_name');
+    return json;
   }
 
   Map<String, dynamic> toCacheJson() {
