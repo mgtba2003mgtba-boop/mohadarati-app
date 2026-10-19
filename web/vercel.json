@@ -62,7 +62,7 @@
       ]
     },
     {
-      "source": "/(index\\.html|main\\.dart\\.js|flutter_bootstrap\\.js|flutter_service_worker\\.js|flutter\\.js|version\\.json|manifest\\.json)",
+      "source": "/(|index\\.html|version\\.json|manifest\\.json)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -75,6 +75,19 @@
         {
           "key": "Expires",
           "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.js)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
         }
       ]
     },
