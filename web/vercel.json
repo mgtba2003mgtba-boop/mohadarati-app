@@ -106,16 +106,8 @@
           "value": "max-age=63072000; includeSubDomains; preload"
         },
         {
-          "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(), geolocation=()"
-        },
-        {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https://mrubdzgcjofjwirkdfwo.supabase.co wss://mrubdzgcjofjwirkdfwo.supabase.co https://rlupqsmqwvidmwrvqrcc.supabase.co wss://rlupqsmqwvidmwrvqrcc.supabase.co https://mohadarati.vercel.app https://api.telegram.org http://192.168.100.25:8050; frame-src 'self' https://mohadarati.vercel.app blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
         }
       ]
     }
