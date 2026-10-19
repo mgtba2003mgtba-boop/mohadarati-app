@@ -1306,6 +1306,9 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
 
   // حقول التبليغ
   final _announceContentController = TextEditingController();
+  PlatformFile? _selectedAnnouncementImage;
+  int _selectedAnnouncementImageSize = 0;
+  bool _isPickingAnnouncementImage = false;
 
   @override
   void dispose() {
@@ -1313,6 +1316,23 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
     _descController.dispose();
     _announceContentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAnnouncementImage() async {
+    setState(() => _isPickingAnnouncementImage = true);
+    final file = await TelegramUploaderService().pickImageOnly();
+    if (mounted) {
+      if (file != null) {
+        final size = await TelegramUploaderService().getFileSize(file);
+        setState(() {
+          _isPickingAnnouncementImage = false;
+          _selectedAnnouncementImage = file;
+          _selectedAnnouncementImageSize = size;
+        });
+      } else {
+        setState(() => _isPickingAnnouncementImage = false);
+      }
+    }
   }
 
   Future<void> _pickFile() async {
@@ -1414,6 +1434,21 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
     setState(() => _isSubmitting = true);
 
     try {
+      String? uploadedImageUrl;
+
+      if (_selectedAnnouncementImage != null) {
+        final uploadRes = await TelegramUploaderService().uploadFileToTelegram(
+          file: _selectedAnnouncementImage!,
+          caption: '$autoTitle • ${widget.subjectName}',
+          fileType: 'announcement',
+        );
+
+        if (!uploadRes.success || uploadRes.fileUrl == null) {
+          throw Exception(uploadRes.message.isNotEmpty ? uploadRes.message : 'فشل رفع صورة التبليغ إلى سحابة تيليجرام');
+        }
+        uploadedImageUrl = uploadRes.fileUrl;
+      }
+
       final announceSection = widget.currentUser?.isAdmin == true
           ? _targetSection
           : (widget.currentUser?.section ?? 'ALL');
@@ -1429,6 +1464,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         stage: widget.stage,
         section: announceSection,
         category: 'academic',
+        imageUrl: uploadedImageUrl,
         subjectName: widget.subjectName,
         createdAt: DateTime.now(),
       );
@@ -1747,6 +1783,72 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                   ),
                 ),
               ),
+              const SizedBox(height: 14),
+
+              // مساحة إرفاق صورة أو كتاب رسمي للتبليغ (اختياري)
+              if (_selectedAnnouncementImage == null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.6), width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: _isPickingAnnouncementImage
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.accent),
+                  label: Text(
+                    'إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري 📷)',
+                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  onPressed: _isPickingAnnouncementImage ? null : _pickAnnouncementImage,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.image_rounded, color: AppTheme.accent, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedAnnouncementImage!.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              '${_formatFileSize(_selectedAnnouncementImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                              style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
+                        tooltip: 'إلغاء إرفاق الصورة',
+                        onPressed: () => setState(() {
+                          _selectedAnnouncementImage = null;
+                          _selectedAnnouncementImageSize = 0;
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 14),
 
               // الشعبة المستهدفة بالتبليغ

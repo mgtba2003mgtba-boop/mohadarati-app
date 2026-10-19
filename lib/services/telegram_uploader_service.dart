@@ -236,7 +236,9 @@ class TelegramUploaderService {
           ? '📅 جدول دراسي/امتحاني'
           : fileType == 'banner'
               ? '📢 إعلان جامعي'
-              : '📁 ملف جامعي';
+              : fileType == 'announcement'
+                  ? '📣 تبليغ أكاديمي رسمي'
+                  : '📁 ملف جامعي';
       final fullCaption = caption != null && caption.trim().isNotEmpty
           ? '$tag\n${caption.trim()}'
           : tag;

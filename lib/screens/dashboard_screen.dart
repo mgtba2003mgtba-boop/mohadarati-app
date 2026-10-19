@@ -97,6 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _selectedAnnounceSection = 'ALL';
   String _selectedAnnounceCategory = 'academic';
   bool _isAnnouncePinned = false;
+  PlatformFile? _selectedAnnouncementImage;
+  int _selectedAnnouncementImageSize = 0;
+  bool _isPickingAnnouncementImage = false;
 
   // ── إدارة شعب نظام البصمة وتكليف الممثلين ─────────────────────
   String _selectedRepDept = AppConstants.departments.first;
@@ -487,6 +490,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  Future<void> _pickAnnouncementImage() async {
+    setState(() => _isPickingAnnouncementImage = true);
+    final file = await TelegramUploaderService().pickImageOnly();
+    if (mounted) {
+      if (file != null) {
+        final size = await TelegramUploaderService().getFileSize(file);
+        setState(() {
+          _isPickingAnnouncementImage = false;
+          _selectedAnnouncementImage = file;
+          _selectedAnnouncementImageSize = size;
+        });
+      } else {
+        setState(() => _isPickingAnnouncementImage = false);
+      }
+    }
+  }
+
   // ── نشر إعلان أكاديمي ──────────────────────────────────────────
   Future<void> _submitAnnouncement() async {
     final content = _announcementContentController.text.trim();
@@ -509,6 +529,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     setState(() => _isLoading = true);
 
+    String? uploadedImageUrl;
+    if (_selectedAnnouncementImage != null) {
+      final uploadRes = await TelegramUploaderService().uploadFileToTelegram(
+        file: _selectedAnnouncementImage!,
+        caption: '$autoTitle${subject.isNotEmpty ? " • $subject" : ""}',
+        fileType: 'announcement',
+      );
+
+      if (!uploadRes.success || uploadRes.fileUrl == null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showSnackbar(uploadRes.message.isNotEmpty ? uploadRes.message : 'فشل رفع صورة التبليغ إلى سحابة تيليجرام', isError: true);
+        }
+        return;
+      }
+      uploadedImageUrl = uploadRes.fileUrl;
+    }
+
     final newAnnounce = AnnouncementModel(
       id: '',
       title: autoTitle,
@@ -522,6 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       category: _selectedAnnounceCategory,
       subjectName: subject.isNotEmpty ? subject : null,
       isPinned: _isAnnouncePinned,
+      imageUrl: uploadedImageUrl,
       createdAt: DateTime.now(),
     );
 
@@ -536,6 +575,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _announcementSubjectController.clear();
       setState(() {
         _isAnnouncePinned = false;
+        _selectedAnnouncementImage = null;
+        _selectedAnnouncementImageSize = 0;
         _allAnnouncements.insert(0, newAnnounce);
       });
       _showSnackbar('تم نشر الإعلان بنجاح');
@@ -2007,6 +2048,72 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
             ),
           ),
+          const SizedBox(height: 14),
+
+          // ── إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري) ──
+          if (_selectedAnnouncementImage == null)
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.6), width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _isPickingAnnouncementImage
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.accent),
+              label: Text(
+                'إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري 📷)',
+                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              ),
+              onPressed: _isPickingAnnouncementImage ? null : _pickAnnouncementImage,
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.image_rounded, color: AppTheme.accent, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _selectedAnnouncementImage!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${_formatFileSize(_selectedAnnouncementImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                          style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
+                    tooltip: 'إلغاء إرفاق الصورة',
+                    onPressed: () => setState(() {
+                      _selectedAnnouncementImage = null;
+                      _selectedAnnouncementImageSize = 0;
+                    }),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 14),
 
           // ── 1. النطاق الأكاديمي للإعلان ──

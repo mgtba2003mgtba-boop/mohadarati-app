@@ -4,6 +4,7 @@ import '../core/theme/app_theme.dart';
 import '../models/announcement_model.dart';
 import '../models/app_user_model.dart';
 import 'app_fullscreen_modal.dart';
+import 'app_media_preview_modal.dart';
 import 'app_network_image.dart';
 import 'app_tactile_bounce.dart';
 
@@ -355,20 +356,59 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                   ),
                 ],
 
-                // 4. صورة التبليغ إن وجدت (مع إخفاء الحاوية إن فشل التحميل)
+                // 4. صورة التبليغ إن وجدت (مع دعم التكبير والتدوير والمعاينة التفاعلية)
                 if (hasImage) ...[
                   const SizedBox(height: 12),
                   InkWell(
-                    onTap: () => _showAnnouncementModal(context),
+                    onTap: () {
+                      AppMediaPreviewModal.show(
+                        context: context,
+                        title: announcement.title.isNotEmpty ? announcement.title : 'صورة التبليغ الأكاديمي',
+                        subtitle: announcement.subjectName != null && announcement.subjectName!.isNotEmpty
+                            ? announcement.subjectName
+                            : '${announcement.department} • ${announcement.stage}',
+                        url: announcement.imageUrl!,
+                        fileName: 'announcement_${announcement.id}.jpg',
+                        mimeType: 'image/jpeg',
+                      );
+                    },
                     borderRadius: BorderRadius.circular(12),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: AppNetworkImage(
-                        imageUrl: announcement.imageUrl!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorWidget: const SizedBox.shrink(),
+                      child: Stack(
+                        alignment: Alignment.bottomLeft,
+                        children: [
+                          AppNetworkImage(
+                            imageUrl: announcement.imageUrl!,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorWidget: const SizedBox.shrink(),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'اضغط للتكبير والفحص 🔍',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
