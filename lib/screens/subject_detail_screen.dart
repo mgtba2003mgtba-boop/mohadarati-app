@@ -446,21 +446,43 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primary,
-          unselectedLabelColor: const Color(0xFF94A3B8),
+          unselectedLabelColor: const Color(0xFF64748B),
           indicatorColor: AppTheme.primary,
+          indicatorWeight: 2.5,
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: AppTheme.lightBorder,
           labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 12),
           tabs: [
             Tab(
-              icon: const Icon(Icons.menu_book_rounded, size: 20),
-              text: 'المحاضرات (${_subjectLectures.length})',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.menu_book_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text('المحاضرات (${_subjectLectures.length})'),
+                ],
+              ),
             ),
             Tab(
-              icon: const Icon(Icons.campaign_rounded, size: 20),
-              text: 'التبليغات (${_subjectAnnouncements.length})',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.campaign_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text('التبليغات (${_subjectAnnouncements.length})'),
+                ],
+              ),
             ),
             Tab(
-              icon: const Icon(Icons.fingerprint_rounded, size: 20),
-              text: 'سجل الحضور (${_subjectAttendanceRecords.length})',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.fingerprint_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Text('الحضور (${_subjectAttendanceRecords.length})'),
+                ],
+              ),
             ),
           ],
         ),

@@ -217,21 +217,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         border: Border(
           top: BorderSide(
-            color: AppTheme.lightBorder.withValues(alpha: 0.9),
+            color: AppTheme.lightBorder,
             width: 1.0,
           ),
         ),
-        boxShadow: AppShadows.elevated,
+        boxShadow: AppShadows.subtle,
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: SizedBox(
+          height: 60,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'الرئيسية'),
               _buildNavItem(1, Icons.menu_book_rounded, Icons.menu_book_outlined, 'المقررات'),
@@ -246,43 +244,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
     final isSelected = _currentIndex == index;
-    return AppTactileBounce(
-      lowerBound: 0.92,
-      onTap: () {
-        if (_currentIndex != index) {
-          HapticFeedback.selectionClick();
-          setState(() => _currentIndex = index);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primarySubtle : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : inactiveIcon,
-              color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
-              size: 21,
+    return Expanded(
+      child: AppTactileBounce(
+        lowerBound: 0.94,
+        onTap: () {
+          if (_currentIndex != index) {
+            HapticFeedback.selectionClick();
+            setState(() => _currentIndex = index);
+          }
+        },
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected ? AppTheme.primarySubtle : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primary,
-                  height: 1.3,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isSelected ? activeIcon : inactiveIcon,
+                  color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
+                  size: 21,
                 ),
-              ),
-            ],
-          ],
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  style: GoogleFonts.cairo(
+                    fontSize: 10.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -324,71 +325,106 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// شعار التطبيق الأنيق أعلى اليمين وبجواره اسم التطبيق بتنسيق راقٍ واستجابة لمسية
+  /// ترويسة الهوية الأكاديمية: شعار المنصة يميناً، وبطاقة التخصص والمرحلة يساراً
   Widget _buildBrandHeader() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: AppTactileBounce(
-        lowerBound: 0.92,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (_homeScrollController.hasClients) {
-            _homeScrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeOutCubic,
-            );
-          }
-        },
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(13),
-                border: Border.all(
-                  color: AppTheme.lightBorder.withValues(alpha: 0.8),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+    final previewActive = AdminPreviewService().isCustomActive;
+    final stageText = _effectiveStage.replaceAll('المرحلة ', '').replaceAll('السنة ', '');
+    final sectionText = _effectiveSection != null && _effectiveSection!.isNotEmpty
+        ? 'شعبة ${_effectiveSection!}'
+        : 'عام';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        AppTactileBounce(
+          lowerBound: 0.94,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            if (_homeScrollController.hasClients) {
+              _homeScrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+              );
+            }
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: AppTheme.lightBorder,
+                    width: 1,
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(9),
-                child: Image.asset(
-                  'assets/images/app_logo.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school_rounded,
-                    color: AppTheme.primary,
-                    size: 24,
+                  boxShadow: AppShadows.subtle,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Image.asset(
+                    'assets/images/app_logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.school_rounded,
+                      color: AppTheme.primary,
+                      size: 22,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'محاضراتي',
-              style: GoogleFonts.cairo(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-                letterSpacing: -0.2,
+              const SizedBox(width: 10),
+              Text(
+                'محاضراتي',
+                style: GoogleFonts.cairo(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+
+        // شارة المرحلة والشعبة المعتمدة (Context Badge)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+          decoration: BoxDecoration(
+            color: previewActive ? const Color(0xFFFEF3C7) : AppTheme.primarySubtle,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: previewActive ? const Color(0xFFFCD34D) : const Color(0xFFDCE7FE),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                previewActive ? Icons.visibility_rounded : Icons.school_rounded,
+                size: 13,
+                color: previewActive ? const Color(0xFFB45309) : AppTheme.primary,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '$stageText • $sectionText',
+                style: GoogleFonts.cairo(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: previewActive ? const Color(0xFF92400E) : AppTheme.primary,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -552,34 +588,34 @@ class _HomeScreenState extends State<HomeScreen> {
   /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بدون أي صور عشوائية)
   Widget _buildDefaultUniversityBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [
-            const Color(0xFF0F172A),
-            AppTheme.primary.withValues(alpha: 0.85),
-            const Color(0xFF0F172A),
+            Color(0xFF0F172A),
+            Color(0xFF1E3A8A),
+            Color(0xFF1E40AF),
           ],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+        boxShadow: AppShadows.card,
+        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.25), width: 1.0),
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppTheme.accent.withValues(alpha: 0.15),
+              color: Colors.white.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
             child: const Center(
-              child: Icon(Icons.school_rounded, color: AppTheme.accent, size: 26),
+              child: Icon(Icons.school_rounded, color: Colors.white, size: 24),
             ),
           ),
           const SizedBox(width: 14),
@@ -591,20 +627,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'الكلية التقنية الهندسية',
                   style: GoogleFonts.cairo(
-                    fontSize: 14,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
+                    height: 1.3,
                   ),
                 ),
                 Text(
                   'الجامعة الوطنية للعلوم والتكنولوجيا (NUST)',
                   style: GoogleFonts.cairo(
                     fontSize: 11,
-                    color: AppTheme.accent,
+                    color: const Color(0xFF93C5FD),
                     fontWeight: FontWeight.w600,
+                    height: 1.3,
                   ),
                 ),
               ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Text(
+              _user?.semester == 2 ? 'فصل 2' : 'فصل 1',
+              style: GoogleFonts.cairo(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -634,23 +688,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بطاقات الوصول السريع للمقررات والجدول
+  /// بطاقات الوصول السريع للمقررات والجدول بتصميم نخبوي
   Widget _buildQuickActionCards() {
     return Row(
       children: [
         Expanded(
           child: AppTactileBounce(
             onTap: () => setState(() => _currentIndex = 1),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.white, Color(0xFFFBFDFF)],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.lightBorder),
                 boxShadow: AppShadows.card,
               ),
@@ -670,14 +720,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           'المقررات',
                           style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
+                        const SizedBox(height: 1),
                         Text(
-                          '${_subjectNames.length} مادة',
+                          '${_subjectNames.length} مادة معتمدة',
                           style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Color(0xFF94A3B8),
                   ),
                 ],
               ),
@@ -688,16 +744,12 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: AppTactileBounce(
             onTap: () => setState(() => _currentIndex = 2),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.white, Color(0xFFFFFDFB)],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.lightBorder),
                 boxShadow: AppShadows.card,
               ),
@@ -717,14 +769,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           'الجدول',
                           style: AppTypography.h3(color: AppTheme.textPrimary),
                         ),
+                        const SizedBox(height: 1),
                         Text(
-                          'المواعيد',
+                          'المواعيد الأسبوعية',
                           style: AppTypography.caption(color: AppTheme.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Color(0xFF94A3B8),
                   ),
                 ],
               ),
@@ -829,27 +887,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ).then((_) => _loadData());
                 },
-                borderRadius: BorderRadius.circular(AppRadius.md),
+                borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppTheme.lightBorder),
                     boxShadow: AppShadows.subtle,
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
-                          color: AppTheme.primarySubtle,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          color: lec.isPractical ? const Color(0xFFECFDF5) : AppTheme.primarySubtle,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
-                          Icons.description_outlined,
-                          color: AppTheme.primary,
-                          size: 20,
+                        child: Center(
+                          child: Icon(
+                            lec.isPractical ? Icons.science_outlined : Icons.description_outlined,
+                            color: lec.isPractical ? const Color(0xFF059669) : AppTheme.primary,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -863,10 +924,32 @@ class _HomeScreenState extends State<HomeScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.bodyStrong(color: AppTheme.textPrimary),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${lec.subjectName} • ${lec.typeLabel}',
-                              style: AppTypography.caption(color: AppTheme.textSecondary),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Text(
+                                  lec.subjectName,
+                                  style: AppTypography.caption(color: AppTheme.textSecondary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: lec.isPractical ? const Color(0xFFECFDF5) : AppTheme.primarySubtle,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    lec.typeLabel,
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: lec.isPractical ? const Color(0xFF059669) : AppTheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -874,7 +957,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       const Icon(
                         Icons.arrow_forward_ios_rounded,
-                        size: 14,
+                        size: 13,
                         color: Color(0xFF94A3B8),
                       ),
                     ],
