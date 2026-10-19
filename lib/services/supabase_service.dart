@@ -1349,8 +1349,7 @@ class SupabaseService {
         }
       }
 
-      final payload = lecture.toJson();
-      payload['stage'] = AppConstants.normalizeStage(lecture.stage);
+      final payload = lecture.toDbJson();
       await client.from('lectures').insert(payload);
       invalidateCachePattern('lectures_');
       return true;

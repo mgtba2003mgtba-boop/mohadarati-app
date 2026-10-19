@@ -503,7 +503,6 @@ class TelegramUploaderService {
             'subject_name': subjectName.trim(),
             'department': department,
             'stage': stage,
-            'section': section,
             'semester': semester,
             'type': lectureType,
             'drive_url': directUrl ?? 'telegram',
@@ -521,10 +520,12 @@ class TelegramUploaderService {
             'duration_seconds': 0,
           };
 
-          bool dbOk = await SupabaseService().createLecture(LectureModel.fromJson(lecturePayload));
+          final lectureModel = LectureModel.fromJson(lecturePayload);
+          bool dbOk = await SupabaseService().createLecture(lectureModel);
           if (!dbOk) {
             try {
-              await SupabaseService().client.from('lectures').insert(lecturePayload);
+              final dbSafe = lectureModel.toDbJson();
+              await SupabaseService().client.from('lectures').insert(dbSafe);
               dbOk = true;
             } catch (dbErr) {
               debugPrint('[-] Direct db insert error: $dbErr');

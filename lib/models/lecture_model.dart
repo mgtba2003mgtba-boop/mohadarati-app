@@ -216,4 +216,17 @@ class LectureModel {
     }
     return map;
   }
+
+  /// تحويل المحاضرة إلى حمولة قاعدة البيانات السحابية مع ضمان خلوها من أي أعمدة غير موجودة (مثل section)
+  Map<String, dynamic> toDbJson() {
+    final map = toJson();
+    map.remove('section'); // جدول lectures لا يحتوي على عمود section في Supabase
+    String desc = (map['description']?.toString() ?? '').trim();
+    if (!desc.contains('[SECTION:')) {
+      desc = '$desc [SECTION:$section]'.trim();
+    }
+    map['description'] = desc;
+    map['stage'] = AppConstants.normalizeStage(stage);
+    return map;
+  }
 }

@@ -79,6 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   final _lectureDescController = TextEditingController();
   String _selectedLectureDept = AppConstants.departments.first;
   String _selectedLectureStage = AppConstants.stages.first;
+  String _selectedLectureSection = 'ALL';
   int _selectedLectureSemester = 1;
   String _selectedLectureType = 'theory'; // 'theory' | 'practical'
 
@@ -426,8 +427,66 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     final targetDept = _currentUser?.isAdmin == true ? _selectedLectureDept : (_currentUser?.department ?? _selectedLectureDept);
     final targetStage = _currentUser?.isAdmin == true ? _selectedLectureStage : (_currentUser?.stage ?? _selectedLectureStage);
-    const targetSection = 'ALL';
+    final targetSection = _currentUser?.isAdmin == true
+        ? _selectedLectureSection
+        : (_currentUser?.assignedSections.isNotEmpty == true && _currentUser!.assignedSections.contains(_selectedLectureSection)
+            ? _selectedLectureSection
+            : (_currentUser?.section ?? 'ALL'));
 
+    if (!_uploadDirectFile) {
+      // ── وضع رابط Google Drive / السحابة الخارجية ──
+      final driveUrl = _driveUrlController.text.trim();
+      if (driveUrl.isEmpty) {
+        _showSnackbar('يرجى إدخال رابط Google Drive أو الرابط السحابي للمحاضرة', isError: true);
+        return;
+      }
+      final parsedUri = Uri.tryParse(driveUrl);
+      if (parsedUri == null || !parsedUri.hasScheme || (!driveUrl.startsWith('https://') && !driveUrl.startsWith('http://'))) {
+        _showSnackbar('يرجى إدخال رابط ويب صالح يبدأ بـ https://', isError: true);
+        return;
+      }
+
+      setState(() => _isLoading = true);
+      try {
+        final newLecture = LectureModel(
+          id: '',
+          title: title,
+          subjectName: subject,
+          department: targetDept,
+          stage: targetStage,
+          section: targetSection,
+          semester: _selectedLectureSemester,
+          type: _selectedLectureType,
+          driveUrl: driveUrl,
+          description: _lectureDescController.text.trim().isNotEmpty ? _lectureDescController.text.trim() : null,
+          uploaderId: _currentUser?.studentId ?? 'NUST_ADMIN',
+          uploaderName: _currentUser?.name ?? 'ممثل الشعبة',
+          uploaderRole: _currentUser?.role ?? 'representative',
+          createdAt: DateTime.now(),
+        );
+
+        final ok = await SupabaseService().createLecture(newLecture);
+        if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
+
+        if (mounted) {
+          _lectureTitleController.clear();
+          _subjectNameController.clear();
+          _driveUrlController.clear();
+          _lectureDescController.clear();
+          _showSnackbar('تم حفظ ونشر رابط المحاضرة بنجاح');
+          _loadDashboardData(forceRefresh: true);
+        }
+      } catch (e) {
+        if (mounted) {
+          _showSnackbar('خطأ أثناء النشر: $e', isError: true);
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    // ── وضع رفع الملف المباشر عبر تيليجرام ──
     if (_selectedFile == null) {
       _showSnackbar('يرجى اختيار ملف المحاضرة أولاً (PDF / مستند / صورة)', isError: true);
       return;
@@ -435,7 +494,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     if (_selectedFileSize > 50 * 1024 * 1024) {
       _showSnackbar(
-        'حجم الملف المختار (${_formatFileSize(_selectedFileSize)}) يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى تقليل حجم الملف أو استخدام ملف آخر.',
+        'حجم الملف المختار (${_formatFileSize(_selectedFileSize)}) يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى التبديل لخيار "رابط سحابي / Drive" لنشر الفيديوهات والملفات الكبيرة.',
         isError: true,
       );
       return;
@@ -486,7 +545,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _showSnackbar('تم رفع ونشر المحاضرة بنجاح');
       _loadDashboardData(forceRefresh: true);
     } else {
-      _showSnackbar(result.message, isError: true);
+      _showSnackbar('${result.message}. يمكنك استخدام خيار "رابط سحابي / Drive" كبديل مباشر.', isError: true);
     }
   }
 
@@ -1640,149 +1699,210 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ),
           const SizedBox(height: 18),
 
-          // ── مساحة اختيار أو عرض الملف المختار ──
-          if (_selectedFile == null)
-            InkWell(
-              onTap: _isPickingFile ? null : _pickLectureFile,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+          // ── التبديل بين رفع ملف مباشر ورابط سحابي / Drive ──
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: _uploadDirectFile ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                    side: BorderSide(color: _uploadDirectFile ? AppTheme.primary : Colors.grey.shade300, width: _uploadDirectFile ? 1.5 : 1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => setState(() => _uploadDirectFile = true),
+                  icon: Icon(Icons.attach_file_rounded, size: 18, color: _uploadDirectFile ? AppTheme.primary : AppTheme.textSecondary),
+                  label: Text(
+                    'ملف مباشر (أقل من 50MB)',
+                    style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _uploadDirectFile ? AppTheme.primary : AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: !_uploadDirectFile ? AppTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
+                    side: BorderSide(color: !_uploadDirectFile ? AppTheme.accent : Colors.grey.shade300, width: !_uploadDirectFile ? 1.5 : 1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => setState(() => _uploadDirectFile = false),
+                  icon: Icon(Icons.link_rounded, size: 18, color: !_uploadDirectFile ? AppTheme.accent : AppTheme.textSecondary),
+                  label: Text(
+                    'رابط سحابي / Drive',
+                    style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: !_uploadDirectFile ? AppTheme.accent : AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (!_uploadDirectFile) ...[
+            TextField(
+              controller: _driveUrlController,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'رابط Google Drive أو الرابط السحابي للمحاضرة',
+                hintText: 'https://drive.google.com/file/d/... أو أي رابط ويب سحابي',
+                prefixIcon: Icon(Icons.cloud_done_rounded, color: AppTheme.accent),
+                helperText: 'يدعم الفيديوهات والملفات الكبيرة ومصادر المحاضرات الخارجية بكل سهولة وبدون قيود حجم',
+              ),
+            ),
+          ] else ...[
+            // ── مساحة اختيار أو عرض الملف المختار ──
+            if (_selectedFile == null)
+              InkWell(
+                onTap: _isPickingFile ? null : _pickLectureFile,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppTheme.primaryLight.withValues(alpha: 0.4),
+                      style: BorderStyle.solid,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: _isPickingFile
+                            ? const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryLight),
+                              )
+                            : const Icon(Icons.cloud_upload_outlined, color: AppTheme.primaryLight, size: 36),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'اضغط هنا لاختيار ملف المحاضرة من جهازك',
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'يدعم ملفات المستندات (PDF, Word, PowerPoint) والصور التوضيحية',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        onPressed: _isPickingFile ? null : _pickLectureFile,
+                        icon: const Icon(Icons.folder_open_rounded, size: 18),
+                        label: const Text('تصفح الملفات'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.primaryLight.withValues(alpha: 0.4),
-                    style: BorderStyle.solid,
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: AppTheme.success.withValues(alpha: 0.5), width: 1.5),
                 ),
-                child: Column(
+                child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppTheme.primary.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: _isPickingFile
-                          ? const SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primaryLight),
-                            )
-                          : const Icon(Icons.cloud_upload_outlined, color: AppTheme.primaryLight, size: 36),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'اضغط هنا لاختيار ملف المحاضرة من جهازك',
-                      style: GoogleFonts.cairo(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                      child: const Icon(
+                        Icons.description_rounded,
+                        color: AppTheme.primaryLight,
+                        size: 32,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'يدعم ملفات المستندات (PDF, Word, PowerPoint) والصور التوضيحية',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.cairo(
-                        fontSize: 11,
-                        color: const Color(0xFF94A3B8),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedFile!.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _selectedFileSize > 50 * 1024 * 1024
+                                      ? AppTheme.danger.withValues(alpha: 0.2)
+                                      : AppTheme.success.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _selectedFileSize > 50 * 1024 * 1024
+                                      ? 'الحجم: ${_formatFileSize(_selectedFileSize)} (يتجاوز 50MB)'
+                                      : 'الحجم: ${_formatFileSize(_selectedFileSize)}',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedFileSize > 50 * 1024 * 1024 ? AppTheme.danger : AppTheme.success,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'مستند / ملف دراسي',
+                                style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    ElevatedButton.icon(
-                      onPressed: _isPickingFile ? null : _pickLectureFile,
-                      icon: const Icon(Icons.folder_open_rounded, size: 18),
-                      label: const Text('تصفح الملفات'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: AppTheme.danger),
+                      tooltip: 'إلغاء الملف',
+                      onPressed: () => setState(() => _selectedFile = null),
                     ),
                   ],
                 ),
               ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.success.withValues(alpha: 0.5), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.description_rounded,
-                      color: AppTheme.primaryLight,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _selectedFile!.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _selectedFileSize > 50 * 1024 * 1024
-                                    ? AppTheme.danger.withValues(alpha: 0.2)
-                                    : AppTheme.success.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _selectedFileSize > 50 * 1024 * 1024
-                                    ? 'الحجم: ${_formatFileSize(_selectedFileSize)} (يتجاوز 50MB)'
-                                    : 'الحجم: ${_formatFileSize(_selectedFileSize)}',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: _selectedFileSize > 50 * 1024 * 1024 ? AppTheme.danger : AppTheme.success,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'مستند / ملف دراسي',
-                              style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: AppTheme.danger),
-                    tooltip: 'إلغاء الملف',
-                    onPressed: () => setState(() => _selectedFile = null),
-                  ),
-                ],
-              ),
-            ),
+          ],
           const SizedBox(height: 18),
 
           // ── 1. النطاق الأكاديمي (القسم والمرحلة والكورس) ──
@@ -1858,6 +1978,39 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ],
           const SizedBox(height: 14),
+
+          // ── الشعبة الدراسية المستهدفة بالمحاضرة ──
+          if (_currentUser?.isAdmin == true || (_currentUser?.assignedSections.isNotEmpty == true)) ...[
+            DropdownButtonFormField<String>(
+              value: (_currentUser?.isAdmin == true || _currentUser?.assignedSections.contains(_selectedLectureSection) == true || _selectedLectureSection == 'ALL')
+                  ? _selectedLectureSection
+                  : (_currentUser?.assignedSections.first ?? 'ALL'),
+              dropdownColor: Colors.white,
+              style: GoogleFonts.cairo(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'الشعبة المستهدفة لنشر المحاضرة',
+                prefixIcon: Icon(Icons.groups_rounded, color: AppTheme.primaryLight),
+              ),
+              items: [
+                const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                if (_currentUser?.isAdmin == true) ...const [
+                  DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                  DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                  DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                  DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                  DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
+                  DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                ] else if (_currentUser?.assignedSections.isNotEmpty == true) ...[
+                  for (final sec in _currentUser!.assignedSections)
+                    DropdownMenuItem(value: sec, child: Text('🏷️ شعبة $sec')),
+                ],
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedLectureSection = val);
+              },
+            ),
+            const SizedBox(height: 14),
+          ],
 
           // ── 2. المادة الدراسية الرسمية من نظام البصمة الجامعي ──
           DropdownButtonFormField<String>(

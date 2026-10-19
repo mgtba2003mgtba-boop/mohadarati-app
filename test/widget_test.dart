@@ -2358,6 +2358,77 @@ void main() {
       attempts++; // المحاولة الخامسة
       expect(isOtpValid(expiry), isFalse, reason: 'يجب إبطال كود التحقق فور تجاوز 5 محاولات لمنع التخمين العنيف');
     });
+
+    test('اختبار تكامل نموذج المحاضرة وتوافق قاعدة البيانات وعزل الشعب (Lecture Model Section Isolation & DB Safety)', () {
+      final now = DateTime.now();
+
+      // 1. إنشاء محاضرة مخصصة لشعبة معينة A مع رابط Google Drive
+      final driveLecture = LectureModel(
+        id: 'lec-drive-1',
+        title: 'محاضرة الدوائر الإلكترونية المتقدمة',
+        subjectName: 'إلكترونيات 2',
+        department: 'هندسة تقنيات الأجهزة الطبية',
+        stage: 'المرحلة الرابعة',
+        section: 'A',
+        semester: 1,
+        type: 'theory',
+        driveUrl: 'https://drive.google.com/file/d/1a2b3c4d/view',
+        description: 'الفصل الأول: مكبرات العمليات والترانزستور',
+        uploaderId: 'REP-101',
+        uploaderName: 'ممثل الشعبة A',
+        uploaderRole: 'representative',
+        createdAt: now,
+      );
+
+      // 2. التحقق من خصائص الرابط السحابي
+      expect(driveLecture.hasDriveUrl, isTrue);
+      expect(driveLecture.streamUrl, equals('https://drive.google.com/file/d/1a2b3c4d/view'));
+      expect(driveLecture.downloadUrl, equals('https://drive.google.com/file/d/1a2b3c4d/view'));
+      expect(driveLecture.hasTelegramMedia, isFalse);
+
+      // 3. التحقق الصارم من حمولة قاعدة البيانات السحابية (toDbJson)
+      final dbJson = driveLecture.toDbJson();
+      expect(dbJson.containsKey('section'), isFalse,
+          reason: 'عمود section غير موجود في جدول lectures بقاعدة بيانات Supabase، إرساله يسبب خطأ PGRST204');
+      expect(dbJson['description'], contains('[SECTION:A]'),
+          reason: 'يجب حفظ الشعبة مشفرة داخل الوصف لمنع التضارب');
+      expect(dbJson['stage'], equals('المرحلة الرابعة'));
+
+      // 4. التحقق من استرجاع النموذج من قاعدة البيانات (fromJson)
+      final reconstructed = LectureModel.fromJson(dbJson);
+      expect(reconstructed.section, equals('A'),
+          reason: 'يجب استرجاع الشعبة بدقة من داخل الوصف');
+      expect(reconstructed.displayDescription, equals('الفصل الأول: مكبرات العمليات والترانزستور'),
+          reason: 'يجب تنظيف الوصف المعروض للطالب من وسم [SECTION:...] الداخلي');
+
+      // 5. التحقق من محاضرة تيليجرام مباشرة لشعبة عامة ALL
+      final tgLecture = LectureModel(
+        id: 'lec-tg-1',
+        title: 'مختبر المعالجات الدقيقة',
+        subjectName: 'معالجات دقيقة',
+        department: 'هندسة تقنيات الحاسوب',
+        stage: 'المرحلة الثالثة',
+        section: 'ALL',
+        semester: 1,
+        type: 'practical',
+        driveUrl: 'telegram',
+        telegramMessageId: 8899,
+        telegramFileId: 'BQACAgQAAxkBA...',
+        uploaderId: 'ST-NUST-001630760-413',
+        uploaderName: 'مجتبى عواد',
+        uploaderRole: 'admin',
+        createdAt: now,
+      );
+
+      expect(tgLecture.hasTelegramMedia, isTrue);
+      expect(tgLecture.isPractical, isTrue);
+      final tgDbJson = tgLecture.toDbJson();
+      expect(tgDbJson.containsKey('section'), isFalse);
+      expect(tgDbJson['description'], contains('[SECTION:ALL]'));
+      final tgReconstructed = LectureModel.fromJson(tgDbJson);
+      expect(tgReconstructed.section, equals('ALL'));
+      expect(tgReconstructed.displayDescription, isEmpty);
+    });
   });
 }
 
