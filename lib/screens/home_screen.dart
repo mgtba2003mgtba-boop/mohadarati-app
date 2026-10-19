@@ -325,13 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// ترويسة الهوية الأكاديمية: شعار المنصة يميناً، وبطاقة التخصص والمرحلة يساراً
+  /// ترويسة الهوية الأكاديمية: شعار المنصة، كلمة محاضراتي ورمز المنظومة NUST-ETC-ATT
   Widget _buildBrandHeader() {
     final previewActive = AdminPreviewService().isCustomActive;
-    final stageText = _effectiveStage.replaceAll('المرحلة ', '').replaceAll('السنة ', '');
-    final sectionText = _effectiveSection != null && _effectiveSection!.isNotEmpty
-        ? 'شعبة ${_effectiveSection!}'
-        : 'عام';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -388,42 +384,51 @@ class _HomeScreenState extends State<HomeScreen> {
                   letterSpacing: -0.2,
                 ),
               ),
-            ],
-          ),
-        ),
-
-        // شارة المرحلة والشعبة المعتمدة (Context Badge)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-          decoration: BoxDecoration(
-            color: previewActive ? const Color(0xFFFEF3C7) : AppTheme.primarySubtle,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: previewActive ? const Color(0xFFFCD34D) : const Color(0xFFDCE7FE),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                previewActive ? Icons.visibility_rounded : Icons.school_rounded,
-                size: 13,
-                color: previewActive ? const Color(0xFFB45309) : AppTheme.primary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '$stageText • $sectionText',
-                style: GoogleFonts.cairo(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: previewActive ? const Color(0xFF92400E) : AppTheme.primary,
-                  height: 1.3,
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  'NUST-ETC-ATT',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF334155),
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ],
           ),
         ),
+
+        if (previewActive)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: const Color(0xFFFCD34D)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.visibility_rounded, size: 12, color: Color(0xFFB45309)),
+                const SizedBox(width: 4),
+                Text(
+                  'وضع المعاينة',
+                  style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

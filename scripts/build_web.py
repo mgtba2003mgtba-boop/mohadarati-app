@@ -15,7 +15,7 @@ res_subst = subprocess.run(["subst", "Z:", PROJECT_ROOT], capture_output=True, t
 if res_subst.returncode != 0:
     print(f"[!] Warning: subst failed: {res_subst.stderr}")
 
-target_cwd = "Z:" if os.path.exists("Z:") else PROJECT_ROOT
+target_cwd = "Z:\\" if os.path.exists("Z:\\") else PROJECT_ROOT
 print(f"[*] Building web in: {target_cwd}")
 
 try:

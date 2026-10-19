@@ -383,41 +383,11 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Stack(
-                          alignment: Alignment.bottomLeft,
-                          children: [
-                            Positioned.fill(
-                              child: AppNetworkImage(
-                                imageUrl: announcement.imageUrl!,
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.65),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    'اضغط للتكبير والفحص 🔍',
-                                    style: GoogleFonts.cairo(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        child: AppNetworkImage(
+                          imageUrl: announcement.imageUrl!,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
