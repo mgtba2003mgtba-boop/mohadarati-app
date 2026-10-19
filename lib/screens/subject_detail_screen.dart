@@ -1707,9 +1707,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
     // ── نمط Optimistic UI الفائق للتبليغات: إغلاق فوري للنافذة ونقل الرفع للخلفية ──
     if (widget.onOptimisticAnnouncement != null) {
       final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-      final announceSection = widget.currentUser?.isAdmin == true
-          ? _targetSection
-          : (widget.currentUser?.section ?? 'ALL');
+      final announceSection = _targetSection.isNotEmpty ? _targetSection : (widget.currentUser?.section ?? 'ALL');
       final optimisticAnnounce = AnnouncementModel(
         id: tempId,
         title: autoTitle,
@@ -1749,9 +1747,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
         uploadedImageUrl = uploadRes.fileUrl;
       }
 
-      final announceSection = widget.currentUser?.isAdmin == true
-          ? _targetSection
-          : (widget.currentUser?.section ?? 'ALL');
+      final announceSection = _targetSection.isNotEmpty ? _targetSection : (widget.currentUser?.section ?? 'ALL');
 
       final newAnnounce = AnnouncementModel(
         id: '',
@@ -2007,17 +2003,17 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                   items: [
-                    const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                    const DropdownMenuItem(value: 'ALL', child: Text('جميع الشعب')),
                     if (widget.currentUser?.isAdmin == true) ...const [
-                      DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                      DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                      DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                      DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-                      DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
-                      DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                      DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                      DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                      DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                      DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                      DropdownMenuItem(value: 'E', child: Text('شعبة E')),
+                      DropdownMenuItem(value: 'F', child: Text('شعبة F')),
                     ] else ...[
-                      for (final sec in widget.currentUser!.assignedSections)
-                        DropdownMenuItem(value: sec, child: Text('🏷️ شعبة $sec')),
+                      for (final sec in widget.currentUser!.assignedSections.where((s) => s != 'ALL'))
+                        DropdownMenuItem(value: sec, child: Text('شعبة $sec')),
                     ],
                   ],
                   onChanged: (val) {
@@ -2041,7 +2037,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                       onPressed: () => setState(() => _isDriveLinkMode = false),
                       icon: Icon(Icons.attach_file_rounded, size: 16, color: !_isDriveLinkMode ? AppTheme.primary : AppTheme.textSecondary),
                       label: Text(
-                        'ملف مباشر (أقل من 50MB)',
+                        'ملف مباشر',
                         style: GoogleFonts.cairo(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -2062,7 +2058,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                       onPressed: () => setState(() => _isDriveLinkMode = true),
                       icon: Icon(Icons.link_rounded, size: 16, color: _isDriveLinkMode ? AppTheme.accent : AppTheme.textSecondary),
                       label: Text(
-                        'رابط سحابي / Drive',
+                        'رابط سحابي',
                         style: GoogleFonts.cairo(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -2203,7 +2199,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               ),
               const SizedBox(height: 14),
 
-              // مساحة إرفاق صورة أو كتاب رسمي للتبليغ (اختياري)
+              // مساحة إرفاق صورة للتبليغ (اختياري)
               if (_selectedAnnouncementImage == null)
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
@@ -2215,7 +2211,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.accent),
                   label: Text(
-                    'إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري 📷)',
+                    'إرفاق صورة (اختياري)',
                     style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
                   onPressed: _isPickingAnnouncementImage ? null : _pickAnnouncementImage,
@@ -2250,7 +2246,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                               style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              '${_formatFileSize(_selectedAnnouncementImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                              '${_formatFileSize(_selectedAnnouncementImageSize)} • جاهز للنشر',
                               style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
                             ),
                           ],
@@ -2285,17 +2281,17 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                   items: [
-                    const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                    const DropdownMenuItem(value: 'ALL', child: Text('جميع الشعب')),
                     if (widget.currentUser?.isAdmin == true) ...const [
-                      DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                      DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                      DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                      DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-                      DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
-                      DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                      DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                      DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                      DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                      DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                      DropdownMenuItem(value: 'E', child: Text('شعبة E')),
+                      DropdownMenuItem(value: 'F', child: Text('شعبة F')),
                     ] else ...[
-                      for (final sec in widget.currentUser!.assignedSections)
-                        DropdownMenuItem(value: sec, child: Text('🏷️ شعبة $sec')),
+                      for (final sec in widget.currentUser!.assignedSections.where((s) => s != 'ALL'))
+                        DropdownMenuItem(value: sec, child: Text('شعبة $sec')),
                     ],
                   ],
                   onChanged: (val) {
@@ -2316,7 +2312,7 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                 label: Text(
-                  _isSubmitting ? 'جاري النشر...' : 'نشر التبليغ للمادة',
+                  _isSubmitting ? 'جاري النشر...' : 'نشر التبليغ',
                   style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),
