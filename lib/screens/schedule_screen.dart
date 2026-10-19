@@ -28,7 +28,8 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   AppUserModel? _user;
   List<ScheduleModel> _schedules = [];
 
-  // ── فلتر الشعبة السريع لعرض وفصل منشورات الكروبات ──────────
+  // ── فلاتر المرحلة والشعبة لعرض وفصل منشورات الجداول للمشرف العام ──────────
+  String _selectedScheduleStage = 'ALL';
   String _selectedScheduleSection = 'ALL';
 
   bool get _isPrivileged =>
@@ -48,9 +49,15 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final user = SupabaseService().currentUser;
     _user = user;
     final preview = AdminPreviewService();
-    if (_isPrivileged && preview.isCustomActive && preview.section != null) {
-      _selectedScheduleSection = preview.section!;
-    } else if (user != null && !_isPrivileged && user.section != null && user.section!.isNotEmpty) {
+    if (_isPrivileged) {
+      if (preview.isCustomActive) {
+        _selectedScheduleStage = preview.stage;
+        _selectedScheduleSection = preview.section ?? 'ALL';
+      } else {
+        _selectedScheduleStage = 'ALL';
+        _selectedScheduleSection = 'ALL';
+      }
+    } else if (user != null && user.section != null && user.section!.isNotEmpty) {
       _selectedScheduleSection = user.section!;
     }
     AdminPreviewService().addListener(_onAdminPreviewChanged);
@@ -60,8 +67,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   void _onAdminPreviewChanged() {
     if (mounted) {
       final preview = AdminPreviewService();
-      if (_isPrivileged && preview.isCustomActive && preview.section != null) {
-        _selectedScheduleSection = preview.section!;
+      if (_isPrivileged && preview.isCustomActive) {
+        _selectedScheduleStage = preview.stage;
+        if (preview.section != null) {
+          _selectedScheduleSection = preview.section!;
+        }
       }
       _loadSchedules(forceRefresh: true);
     }
@@ -85,9 +95,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       final isPrivileged = _isPrivileged;
       final preview = AdminPreviewService();
       final dept = isPrivileged ? preview.department : _user!.department;
-      final stage = isPrivileged ? preview.stage : _user!.stage;
+      // للمشرف العام: جلب كافة جداول القسم دفعة واحدة لضمان عدم حجب أي مرحلة دراسية عنه
+      final stage = isPrivileged ? 'ALL' : _user!.stage;
       final section = isPrivileged
-          ? (preview.section == 'ALL' ? null : preview.section)
+          ? null
           : ((_user!.section != null && _user!.section!.isNotEmpty) ? _user!.section : null);
 
       _schedules = await service.fetchSchedules(
@@ -113,15 +124,23 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     return _schedules.where((s) {
       if (s.type != type) return false;
       if (isPrivileged) {
+        // 1. تصفية المرحلة للمشرف العام
+        if (_selectedScheduleStage != 'ALL') {
+          final aliases = AppConstants.getStageAliases(_selectedScheduleStage);
+          if (s.stage != _selectedScheduleStage && !aliases.contains(s.stage)) {
+            return false;
+          }
+        }
+        // 2. تصفية الشعبة للمشرف العام
         if (preview.isCustomActive && preview.section != null) {
-          return s.section.toUpperCase() == preview.section!.toUpperCase();
+          return s.section.toUpperCase() == preview.section!.toUpperCase() || s.section.toUpperCase() == 'ALL';
         }
         if (_selectedScheduleSection == 'ALL') return true;
-        return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase();
+        return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.section.toUpperCase() == 'ALL';
       } else {
-        // للطالب أو الممثل: تظهر فقط جداول شعبته حصراً ولا تظهر أي شعبة أخرى
+        // للطالب أو الممثل: تظهر فقط جداول شعبته ومرحلته حصراً
         if (userSec.isEmpty) return false;
-        return s.section.toUpperCase() == userSec.toUpperCase();
+        return s.section.toUpperCase() == userSec.toUpperCase() || s.section.toUpperCase() == 'ALL';
       }
     }).toList();
   }
@@ -129,8 +148,21 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   int _countSchedulesForSection(String type, String sectionKey) {
     return _schedules.where((s) {
       if (s.type != type) return false;
+      if (_selectedScheduleStage != 'ALL') {
+        final aliases = AppConstants.getStageAliases(_selectedScheduleStage);
+        if (s.stage != _selectedScheduleStage && !aliases.contains(s.stage)) return false;
+      }
       if (sectionKey == 'ALL') return true;
-      return s.section.toUpperCase() == sectionKey.toUpperCase();
+      return s.section.toUpperCase() == sectionKey.toUpperCase() || s.section.toUpperCase() == 'ALL';
+    }).length;
+  }
+
+  int _countSchedulesForStage(String type, String stageKey) {
+    return _schedules.where((s) {
+      if (s.type != type) return false;
+      if (stageKey == 'ALL') return true;
+      final aliases = AppConstants.getStageAliases(stageKey);
+      return s.stage == stageKey || aliases.contains(s.stage);
     }).length;
   }
 
@@ -514,7 +546,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   ),
                 ),
                 Text(
-                  '${_user?.department ?? ''} • ${_user?.stage ?? ''}',
+                  '${_user?.department ?? ''} • ${_isPrivileged ? (_selectedScheduleStage == "ALL" ? "كافة المراحل" : _selectedScheduleStage) : (_user?.stage ?? '')}',
                   style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textMuted),
                 ),
               ],
@@ -616,11 +648,33 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
     return Column(
         children: [
-          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات (خاص بالمشرف العام عندما لا تكون المحاكاة لشعبة محددة)
+          // شريط أزرار تصفية المراحل الأكاديمية للمشرف العام لسهولة استعراض جداول كافة المراحل
+          if (_isPrivileged)
+            Container(
+              height: 38,
+              margin: const EdgeInsets.fromLTRB(0, 10, 0, 2),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildScheduleStageChip(type, 'ALL', 'كافة المراحل 🎓', _countSchedulesForStage(type, 'ALL')),
+                  const SizedBox(width: 6),
+                  _buildScheduleStageChip(type, 'المرحلة الأولى', 'المرحلة 1', _countSchedulesForStage(type, 'المرحلة الأولى')),
+                  const SizedBox(width: 6),
+                  _buildScheduleStageChip(type, 'المرحلة الثانية', 'المرحلة 2', _countSchedulesForStage(type, 'المرحلة الثانية')),
+                  const SizedBox(width: 6),
+                  _buildScheduleStageChip(type, 'المرحلة الثالثة', 'المرحلة 3', _countSchedulesForStage(type, 'المرحلة الثالثة')),
+                  const SizedBox(width: 6),
+                  _buildScheduleStageChip(type, 'المرحلة الرابعة', 'المرحلة 4', _countSchedulesForStage(type, 'المرحلة الرابعة')),
+                ],
+              ),
+            ),
+
+          // شريط أزرار تصفية الشُعب لفصل منشورات الكروبات
           if (_isPrivileged && (!preview.isCustomActive || preview.section == null))
             Container(
               height: 38,
-              margin: const EdgeInsets.fromLTRB(0, 10, 0, 4),
+              margin: const EdgeInsets.fromLTRB(0, 4, 0, 4),
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -656,6 +710,61 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           ),
         ],
       );
+  }
+
+  Widget _buildScheduleStageChip(String type, String stageKey, String label, int count) {
+    final isSelected = _selectedScheduleStage == stageKey;
+    return AppTactileBounce(
+      lowerBound: 0.94,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _selectedScheduleStage = stageKey);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.lightBorder,
+          ),
+          boxShadow: isSelected ? AppShadows.subtle : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: AppTypography.captionStrong(
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildScheduleSectionChip(String type, String sectionKey, String label, int count) {

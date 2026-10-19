@@ -5355,9 +5355,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   // ── إدارة البوسترات المصورة (خاص بمجتبى عواد عبر سيرفر تيليجرام) ───────────
-  Future<void> _loadBanners() async {
+  Future<void> _loadBanners({bool forceRefresh = false}) async {
     setState(() => _isLoadingBanners = true);
-    final all = await SupabaseService().fetchAnnouncements(department: 'ALL');
+    final all = await SupabaseService().fetchAnnouncements(department: 'ALL', forceRefresh: forceRefresh);
     final banners = all.where((a) => a.imageUrl != null && a.imageUrl!.isNotEmpty).toList();
     if (mounted) {
       setState(() {
@@ -5728,7 +5728,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryLight, size: 20),
-                onPressed: _loadBanners,
+                onPressed: () => _loadBanners(forceRefresh: true),
                 tooltip: 'تحديث القائمة',
               ),
             ],
