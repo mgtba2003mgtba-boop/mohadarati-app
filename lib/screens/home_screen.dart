@@ -43,15 +43,16 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBannerPage = 0;
 
   // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد وصور التبليغات والجداول)
+  List<AnnouncementModel>? _cachedBanners;
   List<AnnouncementModel> get _carouselBanners {
-    return _announcements.where((a) {
+    if (_cachedBanners != null) return _cachedBanners!;
+    _cachedBanners = _announcements.where((a) {
       if (a.content.contains('[SCHEDULE_TIMETABLE]') ||
           a.content.contains('[COURSE_REGISTRY') ||
           a.subjectName == 'SCHEDULE' ||
           a.subjectName == 'COURSE') {
         return false;
       }
-      // التمييز الصارم: بوستر البانر يجب أن يكون مصنفاً صراحة كبوستر للواجهة الرئيسية
       final isHomeBanner = a.category == 'banner' ||
           a.subjectName == 'BANNER' ||
           a.content.contains('[HOME_BANNER]');
@@ -60,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return a.imageUrl != null && a.imageUrl!.trim().isNotEmpty;
     }).toList();
+    return _cachedBanners!;
   }
 
   bool get _isPrivileged =>
@@ -165,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         _announcements = results[0] as List<AnnouncementModel>;
         _lectures = results[1] as List<LectureModel>;
+        _cachedBanners = null;
 
         // بدء تحريك كاروسيل الإعلانات الرسمية فقط
         _startBannerTimer(_carouselBanners.length);
@@ -441,7 +444,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return _buildDefaultUniversityBanner();
     }
 
-    return Column(
+    return RepaintBoundary(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // حاوية الكاروسيل المنظمة والمرتبة مباشرة
@@ -596,7 +600,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ],
-    );
+    ),
+  );
   }
 
   /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بدون أي صور عشوائية)

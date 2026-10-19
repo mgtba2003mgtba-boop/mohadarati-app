@@ -28,6 +28,9 @@ class LectureModel {
   final int? durationSeconds;
   final String? thumbnailUrl;
 
+  // ── حقل التخزين المؤقت لمؤشر البحث الفوري (O(1) Search Index) ──
+  String? _cachedSearchToken;
+
   LectureModel({
     required this.id,
     required this.title,
@@ -114,6 +117,13 @@ class LectureModel {
 
   bool get isPractical => type == 'practical';
   String get typeLabel => isPractical ? 'مختبر وعملي' : 'نظري';
+
+  /// مؤشر بحث مفهرس مسبقاً بالأحرف الصغيرة لتسريع الفلترة اللحظية (O(1) Search Index)
+  String get searchToken {
+    if (_cachedSearchToken != null) return _cachedSearchToken!;
+    _cachedSearchToken = '${title.toLowerCase()} ${subjectName.toLowerCase()} ${displayDescription.toLowerCase()}';
+    return _cachedSearchToken!;
+  }
 
   /// الوصف النظيف للعرض بدون وسوم النظام الداخلية
   String get displayDescription {

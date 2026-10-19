@@ -28,7 +28,10 @@ class TelegramAnnouncementCard extends StatefulWidget {
   State<TelegramAnnouncementCard> createState() => _TelegramAnnouncementCardState();
 }
 
-class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
+class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   // قائمة باقة التفاعلات الأكاديمية الشاملة المعتمدة
   static const List<String> _availableReactions = ['👍', '❤️', '👏', '💡', '🔥'];
 
@@ -171,6 +174,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final announcement = widget.announcement;
     final hasContent = announcement.displayContent.trim().isNotEmpty;
     final hasImage = announcement.imageUrl != null &&
@@ -188,7 +192,8 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
     final counts = announcement.reactionCounts;
     final totalReactions = announcement.totalReactionsCount;
 
-    return Container(
+    return RepaintBoundary(
+      child: Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -569,7 +574,8 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 

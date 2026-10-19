@@ -74,12 +74,12 @@ class _LecturesScreenState extends State<LecturesScreen> {
   }
 
   List<LectureModel> get _filteredLectures {
+    final cleanQuery = _searchQuery.trim().toLowerCase();
     return _lectures.where((l) {
       final matchesType = _selectedType == 'ALL' || l.type == _selectedType;
-      final matchesSearch = _searchQuery.isEmpty ||
-          l.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          l.subjectName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          l.section.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = cleanQuery.isEmpty ||
+          l.searchToken.contains(cleanQuery) ||
+          l.section.toLowerCase().contains(cleanQuery);
       return matchesType && matchesSearch;
     }).toList();
   }
@@ -294,6 +294,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
                         ),
                       )
                     : ListView.builder(
+                        cacheExtent: 800,
+                        addAutomaticKeepAlives: true,
+                        addRepaintBoundaries: true,
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         itemCount: _filteredLectures.length,
                         itemBuilder: (context, index) {
@@ -327,7 +330,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
   }
 
   Widget _buildLectureCard(LectureModel lecture) {
-    return Container(
+    return RepaintBoundary(
+      key: ValueKey('lec_card_${lecture.id}'),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -527,7 +532,8 @@ class _LecturesScreenState extends State<LecturesScreen> {
           ],
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSupervisorBar() {

@@ -179,11 +179,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   List<AnnouncementModel> get _filteredList {
+    final cleanQuery = _searchQuery.trim().toLowerCase();
     return _announcements.where((a) {
       final matchesCategory = _selectedCategory == 'ALL' || a.category == _selectedCategory;
-      final matchesSearch = _searchQuery.isEmpty ||
-          a.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          a.content.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = cleanQuery.isEmpty || a.searchToken.contains(cleanQuery);
       return matchesCategory && matchesSearch;
     }).toList();
   }
@@ -400,6 +399,8 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             itemCount: _filteredList.length,
+                            addAutomaticKeepAlives: true,
+                            addRepaintBoundaries: true,
                             itemBuilder: (context, index) {
                               final item = _filteredList[index];
                               if (item.isPoll) {

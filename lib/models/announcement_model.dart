@@ -240,6 +240,14 @@ class AnnouncementModel {
   final String? subjectName;
   final DateTime createdAt;
 
+  // ── حقول التخزين المؤقت التلقائي للأداء الفائق (Lazy Memoization) ──
+  Map<String, AnnouncementReaction>? _cachedReactions;
+  Map<String, int>? _cachedReactionCounts;
+  PollData? _cachedPollData;
+  bool _pollDataParsed = false;
+  String? _cachedDisplayContent;
+  String? _cachedSearchToken;
+
   AnnouncementModel({
     required this.id,
     required this.title,
@@ -268,6 +276,7 @@ class AnnouncementModel {
 
   /// خريطة التفاعلات المسجلة مع هذا التبليغ مفهرسة بمعرف الطالب
   Map<String, AnnouncementReaction> get reactions {
+    if (_cachedReactions != null) return _cachedReactions!;
     final match = RegExp(r'\[REACTIONS:([^\]]+)\]').firstMatch(content);
     if (match != null) {
       try {
@@ -281,11 +290,13 @@ class AnnouncementModel {
               res[key.toString()] = AnnouncementReaction.fromJson(Map<String, dynamic>.from(val));
             }
           });
-          return res;
+          _cachedReactions = res;
+          return _cachedReactions!;
         }
       } catch (_) {}
     }
-    return const {};
+    _cachedReactions = const {};
+    return _cachedReactions!;
   }
 
   /// قائمة كافة المتفاعلين (للمشرف العام حصراً)
@@ -296,11 +307,13 @@ class AnnouncementModel {
 
   /// إحصائية العدادات لكل إيموجي (تظهر لجميع الطلاب بهوية مجهولة)
   Map<String, int> get reactionCounts {
+    if (_cachedReactionCounts != null) return _cachedReactionCounts!;
     final counts = <String, int>{};
     for (final r in reactions.values) {
       counts[r.reaction] = (counts[r.reaction] ?? 0) + 1;
     }
-    return counts;
+    _cachedReactionCounts = counts;
+    return _cachedReactionCounts!;
   }
 
   /// الإيموجي الذي تفاعل به مستخدم معين إن وجد
@@ -397,18 +410,20 @@ class AnnouncementModel {
 
   /// استخراج بيانات الاستطلاع من المحتوى
   PollData? get pollData {
+    if (_pollDataParsed) return _cachedPollData;
     final jsonStr = extractPollJson(content);
     if (jsonStr != null) {
       try {
         final decoded = jsonDecode(jsonStr);
         if (decoded is Map<String, dynamic>) {
-          return PollData.fromJson(decoded);
+          _cachedPollData = PollData.fromJson(decoded);
         } else if (decoded is Map) {
-          return PollData.fromJson(Map<String, dynamic>.from(decoded));
+          _cachedPollData = PollData.fromJson(Map<String, dynamic>.from(decoded));
         }
       } catch (_) {}
     }
-    return null;
+    _pollDataParsed = true;
+    return _cachedPollData;
   }
 
   /// تضمين أو تحديث وسم الاستطلاع في المحتوى
@@ -440,7 +455,8 @@ class AnnouncementModel {
 
   /// المحتوى النظيف للعرض بدون وسوم تيليجرام والنظام الداخلية
   String get displayContent {
-    return stripPollTag(content)
+    if (_cachedDisplayContent != null) return _cachedDisplayContent!;
+    _cachedDisplayContent = stripPollTag(content)
         .replaceAll(RegExp(r'\[TG_MSG_ID:\d+\]'), '')
         .replaceAll('[SCHEDULE_TIMETABLE]', '')
         .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')
@@ -455,6 +471,14 @@ class AnnouncementModel {
         .replaceAll(RegExp(r'\[?ANNOUNCEMENT\]?', caseSensitive: false), '')
         .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
         .trim();
+    return _cachedDisplayContent!;
+  }
+
+  /// مؤشر بحث مفهرس مسبقاً بالأحرف الصغيرة لتسريع الفلترة اللحظية (O(1) Search Index)
+  String get searchToken {
+    if (_cachedSearchToken != null) return _cachedSearchToken!;
+    _cachedSearchToken = '${title.toLowerCase()} ${displayContent.toLowerCase()} ${subjectName?.toLowerCase() ?? ""}';
+    return _cachedSearchToken!;
   }
 
   factory AnnouncementModel.fromJson(Map<String, dynamic> json) {

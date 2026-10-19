@@ -61,7 +61,26 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   String _lectureTypeFilter = 'ALL'; // 'ALL', 'theory', 'practical'
   String _selectedSectionFilter = 'ALL'; // 'ALL', 'A', 'B', 'C', 'D', 'UNIFIED'
-  String _searchQuery = '';
+  final ValueNotifier<String> _searchQueryNotifier = ValueNotifier<String>('');
+
+  // ── فهرسة مسبقة لعدد المحاضرات لكل شعبة O(1) Lookups ──
+  Map<String, int> _lectureSectionCounts = {};
+
+  void _rebuildSectionCounts() {
+    final counts = <String, int>{
+      'ALL': _subjectLectures.length,
+      'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'UNIFIED': 0,
+    };
+    for (final l in _subjectLectures) {
+      final sec = l.section.toUpperCase();
+      if (sec == 'ALL' || sec.isEmpty) {
+        counts['UNIFIED'] = (counts['UNIFIED'] ?? 0) + 1;
+      } else {
+        counts[sec] = (counts[sec] ?? 0) + 1;
+      }
+    }
+    _lectureSectionCounts = counts;
+  }
 
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
@@ -138,6 +157,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchQueryNotifier.dispose();
     _announcementInsertSub?.cancel();
     _announcementUpdateSub?.cancel();
     super.dispose();
@@ -190,6 +210,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         forceRefresh: forceRefresh,
       );
       _subjectLectures = allLectures.where((l) => _matchesSubject(l.subjectName)).toList();
+      _rebuildSectionCounts();
 
       // 2. جلب تبليغات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي المزدوج)
       final allAnnouncements = await service.fetchAnnouncements(
@@ -231,8 +252,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
   }
 
-  List<LectureModel> get _filteredLectures {
+  List<LectureModel> _getFilteredLectures(String query) {
     final bool isAdmin = _user?.isAdmin == true;
+    final cleanQuery = query.trim().toLowerCase();
 
     return _subjectLectures.where((l) {
       final matchesType =
@@ -245,7 +267,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ? (l.section == 'ALL' || l.section.isEmpty)
                 : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
       } else {
-        // للطالب أو الممثل: تظهر فقط محاضرات شعبته والمحاضرات الموحدة، وأي محاضرة قام هو برفعها
         final bool isAuthor = _user != null && (_user!.studentId == l.uploaderId);
         matchesSection = isAuthor ||
             l.section == 'ALL' ||
@@ -253,14 +274,14 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             (_user != null && _user!.hasSectionAccess(l.section));
       }
 
-      final matchesSearch = _searchQuery.isEmpty ||
-          l.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = cleanQuery.isEmpty || l.searchToken.contains(cleanQuery);
       return matchesType && matchesSection && matchesSearch;
     }).toList();
   }
 
-  List<AnnouncementModel> get _filteredAnnouncements {
+  List<AnnouncementModel> _getFilteredAnnouncements(String query) {
     final bool isAdmin = _user?.isAdmin == true;
+    final cleanQuery = query.trim().toLowerCase();
 
     return _subjectAnnouncements.where((a) {
       final bool matchesSection;
@@ -270,7 +291,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ? (a.section == 'ALL' || a.section.isEmpty)
                 : (a.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || a.section == 'ALL'));
       } else {
-        // للطالب أو الممثل: تظهر فقط تبليغات شعبته والتبليغات العامة الموحدة، وأي تبليغ نشره هو بنفسه
         final bool isAuthor = _user != null && (_user!.studentId == a.authorId);
         matchesSection = isAuthor ||
             a.section == 'ALL' ||
@@ -278,19 +298,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             (_user != null && _user!.hasSectionAccess(a.section));
       }
 
-      final matchesSearch = _searchQuery.isEmpty ||
-          a.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          a.content.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = cleanQuery.isEmpty || a.searchToken.contains(cleanQuery);
       return matchesSection && matchesSearch;
     }).toList();
   }
 
+
   int _countLecturesForSection(String sec) {
-    if (sec == 'ALL') return _subjectLectures.length;
-    if (sec == 'UNIFIED') {
-      return _subjectLectures.where((l) => l.section == 'ALL' || l.section.isEmpty).length;
-    }
-    return _subjectLectures.where((l) => l.section.toUpperCase() == sec.toUpperCase()).length;
+    if (_lectureSectionCounts.isEmpty) _rebuildSectionCounts();
+    return _lectureSectionCounts[sec.toUpperCase()] ?? 0;
   }
 
   Future<void> _launchUrlExternal(String? urlString, {required String errorMsg}) async {
@@ -542,7 +558,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               Expanded(
                 child: TextField(
                   style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
-                  onChanged: (val) => setState(() => _searchQuery = val),
+                  onChanged: (val) => _searchQueryNotifier.value = val,
                   decoration: InputDecoration(
                     hintText: 'ابحث في محاضرات المادة...',
                     hintStyle: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 12),
@@ -625,8 +641,12 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ),
 
         Expanded(
-          child: _filteredLectures.isEmpty
-              ? Center(
+          child: ValueListenableBuilder<String>(
+            valueListenable: _searchQueryNotifier,
+            builder: (context, query, _) {
+              final lectures = _getFilteredLectures(query);
+              if (lectures.isEmpty) {
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -651,15 +671,21 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       ],
                     ],
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  itemCount: _filteredLectures.length,
-                  itemBuilder: (context, index) {
-                    final item = _filteredLectures[index];
-                    return _buildLectureCard(item);
-                  },
-                ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                itemCount: lectures.length,
+                addAutomaticKeepAlives: true,
+                addRepaintBoundaries: true,
+                itemBuilder: (context, index) {
+                  final item = lectures[index];
+                  return _buildLectureCard(item);
+                },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -769,7 +795,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   Widget _buildLectureCard(LectureModel lecture) {
-    return Container(
+    return RepaintBoundary(
+      key: ValueKey('lec_b_${lecture.id}'),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -995,71 +1023,79 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   // ══════════════════════════════════════════════════════════════
   // تبويب 2: تبليغات المادة الأكاديمية
   // ══════════════════════════════════════════════════════════════
   Widget _buildAnnouncementsTab() {
-    final announcements = _filteredAnnouncements;
-    if (announcements.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.campaign_outlined, size: 48, color: Color(0xFFCBD5E1)),
-            const SizedBox(height: 10),
-            Text(
-              'لا توجد تبليغات خاصة بهذه الشعبة حالياً',
-              style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
-            ),
-            if (_canPublish) ...[
-              const SizedBox(height: 14),
-              ElevatedButton.icon(
-                onPressed: () => _showPublishSheet(initialMode: 'announcement'),
-                icon: const Icon(Icons.campaign_rounded, size: 18, color: Colors.black),
-                label: Text('نشر أول تبليغ الآن', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    return ValueListenableBuilder<String>(
+      valueListenable: _searchQueryNotifier,
+      builder: (context, query, _) {
+        final announcements = _getFilteredAnnouncements(query);
+        if (announcements.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.campaign_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                const SizedBox(height: 10),
+                Text(
+                  'لا توجد تبليغات خاصة بهذه الشعبة حالياً',
+                  style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 13),
                 ),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      cacheExtent: 800,
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: announcements.length,
-      itemBuilder: (context, index) {
-        final item = announcements[index];
-        if (item.isPoll) {
-          return RepaintBoundary(
-            key: ValueKey('subj_poll_b_${item.id}'),
-            child: TelegramPollCard(
-              key: ValueKey('subj_poll_${item.id}'),
-              announcement: item,
-              currentUser: _user,
-              onVoteChanged: () => _loadSubjectData(forceRefresh: false, showSpinner: false),
-              onDelete: () => _confirmDeleteAnnouncement(item),
+                if (_canPublish) ...[
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    onPressed: () => _showPublishSheet(initialMode: 'announcement'),
+                    icon: const Icon(Icons.campaign_rounded, size: 18, color: Colors.black),
+                    label: Text('نشر أول تبليغ الآن', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ],
             ),
           );
         }
-        return RepaintBoundary(
-          key: ValueKey('subj_ann_b_${item.id}'),
-          child: TelegramAnnouncementCard(
-            key: ValueKey('subj_ann_${item.id}'),
-            announcement: item,
-            currentUser: _user,
-            onReactionToggled: (emoji) => _toggleReaction(item, emoji),
-            onDelete: () => _confirmDeleteAnnouncement(item),
-          ),
+
+        return ListView.builder(
+          cacheExtent: 800,
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          itemCount: announcements.length,
+          addAutomaticKeepAlives: true,
+          addRepaintBoundaries: true,
+          itemBuilder: (context, index) {
+            final item = announcements[index];
+            if (item.isPoll) {
+              return RepaintBoundary(
+                key: ValueKey('subj_poll_b_${item.id}'),
+                child: TelegramPollCard(
+                  key: ValueKey('subj_poll_${item.id}'),
+                  announcement: item,
+                  currentUser: _user,
+                  onVoteChanged: () => _loadSubjectData(forceRefresh: false, showSpinner: false),
+                  onDelete: () => _confirmDeleteAnnouncement(item),
+                ),
+              );
+            }
+            return RepaintBoundary(
+              key: ValueKey('subj_ann_b_${item.id}'),
+              child: TelegramAnnouncementCard(
+                key: ValueKey('subj_ann_${item.id}'),
+                announcement: item,
+                currentUser: _user,
+                onReactionToggled: (emoji) => _toggleReaction(item, emoji),
+                onDelete: () => _confirmDeleteAnnouncement(item),
+              ),
+            );
+          },
         );
       },
     );
@@ -1213,6 +1249,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           // 1. إدراج فوري تفاؤلي في قائمة محاضرات المادة (استجابة فورية < 16ms)
           setState(() {
             _subjectLectures.insert(0, optimisticLecture);
+            _rebuildSectionCounts();
           });
           HapticFeedback.lightImpact();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1273,6 +1310,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             if (mounted) {
               setState(() {
                 _subjectLectures.removeWhere((l) => l.id == optimisticLecture.id);
+                _rebuildSectionCounts();
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('فشلت مزامنة المحاضرة: $e'), backgroundColor: AppTheme.danger),
