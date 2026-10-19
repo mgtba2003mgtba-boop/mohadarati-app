@@ -235,7 +235,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   List<LectureModel> get _filteredLectures {
     final bool isAdmin = _user?.isAdmin == true;
-    final String userSec = _user?.section ?? '';
 
     return _subjectLectures.where((l) {
       final matchesType =
@@ -253,7 +252,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         matchesSection = isAuthor ||
             l.section == 'ALL' ||
             l.section.isEmpty ||
-            (userSec.isNotEmpty && l.section.toUpperCase() == userSec.toUpperCase());
+            (_user != null && _user!.hasSectionAccess(l.section));
       }
 
       final matchesSearch = _searchQuery.isEmpty ||
@@ -264,7 +263,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   List<AnnouncementModel> get _filteredAnnouncements {
     final bool isAdmin = _user?.isAdmin == true;
-    final String userSec = _user?.section ?? '';
 
     return _subjectAnnouncements.where((a) {
       final bool matchesSection;
@@ -279,7 +277,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         matchesSection = isAuthor ||
             a.section == 'ALL' ||
             a.section.isEmpty ||
-            (userSec.isNotEmpty && a.section.toUpperCase() == userSec.toUpperCase());
+            (_user != null && _user!.hasSectionAccess(a.section));
       }
 
       final matchesSearch = _searchQuery.isEmpty ||
@@ -1290,8 +1288,10 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
       _targetSection = widget.section!;
     } else if (widget.currentUser?.isAdmin == true) {
       _targetSection = 'ALL';
+    } else if (widget.currentUser?.assignedSections.isNotEmpty == true) {
+      _targetSection = widget.currentUser!.assignedSections.first;
     } else {
-      _targetSection = widget.currentUser?.section ?? 'ALL';
+      _targetSection = 'ALL';
     }
   }
 
@@ -1852,9 +1852,11 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
               const SizedBox(height: 14),
 
               // الشعبة المستهدفة بالتبليغ
-              if (widget.currentUser?.isAdmin == true) ...[
+              if (widget.currentUser?.isAdmin == true || (widget.currentUser?.hasMultipleSections == true)) ...[
                 DropdownButtonFormField<String>(
-                  value: _targetSection,
+                  value: (widget.currentUser?.isAdmin == true || widget.currentUser?.assignedSections.contains(_targetSection) == true || _targetSection == 'ALL')
+                      ? _targetSection
+                      : (widget.currentUser?.assignedSections.first ?? 'ALL'),
                   dropdownColor: Colors.white,
                   style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
                   decoration: InputDecoration(
@@ -1864,14 +1866,19 @@ class _PublishToSubjectSheetState extends State<_PublishToSubjectSheet> {
                     prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
-                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-                    DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
-                    DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                  items: [
+                    const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب (عام لكافة الطلاب)')),
+                    if (widget.currentUser?.isAdmin == true) ...const [
+                      DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                      DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                      DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                      DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                      DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
+                      DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                    ] else ...[
+                      for (final sec in widget.currentUser!.assignedSections)
+                        DropdownMenuItem(value: sec, child: Text('🏷️ شعبة $sec')),
+                    ],
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _targetSection = val);

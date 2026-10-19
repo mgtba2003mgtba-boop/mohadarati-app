@@ -71,7 +71,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       final matchesSection = isAdmin ||
           inserted.section == 'ALL' ||
           inserted.section.isEmpty ||
-          inserted.section.toUpperCase() == mySection.toUpperCase();
+          (_user != null && _user!.hasSectionAccess(inserted.section));
 
       if (matchesDept && matchesStage && matchesSection) {
         setState(() {
@@ -659,7 +659,9 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
     final u = widget.currentUser;
     _dept = u.isAdmin ? 'ALL' : u.department;
     _stage = u.isAdmin ? 'ALL' : u.stage;
-    _section = u.isAdmin ? 'ALL' : ((u.section != null && u.section!.isNotEmpty) ? u.section! : 'ALL');
+    _section = u.isAdmin
+        ? 'ALL'
+        : (u.assignedSections.isNotEmpty ? u.assignedSections.first : 'ALL');
   }
 
   @override
@@ -965,7 +967,9 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
               const SizedBox(height: 12),
 
               DropdownButtonFormField<String>(
-                value: _section,
+                value: (widget.currentUser.isAdmin || widget.currentUser.assignedSections.contains(_section) || _section == 'ALL')
+                    ? _section
+                    : (widget.currentUser.assignedSections.isNotEmpty ? widget.currentUser.assignedSections.first : 'ALL'),
                 dropdownColor: Colors.white,
                 style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
                 decoration: InputDecoration(
@@ -975,12 +979,19 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                   prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب')),
-                  DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                  DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                  DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                  DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                items: [
+                  const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب')),
+                  if (widget.currentUser.isAdmin) ...const [
+                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                    DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
+                    DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                  ] else ...[
+                    for (final s in widget.currentUser.assignedSections)
+                      DropdownMenuItem(value: s, child: Text('🏷️ شعبة $s')),
+                  ],
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => _section = val);

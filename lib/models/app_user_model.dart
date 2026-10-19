@@ -51,6 +51,39 @@ class AppUserModel {
   bool get canPromoteUsers => isAdmin;
   bool get canManageCourses => isAdmin || isRepresentative || canManageLectures;
 
+  /// قائمة الشُعب المعيارية المكلف بها أو المنتمي إليها (e.g. ['A', 'B'])
+  List<String> get assignedSections {
+    if (section == null || section!.trim().isEmpty) return [];
+    return section!
+        .split(RegExp(r'[,،/\s]+'))
+        .map((s) => s.trim().toUpperCase())
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  /// هل المستخدم مكلف بأكثر من شعبة دراسية
+  bool get hasMultipleSections => assignedSections.length > 1;
+
+  /// فحص صلاحية الوصول أو الانتماء لشعبة معينة
+  bool hasSectionAccess(String? targetSection) {
+    if (isAdmin) return true;
+    if (targetSection == null || targetSection.trim().isEmpty) return true;
+    final cleanTarget = targetSection.trim().toUpperCase();
+    if (cleanTarget == 'ALL' || cleanTarget == 'الكل' || cleanTarget == 'عام') return true;
+
+    final sections = assignedSections;
+    if (sections.contains('ALL') || sections.contains('الكل')) return true;
+    return sections.contains(cleanTarget);
+  }
+
+  /// نص منسق لعرض الشعب المكلف بها (مثل "A، B")
+  String get sectionsDisplayLabel {
+    final list = assignedSections;
+    if (list.isEmpty) return section ?? 'غير محدد';
+    return list.join('، ');
+  }
+
   String get roleLabel => AppConstants.getRoleLabel(role);
 
   AppUserModel copyWith({

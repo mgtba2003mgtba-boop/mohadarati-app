@@ -117,9 +117,6 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   List<ScheduleModel> _getFilteredSchedules(String type) {
     final bool isPrivileged = _isPrivileged;
     final preview = AdminPreviewService();
-    final String userSec = (isPrivileged && preview.isCustomActive && preview.section != null)
-        ? preview.section!
-        : (_user?.section ?? '');
 
     return _schedules.where((s) {
       if (s.type != type) return false;
@@ -139,8 +136,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
         return s.section.toUpperCase() == _selectedScheduleSection.toUpperCase() || s.section.toUpperCase() == 'ALL';
       } else {
         // للطالب أو الممثل: تظهر فقط جداول شعبته ومرحلته حصراً
-        if (userSec.isEmpty) return false;
-        return s.section.toUpperCase() == userSec.toUpperCase() || s.section.toUpperCase() == 'ALL';
+        return _user?.hasSectionAccess(s.section) == true;
       }
     }).toList();
   }
@@ -192,7 +188,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final preview = AdminPreviewService();
     String targetSection = isAdmin
         ? (preview.section != null && preview.section!.isNotEmpty ? preview.section! : 'A')
-        : (_user?.section != null && _user!.section!.trim().isNotEmpty ? _user!.section!.trim().toUpperCase() : 'A');
+        : (_user?.assignedSections.isNotEmpty == true ? _user!.assignedSections.first : 'A');
 
     showDialog(
       context: context,
@@ -267,14 +263,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 const SizedBox(height: 12),
 
                 // الشعبة المستهدفة: اختيار للمشرف، قفل تلقائي للممثل
-                if (isAdmin) ...[
+                if (isAdmin || (_user?.hasMultipleSections == true)) ...[
                   Text(
                     'الشعبة المستهدفة:',
                     style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    initialValue: targetSection,
+                    initialValue: (isAdmin || (_user?.assignedSections.contains(targetSection) == true))
+                        ? targetSection
+                        : (_user?.assignedSections.isNotEmpty == true ? _user!.assignedSections.first : 'A'),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: AppTheme.lightSurface,
@@ -284,11 +282,16 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                         borderSide: const BorderSide(color: AppTheme.lightBorder),
                       ),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'A', child: Text('شعبة A')),
-                      DropdownMenuItem(value: 'B', child: Text('شعبة B')),
-                      DropdownMenuItem(value: 'C', child: Text('شعبة C')),
-                      DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                    items: [
+                      if (isAdmin) ...const [
+                        DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                        DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                        DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                        DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                      ] else ...[
+                        for (final s in (_user?.assignedSections ?? ['A']))
+                          DropdownMenuItem(value: s, child: Text('شعبة $s')),
+                      ],
                     ],
                     onChanged: (val) {
                       if (val != null) setDlgState(() => targetSection = val);

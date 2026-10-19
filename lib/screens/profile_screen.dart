@@ -227,7 +227,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildProfileRow('المعرف:', _user!.studentId),
                   _buildProfileRow('القسم:', _user!.department),
                   _buildProfileRow('المرحلة:', _user!.stage),
-                  if (_user!.section != null) _buildProfileRow('الشعبة:', _user!.section!),
+                  if (_user!.section != null)
+                    _buildProfileRow(_user!.hasMultipleSections ? 'الشُعب المكلف بها:' : 'الشعبة:', _user!.sectionsDisplayLabel),
                   if (_user!.phone != null) _buildProfileRow('الهاتف:', _user!.phone!),
                 ],
               ),

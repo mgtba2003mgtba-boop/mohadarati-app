@@ -533,10 +533,16 @@ class SupabaseService {
       }
 
       if (section != null && section.isNotEmpty && section != 'ALL') {
-        list = list.where((a) =>
-            a.section == 'ALL' ||
-            a.section.isEmpty ||
-            a.section.toUpperCase() == section.toUpperCase()).toList();
+        final secList = section
+            .split(RegExp(r'[,،/\s]+'))
+            .map((s) => s.trim().toUpperCase())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        list = list.where((a) {
+          if (a.section == 'ALL' || a.section.isEmpty) return true;
+          final targetSec = a.section.trim().toUpperCase();
+          return secList.contains(targetSec) || secList.contains('ALL');
+        }).toList();
       }
 
       await _setCachedData(
@@ -1295,10 +1301,16 @@ class SupabaseService {
       var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
 
       if (section != null && section.isNotEmpty && section != 'ALL') {
-        list = list.where((l) =>
-            l.section == 'ALL' ||
-            l.section.isEmpty ||
-            l.section.toUpperCase() == section.toUpperCase()).toList();
+        final secList = section
+            .split(RegExp(r'[,،/\s]+'))
+            .map((s) => s.trim().toUpperCase())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        list = list.where((l) {
+          if (l.section == 'ALL' || l.section.isEmpty) return true;
+          final targetSec = l.section.trim().toUpperCase();
+          return secList.contains(targetSec) || secList.contains('ALL');
+        }).toList();
       }
 
       await _setCachedData(
@@ -1475,13 +1487,22 @@ class SupabaseService {
   }) async {
     try {
       final normStage = AppConstants.normalizeStage(student.stage);
+      final cleanSections = section
+          .split(RegExp(r'[,،/\s]+'))
+          .map((s) => s.trim().toUpperCase())
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+          .join(', ');
+      final finalSection = cleanSections.isNotEmpty ? cleanSections : section.trim().toUpperCase();
+
       final existing = await getAppUserByStudentId(student.id);
       if (existing != null) {
         await client.from('app_users').update({
           'role': AppConstants.roleRepresentative,
           'department': student.department,
           'stage': normStage,
-          'section': section,
+          'section': finalSection,
           'can_publish_lectures': canLectures,
           'can_publish_announcements': canAnnouncements,
           'is_approved': true,
@@ -1493,7 +1514,7 @@ class SupabaseService {
           'name': student.name,
           'department': student.department,
           'stage': normStage,
-          'section': section,
+          'section': finalSection,
           'role': AppConstants.roleRepresentative,
           'can_publish_lectures': canLectures,
           'can_publish_announcements': canAnnouncements,
@@ -1745,7 +1766,16 @@ class SupabaseService {
         'can_publish_announcements': canPublishAnnouncements,
         'updated_at': DateTime.now().toIso8601String(),
       };
-      if (section != null) updateData['section'] = section;
+      if (section != null) {
+        final cleanSections = section
+            .split(RegExp(r'[,،/\s]+'))
+            .map((s) => s.trim().toUpperCase())
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+            .join(', ');
+        updateData['section'] = cleanSections.isNotEmpty ? cleanSections : section.trim().toUpperCase();
+      }
       if (stage != null) updateData['stage'] = stage;
       if (department != null) updateData['department'] = department;
 

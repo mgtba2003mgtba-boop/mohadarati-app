@@ -592,7 +592,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     bool canLectures = user.canPublishLectures;
     bool canAnnouncements = user.canPublishAnnouncements;
     int selectedSemester = user.semester;
-    final sectionController = TextEditingController(text: user.section ?? '');
+    final selectedSectionsSet = user.assignedSections.toSet();
+    final sectionController = TextEditingController(
+      text: selectedSectionsSet.isNotEmpty
+          ? (selectedSectionsSet.toList()..sort()).join(', ')
+          : (user.section ?? ''),
+    );
 
     showDialog(
       context: context,
@@ -664,15 +669,61 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     const Divider(color: AppTheme.lightBorder, height: 20),
 
                     // الشعبة
+                    Text(
+                      'الشُعب الأكاديمية المكلف بها (يمكن اختيار أكثر من شعبة):',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: ['A', 'B', 'C', 'D', 'E', 'F'].map((sec) {
+                        final isSelected = selectedSectionsSet.contains(sec);
+                        return FilterChip(
+                          label: Text(
+                            'شعبة $sec',
+                            style: GoogleFonts.cairo(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.black : AppTheme.textPrimary,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: AppTheme.accent,
+                          checkmarkColor: Colors.black,
+                          onSelected: (val) {
+                            setDialogState(() {
+                              if (val) {
+                                selectedSectionsSet.add(sec);
+                              } else {
+                                selectedSectionsSet.remove(sec);
+                              }
+                              sectionController.text = (selectedSectionsSet.toList()..sort()).join(', ');
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: sectionController,
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        labelText: 'الشعبة الأكاديمية (A, B, C...)',
+                        labelText: 'الشعب المحددة (مثال: A, B)',
+                        helperText: 'انقر على أزرار الشُعب أعلاه أو اكتبها يدوياً مفصولة بفواصل',
+                        helperStyle: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
                         labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedSectionsSet.clear();
+                          selectedSectionsSet.addAll(
+                            val.split(RegExp(r'[,،/\s]+')).map((s) => s.trim().toUpperCase()).where((s) => s.isNotEmpty),
+                          );
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -2335,7 +2386,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return l.uploaderId == _currentUser!.studentId ||
           (l.department == _currentUser!.department &&
               AppConstants.normalizeStage(l.stage) == AppConstants.normalizeStage(_currentUser!.stage) &&
-              (l.section == _currentUser!.section || l.section == 'ALL'));
+              _currentUser!.hasSectionAccess(l.section));
     }).toList();
 
     return Column(
@@ -2593,7 +2644,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return a.authorId == _currentUser!.studentId ||
           (a.department == _currentUser!.department &&
               AppConstants.normalizeStage(a.stage) == AppConstants.normalizeStage(_currentUser!.stage) &&
-              (a.section == _currentUser!.section || a.section == 'ALL' || a.section.isEmpty));
+              _currentUser!.hasSectionAccess(a.section));
     }).toList();
 
     return Column(
@@ -3786,7 +3837,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               u.isRepresentative &&
                               u.department == _selectedRepDept &&
                               AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(_selectedRepStage) &&
-                              u.section == sec
+                              u.hasSectionAccess(sec)
                             ).length;
 
                             return Padding(
@@ -3822,7 +3873,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       u.isRepresentative &&
                       u.department == _selectedRepDept &&
                       AppConstants.normalizeStage(u.stage) == AppConstants.normalizeStage(_selectedRepStage) &&
-                      u.section == _selectedRepSection
+                      u.hasSectionAccess(_selectedRepSection)
                     ).toList();
 
                     return Column(
@@ -3909,7 +3960,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                             style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                                           ),
                                           Text(
-                                            '${rep.studentId} • ممثل شعبة ${rep.section ?? _selectedRepSection}',
+                                            '${rep.studentId} • مكلف بالشُعب: ${rep.sectionsDisplayLabel}',
                                             style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
                                           ),
                                         ],
@@ -4295,7 +4346,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${rep.studentId} • ${rep.department} (${rep.stage})${rep.section != null && rep.section!.isNotEmpty ? ' • شعبة ${rep.section}' : ''}',
+                      '${rep.studentId} • ${rep.department} (${rep.stage})${rep.section != null && rep.section!.isNotEmpty ? ' • شُعب ${rep.sectionsDisplayLabel}' : ''}',
                       style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
                     ),
                     if (rep.createdAt != null)
@@ -4708,6 +4759,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     bool isLoadingStudents = true;
     List<StudentModel> biometricStudents = [];
     StudentModel? selectedStudent;
+    final Set<String> assignedSections = {section.trim().toUpperCase()};
 
     showDialog(
       context: context,
@@ -4806,7 +4858,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       )
                     else
                       Container(
-                        height: 220,
+                        height: 200,
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(12),
@@ -4878,17 +4930,106 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                       groupValue: selectedStudent?.id,
                                       activeColor: AppTheme.accent,
                                       onChanged: (_) {
-                                        setDialogState(() => selectedStudent = st);
+                                        setDialogState(() {
+                                          selectedStudent = st;
+                                          final existingUser = _allUsers.cast<AppUserModel?>().firstWhere(
+                                            (u) => u?.studentId == st.id,
+                                            orElse: () => null,
+                                          );
+                                          if (existingUser != null && existingUser.assignedSections.isNotEmpty) {
+                                            assignedSections.addAll(existingUser.assignedSections);
+                                          }
+                                        });
                                       },
                                     ),
                                     onTap: () {
-                                      setDialogState(() => selectedStudent = st);
+                                      setDialogState(() {
+                                        selectedStudent = st;
+                                        final existingUser = _allUsers.cast<AppUserModel?>().firstWhere(
+                                          (u) => u?.studentId == st.id,
+                                          orElse: () => null,
+                                        );
+                                        if (existingUser != null && existingUser.assignedSections.isNotEmpty) {
+                                          assignedSections.addAll(existingUser.assignedSections);
+                                        }
+                                      });
                                     },
                                   );
                                 },
                               ),
                       ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
+
+                    // محدد الشُعب المتعددة
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.lightBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.hub_rounded, color: AppTheme.accent, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'الشُعب المكلف بها الممثل:',
+                                style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                              ),
+                              const Spacer(),
+                              Text(
+                                assignedSections.isEmpty ? 'شعبة ($section)' : assignedSections.toList().join('، '),
+                                style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'يمكنك اختيار أكثر من شعبة لتكليف الممثل بعدة شعب معاً:',
+                            style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: (_availableBiometricSections.isNotEmpty
+                                    ? _availableBiometricSections
+                                    : ['A', 'B', 'C', 'D', 'E', 'F'])
+                                .map((s) {
+                              final isChecked = assignedSections.contains(s);
+                              return FilterChip(
+                                label: Text(
+                                  'شعبة $s',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isChecked ? Colors.black : AppTheme.textPrimary,
+                                  ),
+                                ),
+                                selected: isChecked,
+                                selectedColor: AppTheme.accent,
+                                checkmarkColor: Colors.black,
+                                onSelected: (selected) {
+                                  setDialogState(() {
+                                    if (selected) {
+                                      assignedSections.add(s);
+                                    } else {
+                                      if (assignedSections.length > 1) {
+                                        assignedSections.remove(s);
+                                      }
+                                    }
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
                     SwitchListTile(
                       dense: true,
@@ -4921,22 +5062,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.verified_user_rounded, color: Colors.black, size: 18),
-                  label: Text('تكليف وتثبيت الممثل ⭐',
-                      style: GoogleFonts.cairo(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                  label: Text(
+                    assignedSections.length > 1
+                        ? 'تكليف لشُعب (${(assignedSections.toList()..sort()).join(', ')}) ⭐'
+                        : 'تكليف وتثبيت الممثل ⭐',
+                    style: GoogleFonts.cairo(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                   onPressed: selectedStudent == null
                       ? null
                       : () async {
                           final targetStudent = selectedStudent!;
+                          final finalSecString = (assignedSections.toList()..sort()).join(', ');
                           Navigator.pop(dialogCtx);
-                          _showSnackbar('جارٍ تكليف ${targetStudent.name} ممثلاً لشعبة ($section)...');
+                          _showSnackbar('جارٍ تكليف ${targetStudent.name} ممثلاً لشُعب ($finalSecString)...');
                           final ok = await SupabaseService().assignSectionRepresentative(
                             student: targetStudent,
-                            section: section,
+                            section: finalSecString.isNotEmpty ? finalSecString : section,
                             canLectures: canLectures,
                             canAnnouncements: canAnnouncements,
                           );
                           if (ok) {
-                            _showSnackbar('تم تكليف ${targetStudent.name} ممثلاً لشعبة ($section) بنجاح ⭐');
+                            _showSnackbar('تم تكليف ${targetStudent.name} ممثلاً لشُعب ($finalSecString) بنجاح ⭐');
                             await _loadDashboardData();
                           } else {
                             _showSnackbar('حدث خطأ أثناء حفظ التكليف', isError: true);
