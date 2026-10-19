@@ -58,13 +58,22 @@ idx_path = os.path.join(BUILD_WEB, "index.html")
 if os.path.exists(idx_path):
     with open(idx_path, "r", encoding="utf-8") as f:
         content = f.read()
+    import re
     if '<base href="/mohadarati/">' in content:
         content = content.replace('<base href="/mohadarati/">', '<base href="/">')
-    if 'src="flutter_bootstrap.js"' in content:
-        content = content.replace('src="flutter_bootstrap.js"', f'src="flutter_bootstrap.js?v={build_time}"')
+    content = re.sub(r'src="flutter_bootstrap\.js(?:\?v=\d+)?"', f'src="flutter_bootstrap.js?v={build_time}"', content)
     with open(idx_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"[+] Updated index.html with base href='/' and flutter_bootstrap.js?v={build_time}")
+
+    fb_path = os.path.join(BUILD_WEB, "flutter_bootstrap.js")
+    if os.path.exists(fb_path):
+        with open(fb_path, "r", encoding="utf-8") as f:
+            fb_content = f.read()
+        fb_content = re.sub(r'"mainJsPath":\s*"main\.dart\.js(?:\?v=\d+)?"', f'"mainJsPath":"main.dart.js?v={build_time}"', fb_content)
+        with open(fb_path, "w", encoding="utf-8") as f:
+            f.write(fb_content)
+        print(f"[+] Injected cache buster into flutter_bootstrap.js mainJsPath: ?v={build_time}")
 
 # 5. Git setup in build/web
 git_dir = os.path.join(BUILD_WEB, ".git")

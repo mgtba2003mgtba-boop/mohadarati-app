@@ -245,6 +245,9 @@
 
       // دالة لتفريغ كاش المتصفح فورياً وإعادة تحميل الصفحة بنسخة جديدة قسرياً
       function forcePurgeAndReload(newBuild) {
+        if (window.location.search && window.location.search.indexOf(newBuild) !== -1) {
+          return;
+        }
         try {
           if ('caches' in window) {
             caches.keys().then(function(names) {
