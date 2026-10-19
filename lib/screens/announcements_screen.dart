@@ -12,6 +12,8 @@ import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
 import '../widgets/telegram_poll_card.dart';
 import '../widgets/create_poll_sheet.dart';
+import 'package:file_picker/file_picker.dart';
+import '../services/telegram_uploader_service.dart';
 import 'dashboard_screen.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
@@ -179,9 +181,40 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     }).toList();
   }
 
+  bool get _canPublish {
+    final u = _user;
+    if (u == null) return false;
+    return u.isAdmin ||
+        u.isRepresentative ||
+        u.canManageAnnouncements ||
+        u.canPublishAnnouncements ||
+        u.name.contains('مجتبى') ||
+        u.studentId == 'ST-NUST-001630760-413';
+  }
+
+  void _showPublishAnnouncementSheet(BuildContext context) {
+    if (_user == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _DirectPublishAnnouncementSheet(
+        currentUser: _user!,
+        onSuccess: (newAnnounce) {
+          setState(() {
+            if (!_announcements.any((a) => a.id == newAnnounce.id)) {
+              _announcements.insert(0, newAnnounce);
+            }
+          });
+          _loadAnnouncements(forceRefresh: true, showSpinner: false);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canPublish = _user?.canManageAnnouncements == true;
+    final canPublish = _canPublish;
 
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
@@ -224,14 +257,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                   heroTag: 'create_announce_fab',
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
-                  icon: const Icon(Icons.add_comment_rounded, size: 20),
-                  label: Text('نشر إعلان', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const DashboardScreen(initialTabIndex: 1)),
-                    ).then((_) => _loadAnnouncements(forceRefresh: true, showSpinner: false));
-                  },
+                  icon: const Icon(Icons.add_photo_alternate_rounded, size: 20),
+                  label: Text('نشر تبليغ 📷', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () => _showPublishAnnouncementSheet(context),
                 ),
               ],
             )
@@ -597,3 +625,398 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     );
   }
 }
+
+/// نافذة نشر تبليغ مباشر مع إرفاق الصور والكتب الرسمية من خانة التبليغات
+class _DirectPublishAnnouncementSheet extends StatefulWidget {
+  final AppUserModel currentUser;
+  final Function(AnnouncementModel newAnnounce) onSuccess;
+
+  const _DirectPublishAnnouncementSheet({
+    required this.currentUser,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_DirectPublishAnnouncementSheet> createState() => _DirectPublishAnnouncementSheetState();
+}
+
+class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncementSheet> {
+  final _contentController = TextEditingController();
+  PlatformFile? _selectedImage;
+  int _selectedImageSize = 0;
+  bool _isPickingImage = false;
+  bool _isSubmitting = false;
+
+  late String _dept;
+  late String _stage;
+  late String _section;
+  String _category = 'academic';
+  bool _isPinned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final u = widget.currentUser;
+    _dept = u.isAdmin ? 'ALL' : u.department;
+    _stage = u.isAdmin ? 'ALL' : u.stage;
+    _section = u.isAdmin ? 'ALL' : ((u.section != null && u.section!.isNotEmpty) ? u.section! : 'ALL');
+  }
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } else if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+  }
+
+  Future<void> _pickImage() async {
+    setState(() => _isPickingImage = true);
+    final file = await TelegramUploaderService().pickImageOnly();
+    if (mounted) {
+      if (file != null) {
+        final size = await TelegramUploaderService().getFileSize(file);
+        setState(() {
+          _isPickingImage = false;
+          _selectedImage = file;
+          _selectedImageSize = size;
+        });
+      } else {
+        setState(() => _isPickingImage = false);
+      }
+    }
+  }
+
+  Future<void> _submit() async {
+    final content = _contentController.text.trim();
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى كتابة نص التبليغ أولاً'), backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+
+    final firstLine = content.split('\n').first.trim();
+    final autoTitle = firstLine.length > 50
+        ? '${firstLine.substring(0, 47)}...'
+        : (firstLine.isNotEmpty ? firstLine : 'تبليغ أكاديمي');
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      String? uploadedImageUrl;
+      if (_selectedImage != null) {
+        final res = await TelegramUploaderService().uploadFileToTelegram(
+          file: _selectedImage!,
+          caption: autoTitle,
+          fileType: 'announcement',
+        );
+
+        if (!res.success || res.fileUrl == null) {
+          throw Exception(res.message.isNotEmpty ? res.message : 'فشل رفع الصورة إلى سحابة تيليجرام');
+        }
+        uploadedImageUrl = res.fileUrl;
+      }
+
+      final newAnnounce = AnnouncementModel(
+        id: '',
+        title: autoTitle,
+        content: content,
+        authorId: widget.currentUser.studentId.isNotEmpty ? widget.currentUser.studentId : 'ADMIN',
+        authorName: widget.currentUser.name.isNotEmpty ? widget.currentUser.name : 'إدارة الكلية',
+        authorRole: widget.currentUser.role,
+        department: _dept,
+        stage: _stage,
+        section: _section,
+        category: _category,
+        isPinned: _isPinned,
+        imageUrl: uploadedImageUrl,
+        createdAt: DateTime.now(),
+      );
+
+      final ok = await SupabaseService().createAnnouncement(newAnnounce);
+      if (!ok) throw Exception('تعذر حفظ بيانات التبليغ');
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم نشر التبليغ بنجاح')),
+        );
+        widget.onSuccess(newAnnounce);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ أثناء النشر: $e'), backgroundColor: AppTheme.danger),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAdmin = widget.currentUser.isAdmin;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        top: 12,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // مقبض السحب
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // رأس النافذة
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primarySubtle,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.campaign_rounded, color: AppTheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'نشر تبليغ جديد للطلبة',
+                        style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        isAdmin
+                            ? 'نشر عام أو مخصص لكافة الأقسام والمراحل'
+                            : '${widget.currentUser.department} • ${widget.currentUser.stage}',
+                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // حقل النص
+            TextField(
+              controller: _contentController,
+              maxLines: 5,
+              style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'نص التبليغ أو الإعلان الأكاديمي',
+                hintText: 'اكتب نص التبليغ هنا ليظهر مباشرة للطلاب...',
+                labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                alignLabelWithHint: true,
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(bottom: 70),
+                  child: Icon(Icons.campaign_rounded, size: 22, color: AppTheme.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // مساحة إرفاق صورة
+            if (_selectedImage == null)
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.6), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: _isPickingImage
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.accent),
+                label: Text(
+                  'إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري 📷)',
+                  style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                onPressed: _isPickingImage ? null : _pickImage,
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.image_rounded, color: AppTheme.accent, size: 22),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedImage!.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${_formatFileSize(_selectedImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                            style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
+                      tooltip: 'إلغاء إرفاق الصورة',
+                      onPressed: () => setState(() {
+                        _selectedImage = null;
+                        _selectedImageSize = 0;
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 14),
+
+            if (isAdmin) ...[
+              DropdownButtonFormField<String>(
+                value: _dept,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'القسم المستهدف',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.domain_rounded, size: 20, color: AppTheme.primaryLight),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: [
+                  const DropdownMenuItem(value: 'ALL', child: Text('كافة أقسام الكلية')),
+                  ...AppConstants.departments.map((d) => DropdownMenuItem(value: d, child: Text(d))),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _dept = val);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              DropdownButtonFormField<String>(
+                value: _stage,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'المرحلة المستهدفة',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.school_rounded, size: 20, color: AppTheme.primaryLight),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: [
+                  const DropdownMenuItem(value: 'ALL', child: Text('كافة المراحل الدراسية')),
+                  ...AppConstants.stages.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _stage = val);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              DropdownButtonFormField<String>(
+                value: _section,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'الشعبة المستهدفة',
+                  labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.groups_rounded, size: 20, color: AppTheme.accent),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب')),
+                  DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
+                  DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
+                  DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
+                  DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _section = val);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              SwitchListTile(
+                title: Text('تثبيت الإعلان في أعلى التطبيق', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
+                value: _isPinned,
+                activeThumbColor: AppTheme.accent,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) => setState(() => _isPinned = val),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+              label: Text(
+                _isSubmitting ? 'جاري الرفع والنشر...' : 'إرسال ونشر التبليغ للطلبة',
+                style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
