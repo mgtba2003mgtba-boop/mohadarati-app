@@ -200,6 +200,8 @@ class SupabaseService {
             .single();
 
         _currentUser = AppUserModel.fromJson(res);
+        _memoryCache.clear();
+        _cacheTimestamps.clear();
         await _saveUserSession(_currentUser!);
         return _currentUser;
       }
@@ -229,6 +231,8 @@ class SupabaseService {
           .single();
 
       _currentUser = AppUserModel.fromJson(res);
+      _memoryCache.clear();
+      _cacheTimestamps.clear();
       await _saveUserSession(_currentUser!);
       return _currentUser;
     } catch (e) {
@@ -271,6 +275,8 @@ class SupabaseService {
         final isMatch = AppConstants.verifyPin(inputPin, storedPin);
         if (isMatch) {
           _currentUser = user;
+          _memoryCache.clear();
+          _cacheTimestamps.clear();
           await _saveUserSession(user);
 
           // ترقية أمنية تلقائية: إذا كان الرمز في قاعدة البيانات غير مشفر بعد، نقوم بتشفيره فوراً
@@ -807,6 +813,18 @@ class SupabaseService {
     }
   }
 
+  /// ── استرجاع استفسارات المحاضرة من الكاش المحلي ─────────────────────────
+  Future<List<LectureCommentModel>?> getCachedLectureComments(String lectureId) async {
+    final cacheKey = 'lecture_comments_$lectureId';
+    return await _getCachedData<List<LectureCommentModel>>(
+      key: cacheKey,
+      fromJson: (json) => (json as List).map((i) {
+        final ann = AnnouncementModel.fromJson(i);
+        return LectureCommentModel.fromAnnouncement(ann);
+      }).whereType<LectureCommentModel>().toList(),
+    );
+  }
+
   /// ── جلب استفسارات وملاحظات المحاضرة الأكاديمية (سريعة وخفيفة من الكاش والسحابة) ──
   Future<List<LectureCommentModel>> fetchLectureComments({
     required String lectureId,
@@ -814,17 +832,26 @@ class SupabaseService {
   }) async {
     final cacheKey = 'lecture_comments_$lectureId';
 
+    // 1. استرجاع فوري من الكاش إن وجد ولم يُطلب التحديث الإجباري
     if (!forceRefresh) {
-      final cached = await _getCachedData<List<LectureCommentModel>>(
-        key: cacheKey,
-        fromJson: (json) => (json as List).map((i) {
-          final ann = AnnouncementModel.fromJson(i);
-          return LectureCommentModel.fromAnnouncement(ann);
-        }).whereType<LectureCommentModel>().toList(),
-      );
-      if (cached != null) return cached;
+      final cached = await getCachedLectureComments(lectureId);
+      if (cached != null && cached.isNotEmpty) {
+        // تحديث صامت بالخلفية إن مضى أكثر من دقيقة
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 1)) {
+          _fetchFreshLectureComments(lectureId, cacheKey).catchError((_) => <LectureCommentModel>[]);
+        }
+        return cached;
+      }
     }
 
+    return await _fetchFreshLectureComments(lectureId, cacheKey);
+  }
+
+  Future<List<LectureCommentModel>> _fetchFreshLectureComments(
+    String lectureId,
+    String cacheKey,
+  ) async {
     try {
       final res = await client
           .from('announcements')
@@ -847,15 +874,23 @@ class SupabaseService {
         return a.createdAt.compareTo(b.createdAt);
       });
 
-      await _setCachedData(
-        key: cacheKey,
-        rawData: list,
-        toJson: () => (res as List),
-      );
+      if (list.isNotEmpty) {
+        await _setCachedData(
+          key: cacheKey,
+          rawData: list,
+          toJson: () => (res as List),
+        );
+      } else {
+        // إزالة الكاش الفارغ حتى لا يمنع استرجاع أي تعليقات جديدة
+        _memoryCache.remove(cacheKey);
+        _cacheTimestamps.remove(cacheKey);
+        SharedPreferences.getInstance().then((prefs) => prefs.remove('cache_$cacheKey')).catchError((_) {});
+      }
       return list;
     } catch (e) {
-      debugPrint('[-] Error fetching lecture comments: $e');
-      return [];
+      debugPrint('[-] Error fetching fresh lecture comments: $e');
+      final fallback = await getCachedLectureComments(lectureId);
+      return fallback ?? [];
     }
   }
 
@@ -1818,8 +1853,18 @@ class SupabaseService {
 
   Future<void> logout() async {
     _currentUser = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('session_student_id');
-    await prefs.remove('session_user_json');
+    _memoryCache.clear();
+    _cacheTimestamps.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('session_student_id');
+      await prefs.remove('session_user_json');
+      final keys = prefs.getKeys().where((k) => k.startsWith('cache_')).toList();
+      for (final k in keys) {
+        await prefs.remove(k);
+      }
+    } catch (e) {
+      debugPrint('[-] Error clearing cache on logout: $e');
+    }
   }
 }

@@ -1214,7 +1214,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         lecture: lecture,
         department: _effectiveDepartment,
         stage: _effectiveStage,
-        currentUser: _user,
+        currentUser: _user ?? SupabaseService().currentUser,
       ),
     );
   }
@@ -1952,14 +1952,29 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
     });
   }
 
+  AppUserModel? get _effectiveUser => widget.currentUser ?? SupabaseService().currentUser;
+
   Future<void> _loadComments({bool forceRefresh = false}) async {
-    final list = await SupabaseService().fetchLectureComments(
+    // 1. فحص الكاش وعرضه فورياً (0ms) إن وجد لتفادي أي انتظار أو شاشة تحميل
+    if (!forceRefresh) {
+      final cached = await SupabaseService().getCachedLectureComments(widget.lecture.id);
+      if (cached != null && cached.isNotEmpty && mounted) {
+        setState(() {
+          _comments = cached;
+          _isLoading = false;
+        });
+        _scrollToBottom(animated: false);
+      }
+    }
+
+    // 2. جلب مباشر وفوري من السحابة لضمان التزامن الكامل عند التبديل بين الحسابات
+    final fresh = await SupabaseService().fetchLectureComments(
       lectureId: widget.lecture.id,
-      forceRefresh: forceRefresh,
+      forceRefresh: true,
     );
     if (mounted) {
       setState(() {
-        _comments = list;
+        _comments = fresh;
         _isLoading = false;
       });
       _scrollToBottom(animated: false);
@@ -1969,11 +1984,12 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
   /// ── إرسال تفاؤلي فوري في 0ms مع حماية كاملة للنص ومزامنة سحابية ─────────
   Future<void> _sendComment() async {
     final text = _commentController.text.trim();
-    if (text.isEmpty || widget.currentUser == null) return;
+    final user = _effectiveUser;
+    if (text.isEmpty || user == null) return;
 
-    final currentStudentId = widget.currentUser!.studentId.isNotEmpty
-        ? widget.currentUser!.studentId
-        : widget.currentUser!.id;
+    final currentStudentId = user.studentId.isNotEmpty
+        ? user.studentId
+        : user.id;
 
     // 1. مسح حقل الكتابة فوراً في 0ms لمرونة فائقة
     _commentController.clear();
@@ -1984,8 +2000,8 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
       id: tempId,
       lectureId: widget.lecture.id,
       authorId: currentStudentId,
-      authorName: widget.currentUser!.name,
-      authorRole: widget.currentUser!.role,
+      authorName: user.name,
+      authorRole: user.role,
       content: text,
       isPinned: false,
       helpfulUserIds: const [],
@@ -2005,7 +2021,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
       final syncedComment = await SupabaseService().addLectureComment(
         lectureId: widget.lecture.id,
         text: text,
-        user: widget.currentUser!,
+        user: user,
         department: widget.department,
         stage: widget.stage,
         section: widget.lecture.section,
@@ -2051,10 +2067,11 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
 
   /// ── تفاعل لحظي فوري (In-Place 1ms Mutation) بدون وميض أو إعادة تحميل ───
   Future<void> _toggleHelpful(LectureCommentModel comment) async {
-    if (widget.currentUser == null) return;
-    final studentId = widget.currentUser!.studentId.isNotEmpty
-        ? widget.currentUser!.studentId
-        : widget.currentUser!.id;
+    final user = _effectiveUser;
+    if (user == null) return;
+    final studentId = user.studentId.isNotEmpty
+        ? user.studentId
+        : user.id;
 
     final currentUsers = List<String>.from(comment.helpfulUserIds);
     final wasHelpful = currentUsers.contains(studentId);
@@ -2095,7 +2112,8 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
 
   /// ── تثبيت/إلغاء تثبيت لحظي فوري (In-Place 1ms Mutation) ────────────────
   Future<void> _togglePin(LectureCommentModel comment) async {
-    if (widget.currentUser == null) return;
+    final user = _effectiveUser;
+    if (user == null) return;
     final newPinned = !comment.isPinned;
     final updated = comment.copyWith(isPinned: newPinned);
 
@@ -2113,7 +2131,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
       commentId: comment.id,
       lectureId: widget.lecture.id,
       isPinned: newPinned,
-      user: widget.currentUser!,
+      user: user,
     );
 
     if (!ok && mounted) {
@@ -2177,10 +2195,13 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final currentStudentId = widget.currentUser?.studentId ?? widget.currentUser?.id ?? '';
-    final canModerate = widget.currentUser?.isAdmin == true ||
-        widget.currentUser?.role == AppConstants.roleRepresentative ||
-        widget.currentUser?.studentId == 'ST-NUST-001630760-413';
+    final user = _effectiveUser;
+    final currentStudentId = user?.studentId.isNotEmpty == true
+        ? user!.studentId
+        : user?.id ?? '';
+    final canModerate = user?.isAdmin == true ||
+        user?.role == AppConstants.roleRepresentative ||
+        user?.studentId == 'ST-NUST-001630760-413';
 
     return Container(
       constraints: BoxConstraints(
@@ -2244,6 +2265,11 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                   ),
                 ),
                 IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 20, color: AppTheme.textSecondary),
+                  tooltip: 'تحديث التعليقات',
+                  onPressed: () => _loadComments(forceRefresh: true),
+                ),
+                IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -2254,52 +2280,62 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-                : _comments.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                : RefreshIndicator(
+                    onRefresh: () => _loadComments(forceRefresh: true),
+                    color: AppTheme.primary,
+                    child: _comments.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.primarySubtle,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.mark_chat_unread_outlined, color: AppTheme.primary, size: 28),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                'لا توجد استفسارات بعد',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'كن أول من يطرح سؤالاً',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 11,
-                                  color: AppTheme.textSecondary,
+                              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: const BoxDecoration(
+                                          color: AppTheme.primarySubtle,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Center(
+                                          child: Icon(Icons.mark_chat_unread_outlined, color: AppTheme.primary, size: 28),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'لا توجد استفسارات بعد',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'كن أول من يطرح سؤالاً أو اسحب للأسفل للتحديث',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 11,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _comments.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (ctx, index) {
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _comments.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (ctx, index) {
                           final comment = _comments[index];
                           final isMe = comment.authorId == currentStudentId;
                           final canDelete = isMe || canModerate;
@@ -2523,6 +2559,7 @@ class _LectureCommentsSheetState extends State<_LectureCommentsSheet> {
                           );
                         },
                       ),
+                  ),
           ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),

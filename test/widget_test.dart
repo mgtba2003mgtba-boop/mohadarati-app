@@ -18,6 +18,8 @@ import 'package:nust_student_portal/services/app_notification_service.dart';
 import 'package:nust_student_portal/models/course_override_model.dart';
 import 'package:nust_student_portal/services/course_customization_service.dart';
 import 'package:nust_student_portal/models/lecture_comment_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nust_student_portal/services/supabase_service.dart';
 
 void main() {
   group('اختبارات نماذج البيانات والخدمات الأكاديمية (NUST Portal Tests)', () {
@@ -2216,6 +2218,27 @@ void main() {
       expect(isInternalAnnouncement(commentRecord), isTrue, reason: 'يجب استبعاد استفسارات المحاضرات من إشعارات التبليغات العامة');
       expect(isInternalAnnouncement(scheduleRecord), isTrue, reason: 'يجب استبعاد الجداول من إشعارات التبليغات العامة');
       expect(isInternalAnnouncement(officialAnnouncement), isFalse, reason: 'التبليغ الرسمي يجب أن يمر بنجاح');
+    });
+
+    test('اختبار تفريغ الكاش التام عند تسجيل الخروج والتبديل بين الحسابات (Account Switch Cache Purge)', () async {
+      SharedPreferences.setMockInitialValues({
+        'session_student_id': 'ST-USER-A',
+        'session_user_json': '{"name":"أحمد"}',
+        'cache_lecture_comments_lec-01': '[{"id":"c1","content":"تعليق قديم"}]',
+        'cache_announcements_ALL_ALL_ALL': '[{"id":"a1"}]',
+      });
+
+      final service = SupabaseService();
+      await service.logout();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(service.currentUser, isNull);
+      expect(prefs.getString('session_student_id'), isNull);
+      expect(prefs.getString('session_user_json'), isNull);
+
+      // التأكد من مسح كافة مفاتيح الكاش القديمة
+      final remainingCacheKeys = prefs.getKeys().where((k) => k.startsWith('cache_')).toList();
+      expect(remainingCacheKeys.isEmpty, isTrue, reason: 'يجب تفريغ كافة مفاتيح الكاش عند الخروج لضمان عدم تسريب البيانات بين الحسابات');
     });
   });
 }
