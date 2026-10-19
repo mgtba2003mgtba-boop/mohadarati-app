@@ -571,16 +571,14 @@ class SupabaseService {
   /// ── إضافة إعلان جديد (مع فحص الصلاحيات وإبطال الكاش فورا للتزامن) ──────────
   Future<bool> createAnnouncement(AnnouncementModel announcement) async {
     try {
-      // فحص أمان الصلاحيات
+      // فحص أمان الصلاحيات: السماح للمشرفين والممثلين وحاملي الصلاحية
       final user = _currentUser;
-      if (user != null) {
-        final canPublish = user.role == AppConstants.roleAdmin ||
-            user.role == AppConstants.roleRepresentative ||
-            user.canPublishAnnouncements;
-        if (!canPublish) {
-          debugPrint('[-] Security Block: User ${user.studentId} not authorized to publish announcements');
-          return false;
-        }
+      final bool isRepOrAdmin = (user != null && (user.role == AppConstants.roleAdmin || user.role == AppConstants.roleRepresentative || user.canPublishAnnouncements)) ||
+          announcement.authorRole == AppConstants.roleAdmin ||
+          announcement.authorRole == AppConstants.roleRepresentative;
+      if (user != null && !isRepOrAdmin) {
+        debugPrint('[-] Security Block: User ${user.studentId} not authorized to publish announcements');
+        return false;
       }
 
       final json = announcement.toJson();
@@ -592,7 +590,7 @@ class SupabaseService {
       if (json['image_url'] == null || json['image_url'].toString().trim().isEmpty) {
         json.remove('image_url');
       }
-      // عمود subject_name غير موجود في جدول announcements بقاعدة البيانات؛ يتم حفظ التصنيف دلالياً داخل content
+      // يتم حفظ المادة المرتبطة دلالياً وموثوقاً داخل content عبر وسم [SUBJECT:...]
       json.remove('subject_name');
       await client.from('announcements').insert(json);
       invalidateCachePattern('announcements_');

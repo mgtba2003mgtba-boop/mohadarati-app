@@ -733,9 +733,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
           HapticFeedback.lightImpact();
           messenger.showSnackBar(
             const SnackBar(
-              content: Text('تم إدراج المحاضرة فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              content: Text('تم النشر بنجاح'),
               backgroundColor: AppTheme.primary,
-              duration: Duration(seconds: 3),
+              duration: Duration(seconds: 2),
             ),
           );
 
@@ -792,7 +792,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
               });
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text('فشلت مزامنة المحاضرة: $e'),
+                  content: Text('تعذر إكمال النشر: $e'),
                   backgroundColor: AppTheme.danger,
                 ),
               );
@@ -1335,7 +1335,7 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
                     DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
                     DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
                   ] else ...[
-                    for (final s in widget.currentUser.assignedSections)
+                    for (final s in widget.currentUser.assignedSections.where((s) => s != 'ALL'))
                       DropdownMenuItem(value: s, child: Text('🏷️ شعبة $s')),
                   ],
                 ],

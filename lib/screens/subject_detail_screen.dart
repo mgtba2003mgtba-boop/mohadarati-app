@@ -1288,9 +1288,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           HapticFeedback.lightImpact();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم إدراج التبليغ فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              content: Text('تم النشر بنجاح'),
               backgroundColor: AppTheme.primary,
-              duration: Duration(seconds: 3),
+              duration: Duration(seconds: 2),
             ),
           );
 
@@ -1337,7 +1337,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 _subjectAnnouncements.removeWhere((a) => a.id == optimisticAnnounce.id);
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('فشلت مزامنة التبليغ: $e'), backgroundColor: AppTheme.danger),
+                SnackBar(content: Text('تعذر إكمال النشر: $e'), backgroundColor: AppTheme.danger),
               );
             }
           }

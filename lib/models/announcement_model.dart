@@ -445,6 +445,7 @@ class AnnouncementModel {
         .replaceAll('[SCHEDULE_TIMETABLE]', '')
         .replaceAll(RegExp(r'\[COURSE_REGISTRY:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[SECTION:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[SUBJECT:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[REACTIONS:[^\]]+\]'), '')
         .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]\{[^{}]*\}'), '')
         .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]'), '')
@@ -473,7 +474,10 @@ class AnnouncementModel {
 
     String? derivedSubject = json['subject_name']?.toString();
     if (derivedSubject == null || derivedSubject.isEmpty) {
-      if (rawContent.contains('[SCHEDULE_TIMETABLE]')) {
+      final subMatch = RegExp(r'\[SUBJECT:([^\]]+)\]').firstMatch(rawContent);
+      if (subMatch != null) {
+        derivedSubject = subMatch.group(1);
+      } else if (rawContent.contains('[SCHEDULE_TIMETABLE]')) {
         derivedSubject = 'SCHEDULE';
       } else if (rawContent.contains('[HOME_BANNER]')) {
         derivedSubject = 'BANNER';
@@ -514,6 +518,8 @@ class AnnouncementModel {
       tagContent = '$tagContent [HOME_BANNER]'.trim();
     } else if (subjectName == 'SCHEDULE' && !tagContent.contains('[SCHEDULE_TIMETABLE]')) {
       tagContent = '$tagContent [SCHEDULE_TIMETABLE]'.trim();
+    } else if (subjectName != null && subjectName!.isNotEmpty && !tagContent.contains('[SUBJECT:')) {
+      tagContent = '$tagContent [SUBJECT:$subjectName]'.trim();
     }
 
     return {

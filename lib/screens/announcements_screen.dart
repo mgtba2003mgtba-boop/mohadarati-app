@@ -215,9 +215,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           HapticFeedback.lightImpact();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم إدراج التبليغ فورياً، وجاري المزامنة السحابية للطلبة... ⚡'),
+              content: Text('تم النشر بنجاح'),
               backgroundColor: AppTheme.primary,
-              duration: Duration(seconds: 3),
+              duration: Duration(seconds: 2),
             ),
           );
 
@@ -264,7 +264,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('تنبيه: تعذر إكمال المزامنة السحابية للتبليغ: $e'),
+                  content: Text('تعذر إكمال النشر: $e'),
                   backgroundColor: AppTheme.danger,
                 ),
               );
@@ -304,7 +304,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                   backgroundColor: AppTheme.primaryDark,
                   foregroundColor: Colors.white,
                   icon: const Icon(Icons.poll_rounded, size: 20),
-                  label: Text('تصويت 📊', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                  label: Text('تصويت', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
                   onPressed: () {
                     CreatePollSheet.show(
                       context: context,
@@ -321,7 +321,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   icon: const Icon(Icons.add_photo_alternate_rounded, size: 20),
-                  label: Text('نشر تبليغ 📷', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                  label: Text('نشر تبليغ', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
                   onPressed: () => _showPublishAnnouncementSheet(context),
                 ),
               ],
@@ -846,7 +846,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'نشر تبليغ جديد للطلبة',
+                        'نشر تبليغ',
                         style: GoogleFonts.cairo(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -855,7 +855,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                       ),
                       Text(
                         isAdmin
-                            ? 'نشر عام أو مخصص لكافة الأقسام والمراحل'
+                            ? 'نشر عام'
                             : '${widget.currentUser.department} • ${widget.currentUser.stage}',
                         style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
                       ),
@@ -876,8 +876,8 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
               maxLines: 5,
               style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textPrimary),
               decoration: InputDecoration(
-                labelText: 'نص التبليغ أو الإعلان الأكاديمي',
-                hintText: 'اكتب نص التبليغ هنا ليظهر مباشرة للطلاب...',
+                labelText: 'نص التبليغ',
+                hintText: 'اكتب نص التبليغ هنا...',
                 labelStyle: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textSecondary),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 alignLabelWithHint: true,
@@ -901,7 +901,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.accent),
                 label: Text(
-                  'إرفاق صورة أو كتاب رسمي مع التبليغ (اختياري 📷)',
+                  'إرفاق صورة (اختياري)',
                   style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                 ),
                 onPressed: _isPickingImage ? null : _pickImage,
@@ -936,7 +936,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                             style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            '${_formatFileSize(_selectedImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                            _formatFileSize(_selectedImageSize),
                             style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
                           ),
                         ],
@@ -1012,17 +1012,17 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 items: [
-                  const DropdownMenuItem(value: 'ALL', child: Text('🌐 جميع الشعب')),
+                  const DropdownMenuItem(value: 'ALL', child: Text('جميع الشعب')),
                   if (widget.currentUser.isAdmin) ...const [
-                    DropdownMenuItem(value: 'A', child: Text('🏷️ شعبة A')),
-                    DropdownMenuItem(value: 'B', child: Text('🏷️ شعبة B')),
-                    DropdownMenuItem(value: 'C', child: Text('🏷️ شعبة C')),
-                    DropdownMenuItem(value: 'D', child: Text('🏷️ شعبة D')),
-                    DropdownMenuItem(value: 'E', child: Text('🏷️ شعبة E')),
-                    DropdownMenuItem(value: 'F', child: Text('🏷️ شعبة F')),
+                    DropdownMenuItem(value: 'A', child: Text('شعبة A')),
+                    DropdownMenuItem(value: 'B', child: Text('شعبة B')),
+                    DropdownMenuItem(value: 'C', child: Text('شعبة C')),
+                    DropdownMenuItem(value: 'D', child: Text('شعبة D')),
+                    DropdownMenuItem(value: 'E', child: Text('شعبة E')),
+                    DropdownMenuItem(value: 'F', child: Text('شعبة F')),
                   ] else ...[
-                    for (final s in widget.currentUser.assignedSections)
-                      DropdownMenuItem(value: s, child: Text('🏷️ شعبة $s')),
+                    for (final s in widget.currentUser.assignedSections.where((s) => s != 'ALL'))
+                      DropdownMenuItem(value: s, child: Text('شعبة $s')),
                   ],
                 ],
                 onChanged: (val) {
@@ -1032,7 +1032,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
               const SizedBox(height: 12),
 
               SwitchListTile(
-                title: Text('تثبيت الإعلان في أعلى التطبيق', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
+                title: Text('تثبيت الإعلان في الأعلى', style: GoogleFonts.cairo(fontSize: 12, color: AppTheme.textPrimary)),
                 value: _isPinned,
                 activeThumbColor: AppTheme.accent,
                 contentPadding: EdgeInsets.zero,
@@ -1050,7 +1050,7 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
               onPressed: _submit,
               icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
               label: Text(
-                'إرسال ونشر التبليغ للطلبة 🚀',
+                'نشر التبليغ',
                 style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
