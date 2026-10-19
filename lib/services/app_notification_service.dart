@@ -96,8 +96,19 @@ class AppNotificationService {
 
   void _handleNewAnnouncement(Map<String, dynamic> record) {
     try {
-      final title = record['title']?.toString() ?? 'إعلان جديد';
+      final subjectName = record['subject_name']?.toString() ?? '';
       final content = record['content']?.toString() ?? '';
+      final isInternal = subjectName == 'LECTURE_NOTE' ||
+          content.contains('[LECTURE_NOTE_V1]') ||
+          subjectName == 'SCHEDULE' ||
+          content.contains('[SCHEDULE_TIMETABLE]') ||
+          subjectName == 'COURSE' ||
+          content.contains('[COURSE_REGISTRY') ||
+          subjectName == 'COURSE_OVERRIDE' ||
+          content.contains('[COURSE_OVERRIDE');
+      if (isInternal) return;
+
+      final title = record['title']?.toString() ?? 'إعلان جديد';
       final id = record['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
 
       try {
@@ -128,6 +139,18 @@ class AppNotificationService {
 
   void _handleUpdatedAnnouncement(Map<String, dynamic> record) {
     try {
+      final subjectName = record['subject_name']?.toString() ?? '';
+      final content = record['content']?.toString() ?? '';
+      final isInternal = subjectName == 'LECTURE_NOTE' ||
+          content.contains('[LECTURE_NOTE_V1]') ||
+          subjectName == 'SCHEDULE' ||
+          content.contains('[SCHEDULE_TIMETABLE]') ||
+          subjectName == 'COURSE' ||
+          content.contains('[COURSE_REGISTRY') ||
+          subjectName == 'COURSE_OVERRIDE' ||
+          content.contains('[COURSE_OVERRIDE');
+      if (isInternal) return;
+
       final ann = AnnouncementModel.fromJson(record);
       _announcementUpdateController.add(ann);
     } catch (e) {

@@ -2090,6 +2090,133 @@ void main() {
       expect(comment!.content, 'شنو هاي');
       expect(comment.displayContent, 'شنو هاي');
     });
+
+    test('اختبار محرك التعليقات التفاؤلي والاستجابة الفورية (Optimistic UI & Realtime Reconciliation)', () {
+      final currentStudentId = 'ST-001';
+      final list = <LectureCommentModel>[];
+
+      // 1. إضافة تفاؤلية فورية في 0ms
+      final tempId = 'temp_${DateTime.now().microsecondsSinceEpoch}';
+      final optimisticComment = LectureCommentModel(
+        id: tempId,
+        lectureId: 'lec-math-01',
+        authorId: currentStudentId,
+        authorName: 'أحمد',
+        authorRole: 'student',
+        content: 'هل القانون مطلوب حفظه؟',
+        isPinned: false,
+        helpfulUserIds: const [],
+        createdAt: DateTime.now(),
+      );
+
+      list.add(optimisticComment);
+      expect(list.length, 1);
+      expect(list.first.id.startsWith('temp_'), isTrue);
+      expect(list.first.displayContent, 'هل القانون مطلوب حفظه؟');
+
+      // 2. محاكاة وصول السجل المؤكد من السيرفر ومطابقته (Reconciliation)
+      final confirmedComment = LectureCommentModel(
+        id: 'real-uuid-999',
+        lectureId: 'lec-math-01',
+        authorId: currentStudentId,
+        authorName: 'أحمد',
+        authorRole: 'student',
+        content: 'هل القانون مطلوب حفظه؟',
+        isPinned: false,
+        helpfulUserIds: const [],
+        createdAt: DateTime.now(),
+      );
+
+      final optIndex = list.indexWhere((c) =>
+          c.id.startsWith('temp_') &&
+          c.authorId == confirmedComment.authorId &&
+          c.content.trim() == confirmedComment.content.trim());
+
+      expect(optIndex, 0);
+      list[optIndex] = confirmedComment;
+
+      expect(list.length, 1);
+      expect(list.first.id, 'real-uuid-999');
+
+      // 3. اختبار التفاعل اللحظي الموضعي In-Place 1ms Mutation لـ (مفيد 👍)
+      final currentUsers = List<String>.from(list.first.helpfulUserIds);
+      currentUsers.add(currentStudentId);
+      list[0] = list.first.copyWith(helpfulUserIds: currentUsers);
+
+      expect(list.first.helpfulCount, 1);
+      expect(list.first.isHelpfulBy(currentStudentId), isTrue);
+
+      // إلغاء التفاعل موضعياً
+      currentUsers.remove(currentStudentId);
+      list[0] = list.first.copyWith(helpfulUserIds: currentUsers);
+      expect(list.first.helpfulCount, 0);
+      expect(list.first.isHelpfulBy(currentStudentId), isFalse);
+
+      // 4. اختبار التثبيت اللحظي وإعادة الترتيب التلقائي
+      final olderComment = LectureCommentModel(
+        id: 'real-uuid-001',
+        lectureId: 'lec-math-01',
+        authorId: 'ST-002',
+        authorName: 'سارة',
+        authorRole: 'representative',
+        content: 'تم رفع الملف المحدث',
+        isPinned: false,
+        helpfulUserIds: const [],
+        createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+      );
+      list.add(olderComment);
+
+      // قبل التثبيت: الأقدم أولاً
+      list.sort((a, b) {
+        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+      expect(list.first.id, 'real-uuid-001');
+
+      // بعد تثبيت التعليق الثاني من قبل الممثل
+      list[1] = list[1].copyWith(isPinned: true);
+      list.sort((a, b) {
+        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+      expect(list.first.isPinned, isTrue);
+      expect(list.first.id, 'real-uuid-999');
+    });
+
+    test('اختبار حظر إشعارات التبليغات لتعليقات المحاضرات والجداول (Announcement Notification Guard)', () {
+      bool isInternalAnnouncement(Map<String, dynamic> record) {
+        final subjectName = record['subject_name']?.toString() ?? '';
+        final content = record['content']?.toString() ?? '';
+        return subjectName == 'LECTURE_NOTE' ||
+            content.contains('[LECTURE_NOTE_V1]') ||
+            subjectName == 'SCHEDULE' ||
+            content.contains('[SCHEDULE_TIMETABLE]') ||
+            subjectName == 'COURSE' ||
+            content.contains('[COURSE_REGISTRY') ||
+            subjectName == 'COURSE_OVERRIDE' ||
+            content.contains('[COURSE_OVERRIDE');
+      }
+
+      final commentRecord = {
+        'subject_name': 'LECTURE_NOTE',
+        'title': 'lec-123',
+        'content': '[LECTURE_NOTE_V1]{"text":"سؤال عن المحاضرة"}',
+      };
+      final scheduleRecord = {
+        'subject_name': 'SCHEDULE',
+        'title': 'جدول المحاضرات',
+        'content': '[SCHEDULE_TIMETABLE]{"days":[]}',
+      };
+      final officialAnnouncement = {
+        'subject_name': 'عام',
+        'title': 'عطلة رسمية',
+        'content': 'تقرر تعطيل الدوام الرسمي غداً بمناسبة العيد.',
+      };
+
+      expect(isInternalAnnouncement(commentRecord), isTrue, reason: 'يجب استبعاد استفسارات المحاضرات من إشعارات التبليغات العامة');
+      expect(isInternalAnnouncement(scheduleRecord), isTrue, reason: 'يجب استبعاد الجداول من إشعارات التبليغات العامة');
+      expect(isInternalAnnouncement(officialAnnouncement), isFalse, reason: 'التبليغ الرسمي يجب أن يمر بنجاح');
+    });
   });
 }
 
