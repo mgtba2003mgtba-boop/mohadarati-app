@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 
@@ -50,8 +52,18 @@ class AppNetworkImage extends StatelessWidget {
 
     // 2. حل روابط تيليجرام وشبكات الـ CDN لتخطي CORS
     final resolved = AppConstants.resolveImageUrl(cleanUrl);
-    final int? targetCacheWidth = width != null ? (width! * 2.5).toInt().clamp(100, 1200) : 800;
-    final int? targetCacheHeight = height != null ? (height! * 2.5).toInt().clamp(100, 1200) : null;
+
+    final bool hasFiniteWidth = width != null && width!.isFinite && width! > 0;
+    final bool hasFiniteHeight = height != null && height!.isFinite && height! > 0;
+
+    // على الويب نمنع تماماً تمرير cacheWidth/cacheHeight لمنع انهيار متصفحات الهواتف
+    // وعلى المنصات الأخرى لا نمرره إلا إذا كانت الأبعاد محددة ومنتهية وليست infinity
+    final int? targetCacheWidth = (!kIsWeb && hasFiniteWidth)
+        ? (width! * 2.5).toInt().clamp(100, 1200)
+        : null;
+    final int? targetCacheHeight = (!kIsWeb && hasFiniteHeight)
+        ? (height! * 2.5).toInt().clamp(100, 1200)
+        : null;
 
     return Image.network(
       resolved,
@@ -79,9 +91,25 @@ class AppNetworkImage extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: AppTheme.primary,
-      child: const Center(
-        child: Icon(Icons.image_outlined, color: Colors.white54, size: 28),
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.broken_image_outlined,
+              color: const Color(0xFF94A3B8),
+              size: (height != null && height!.isFinite && height! < 100) ? 20 : 28,
+            ),
+            if (height == null || (height!.isFinite && height! >= 100)) ...[
+              const SizedBox(height: 6),
+              Text(
+                'تعذر تحميل الصورة',
+                style: GoogleFonts.cairo(color: const Color(0xFF94A3B8), fontSize: 11),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

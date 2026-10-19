@@ -373,42 +373,52 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> {
                       );
                     },
                     borderRadius: BorderRadius.circular(12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        alignment: Alignment.bottomLeft,
-                        children: [
-                          AppNetworkImage(
-                            imageUrl: announcement.imageUrl!,
-                            height: 180,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorWidget: const SizedBox.shrink(),
-                          ),
-                          Container(
-                            margin: const EdgeInsets.all(8),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.lightBorder),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Stack(
+                          alignment: Alignment.bottomLeft,
+                          children: [
+                            Positioned.fill(
+                              child: AppNetworkImage(
+                                imageUrl: announcement.imageUrl!,
+                                height: 200,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'اضغط للتكبير والفحص 🔍',
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                            Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'اضغط للتكبير والفحص 🔍',
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
