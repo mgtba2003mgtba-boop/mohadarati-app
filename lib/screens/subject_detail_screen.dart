@@ -296,9 +296,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   Future<void> _launchUrlExternal(String? urlString, {required String errorMsg}) async {
-    if (urlString == null || urlString.isEmpty) return;
-    final uri = Uri.parse(urlString.trim());
+    if (urlString == null || urlString.trim().isEmpty) return;
+    final clean = urlString.trim();
     try {
+      final uri = Uri.parse(clean);
+      if (uri.scheme != 'https' && uri.scheme != 'http' && uri.scheme != 'tg') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بروتوكول الرابط غير آمن')));
+        }
+        return;
+      }
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));

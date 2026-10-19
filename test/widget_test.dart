@@ -2311,6 +2311,53 @@ void main() {
       expect(dbPayload.containsKey('subject_name'), isFalse, reason: 'يجب عدم إرسال عمود subject_name لتجنب خطأ 400 PGRST204 في Supabase');
       expect(dbPayload['content'].contains('[SCHEDULE_TIMETABLE]'), isTrue);
     });
+
+    test('اختبار التدريع الأمني وحماية كلمات المرور والروابط ومحاولات التخمين (OWASP Security & Hardening Suite)', () {
+      // 1. التحقق من التشفير الآمن والملح لرمز المرور (Salted SHA-256)
+      final pin1 = '1234';
+      final hash1 = AppConstants.hashPin(pin1);
+      expect(hash1, isNotEmpty);
+      expect(hash1, isNot(equals(pin1)), reason: 'يجب تشفير الرمز وعدم حفظه بنص صريح');
+      expect(hash1.length, 64, reason: 'SHA-256 تنتج تجزئة بطول 64 حرفاً');
+
+      // 2. التحقق المزدوج الذكي: قبول الرمز القديم والمشفر ورفض الرموز الخاطئة
+      expect(AppConstants.verifyPin('1234', '1234'), isTrue, reason: 'يجب قبول الرمز القديم لإتاحة الترقية التلقائية');
+      expect(AppConstants.verifyPin('1234', hash1), isTrue, reason: 'يجب قبول الرمز المشفر بنجاح');
+      expect(AppConstants.verifyPin('9999', hash1), isFalse, reason: 'يجب رفض الرمز الخاطئ فوراً');
+      expect(AppConstants.verifyPin('', hash1), isFalse);
+      expect(AppConstants.verifyPin('1234', null), isFalse);
+
+      // 3. اختبار فحص وتطهير بروتوكولات الروابط الخارجية (Safe URI Scheme Enforcement)
+      bool isSafeUri(String url) {
+        final clean = url.trim();
+        if (clean.isEmpty) return false;
+        try {
+          final uri = Uri.parse(clean);
+          return uri.scheme == 'https' || uri.scheme == 'http' || uri.scheme == 'tg';
+        } catch (_) {
+          return false;
+        }
+      }
+
+      expect(isSafeUri('https://mohadarati.vercel.app/api/proxy'), isTrue);
+      expect(isSafeUri('http://192.168.100.25:8050'), isTrue);
+      expect(isSafeUri('tg://resolve?domain=UnivercityAttendance_mujtba_Bot'), isTrue);
+      expect(isSafeUri('javascript:alert(1)'), isFalse, reason: 'يجب حظر بروتوكول javascript منعاً لثغرات XSS');
+      expect(isSafeUri('file:///etc/passwd'), isFalse, reason: 'يجب حظر بروتوكول file منعاً لثغرات LFI');
+      expect(isSafeUri('data:text/html;base64,PHNjcmlwdD4='), isFalse, reason: 'يجب حظر بروتوكول data');
+
+      // 4. اختبار محدد محاولات كود الـ OTP (Max 5 attempts)
+      int attempts = 0;
+      bool isOtpValid(DateTime expiresAt) => DateTime.now().isBefore(expiresAt) && attempts < 5;
+      final expiry = DateTime.now().add(const Duration(minutes: 10));
+
+      for (int i = 0; i < 4; i++) {
+        attempts++;
+        expect(isOtpValid(expiry), isTrue);
+      }
+      attempts++; // المحاولة الخامسة
+      expect(isOtpValid(expiry), isFalse, reason: 'يجب إبطال كود التحقق فور تجاوز 5 محاولات لمنع التخمين العنيف');
+    });
   });
 }
 

@@ -27,6 +27,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _errorMessage;
   StudentModel? _verifiedStudent;
   bool _isAccountAlreadyRegistered = false;
+  int _failedLoginAttempts = 0;
+  DateTime? _loginLockoutUntil;
 
   @override
   void dispose() {
@@ -132,6 +134,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _handleExistingLogin() async {
     if (_verifiedStudent == null) return;
 
+    if (_loginLockoutUntil != null) {
+      if (DateTime.now().isBefore(_loginLockoutUntil!)) {
+        final sec = _loginLockoutUntil!.difference(DateTime.now()).inSeconds + 1;
+        setState(() => _errorMessage = 'تم تجاوز عدد المحاولات المسموح بها. يرجى الانتظار $sec ثانية.');
+        return;
+      } else {
+        _loginLockoutUntil = null;
+        _failedLoginAttempts = 0;
+      }
+    }
+
     final pin = _pinController.text.trim();
     if (pin.isEmpty) {
       setState(() => _errorMessage = 'يرجى إدخال رمز المرور الخاص بحسابك');
@@ -152,14 +165,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _isLoading = false);
 
     if (user != null) {
+      _failedLoginAttempts = 0;
+      _loginLockoutUntil = null;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     } else {
-      setState(() {
-        _errorMessage = 'رمز المرور غير صحيح! يرجى إدخال الرمز الذي حددته مسبقاً، أو استخدام خيار الاستعادة عبر تيليجرام.';
-      });
+      _failedLoginAttempts++;
+      if (_failedLoginAttempts >= 5) {
+        _loginLockoutUntil = DateTime.now().add(const Duration(seconds: 30));
+        setState(() {
+          _errorMessage = 'تم قفل المحاولات مؤقتاً لمدة 30 ثانية لحماية حسابك من التخمين.';
+        });
+      } else {
+        final left = 5 - _failedLoginAttempts;
+        setState(() {
+          _errorMessage = 'رمز المرور غير صحيح! متبقي $left محاولات قبل القفل المؤقت.';
+        });
+      }
     }
   }
 

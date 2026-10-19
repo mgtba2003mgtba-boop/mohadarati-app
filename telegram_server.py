@@ -41,6 +41,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or base64.b64decode(b
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 client: Optional[TelegramClient] = None
 recently_uploaded_msg_ids: set = set()
+otp_cooldowns: dict = {}
 
 # حجم الشريحة الافتراضي لبث الفيديو (1MB إلى 2MB للأداء السلس)
 DEFAULT_CHUNK_SIZE = 1024 * 1024  # 1MB
@@ -175,6 +176,13 @@ async def send_otp_endpoint(request: Request):
 
         if not chat_id or not otp_code:
             return JSONResponse(status_code=400, content={"ok": False, "error": "Missing chat_id or otp_code"})
+
+        now = time.time()
+        last_req = otp_cooldowns.get(chat_id, 0)
+        if now - last_req < 30:
+            retry_after = int(30 - (now - last_req)) + 1
+            return JSONResponse(status_code=429, content={"ok": False, "error": f"يرجى الانتظار {retry_after} ثانية قبل إعادة طلب الرمز"})
+        otp_cooldowns[chat_id] = now
 
         # رسالة مختصرة ومباشرة بدون حشو
         text = f"🔐 *كود الاستعادة:* `{otp_code}`\nصالح لمدة 10 دقائق."

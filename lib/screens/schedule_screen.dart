@@ -164,8 +164,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Future<void> _launchUrl(String? url) async {
     if (url == null || url.trim().isEmpty) return;
-    final uri = Uri.parse(url.trim());
+    final clean = url.trim();
     try {
+      final uri = Uri.parse(clean);
+      if (uri.scheme != 'https' && uri.scheme != 'http' && uri.scheme != 'tg') return;
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }

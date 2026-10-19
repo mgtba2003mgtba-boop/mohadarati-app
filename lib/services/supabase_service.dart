@@ -19,8 +19,9 @@ import 'telegram_uploader_service.dart';
 class _OtpRecord {
   final String code;
   final DateTime expiresAt;
+  int attempts = 0;
   _OtpRecord(this.code, this.expiresAt);
-  bool get isValid => DateTime.now().isBefore(expiresAt);
+  bool get isValid => DateTime.now().isBefore(expiresAt) && attempts < 5;
 }
 
 class SupabaseService {
@@ -310,8 +311,8 @@ class SupabaseService {
       return false;
     }
 
-    // توليد كود عشوائي من 6 أرقام
-    final rng = Random();
+    // توليد كود عشوائي آمن تشفيرياً من 6 أرقام (CSPRNG)
+    final rng = Random.secure();
     final otpCode = (100000 + rng.nextInt(900000)).toString();
 
     // حفظ الكود صالحاً لمدة 10 دقائق
@@ -377,7 +378,11 @@ class SupabaseService {
       return false;
     }
 
+    record.attempts++;
     if (record.code.trim() != otpCode.trim()) {
+      if (record.attempts >= 5) {
+        _otpCache.remove(studentId);
+      }
       return false;
     }
 

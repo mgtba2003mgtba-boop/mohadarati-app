@@ -170,8 +170,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
   }
 
   Future<void> _launchExternal(String url) async {
-    final uri = Uri.parse(url.trim());
+    final clean = url.trim();
+    if (clean.isEmpty) return;
     try {
+      final uri = Uri.parse(clean);
+      if (uri.scheme != 'https' && uri.scheme != 'http') return;
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
@@ -183,8 +186,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
   }
 
   Future<void> _openViewer(String embedUrl) async {
-    final uri = Uri.parse(embedUrl.trim());
+    final clean = embedUrl.trim();
+    if (clean.isEmpty) return;
     try {
+      final uri = Uri.parse(clean);
+      if (uri.scheme != 'https' && uri.scheme != 'http') return;
       final can = await canLaunchUrl(uri);
       if (can) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);

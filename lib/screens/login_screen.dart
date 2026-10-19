@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../services/supabase_service.dart';
@@ -23,7 +24,36 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  int _failedAttempts = 0;
+  DateTime? _lockoutUntil;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLockoutStatus();
+  }
+
+  Future<void> _checkLockoutStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lockoutMillis = prefs.getInt('login_lockout_until') ?? 0;
+      if (lockoutMillis > 0) {
+        final lockTime = DateTime.fromMillisecondsSinceEpoch(lockoutMillis);
+        if (DateTime.now().isBefore(lockTime)) {
+          if (!mounted) return;
+          setState(() {
+            _lockoutUntil = lockTime;
+            _failedAttempts = 5;
+            final sec = lockTime.difference(DateTime.now()).inSeconds + 1;
+            _errorMessage = 'الحساب مقفل مؤقتاً بسبب تكرار المحاولات الخاطئة. يرجى الانتظار $sec ثانية.';
+          });
+        } else {
+          await prefs.remove('login_lockout_until');
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -33,6 +63,19 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    // 1. فحص حظر التخمين العنيف (Brute Force Rate Limiting)
+    if (_lockoutUntil != null) {
+      if (DateTime.now().isBefore(_lockoutUntil!)) {
+        final sec = _lockoutUntil!.difference(DateTime.now()).inSeconds + 1;
+        setState(() => _errorMessage = 'تم تجاوز عدد المحاولات المسموح بها. يرجى الانتظار $sec ثانية.');
+        return;
+      } else {
+        _lockoutUntil = null;
+        _failedAttempts = 0;
+        SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => null);
+      }
+    }
+
     final id = _idController.text.trim();
     final pin = _pinController.text.trim();
 
@@ -58,16 +101,31 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (user != null) {
+      _failedAttempts = 0;
+      _lockoutUntil = null;
+      SharedPreferences.getInstance().then((p) => p.remove('login_lockout_until')).catchError((_) => null);
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
     } else {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'بيانات الدخول غير صحيحة. يرجى التحقق من الرقم الجامعي ورمز المرور.';
-      });
+      _failedAttempts++;
+      if (_failedAttempts >= 5) {
+        final lockTime = DateTime.now().add(const Duration(seconds: 30));
+        _lockoutUntil = lockTime;
+        SharedPreferences.getInstance().then((p) => p.setInt('login_lockout_until', lockTime.millisecondsSinceEpoch)).catchError((_) => null);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'تم قفل محاولات تسجيل الدخول مؤقتاً لمدة 30 ثانية لحماية الحساب من التخمين.';
+        });
+      } else {
+        final left = 5 - _failedAttempts;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'بيانات الدخول غير صحيحة. متبقي $left محاولات قبل القفل المؤقت.';
+        });
+      }
     }
   }
 
