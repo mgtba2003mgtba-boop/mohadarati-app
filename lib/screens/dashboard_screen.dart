@@ -5790,7 +5790,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             final nameWithoutExt = file.name.contains('.')
                 ? file.name.substring(0, file.name.lastIndexOf('.'))
                 : file.name;
-            _bannerTitleController.text = nameWithoutExt;
+            final lower = nameWithoutExt.toLowerCase().trim();
+            if (!lower.contains('home_banner') &&
+                !lower.contains('home banner') &&
+                lower != 'banner' &&
+                lower != 'image') {
+              _bannerTitleController.text = nameWithoutExt;
+            }
           }
         });
       } else {

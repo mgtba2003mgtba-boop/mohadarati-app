@@ -460,20 +460,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
               final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
                   rawContent.contains('إعلان بوستر رسمي') ||
-                  rawContent.contains('بوستر رسمي');
+                  rawContent.contains('بوستر رسمي') ||
+                  rawContent.trim() == '[HOME_BANNER]' ||
+                  rawContent.toLowerCase().trim() == 'home banner' ||
+                  rawContent.toLowerCase().trim() == 'home_banner' ||
+                  rawContent.toLowerCase().trim() == 'banner';
               final content = isBoilerplate
                   ? ''
                   : rawContent
                       .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
                       .replaceAll('إعلان وبوستر رسمي', '')
                       .replaceAll('إعلان بوستر رسمي', '')
+                      .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
+                      .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
+                      .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
                       .trim();
 
               String title = rawTitle
                   .replaceAll('إعلان وبوستر رسمي', '')
                   .replaceAll('إعلان بوستر رسمي', '')
+                  .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
+                  .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
+                  .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
                   .trim();
-              if (RegExp(r'^\d+$').hasMatch(title)) {
+              if (title.isEmpty || RegExp(r'^\d+$').hasMatch(title)) {
                 title = 'الكلية التقنية الهندسية';
               }
 

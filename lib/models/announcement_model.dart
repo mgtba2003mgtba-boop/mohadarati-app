@@ -449,6 +449,10 @@ class AnnouncementModel {
         .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]\{[^{}]*\}'), '')
         .replaceAll(RegExp(r'\[LECTURE_NOTE_V1\]'), '')
         .replaceAll(RegExp(r'\[COURSE_OVERRIDE:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\[?ANNOUNCEMENT\]?', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
         .trim();
   }
 
