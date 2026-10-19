@@ -47,7 +47,7 @@ def build_student_message(name, student_id=None):
         f"افتح الرابط وسوي إضافة للشاشة، يضمن وصول كل التحديثات تلقائياً لحين اكتمال النشر على <b>Google Play</b> و <b>App Store</b>."
     )
 
-def send_telegram_message(chat_id, text, reply_markup):
+def send_telegram_message(chat_id, text, reply_markup, retry_count=0):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -66,34 +66,53 @@ def send_telegram_message(chat_id, text, reply_markup):
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8")
+        try:
+            err_json = json.loads(err_body)
+            if e.code == 429 and retry_count < 3:
+                retry_after = err_json.get("parameters", {}).get("retry_after", 3)
+                time.sleep(retry_after + 1)
+                return send_telegram_message(chat_id, text, reply_markup, retry_count + 1)
+        except Exception:
+            pass
         return {"ok": False, "error": err_body}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
 def fetch_stage4_students():
-    url = f"{SUPABASE_URL}/rest/v1/students?select=id,name,department,stage,section,telegram_chat_id&telegram_chat_id=not.is.null"
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}"
     }
-    req = urllib.request.Request(url, headers=headers)
+    all_students = []
+    offset = 0
+    limit = 1000
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            stage4_students = []
-            seen_chats = set()
-            for s in data:
-                dept = s.get("department") or ""
-                stage = s.get("stage") or ""
-                cid = s.get("telegram_chat_id")
-                is_med = ("أجهزة" in dept or "اجهزة" in dept)
-                is_stg4 = ("4" in stage or "رابع" in stage)
-                if is_med and is_stg4 and cid and str(cid).strip():
-                    cid_str = str(cid).strip()
-                    if cid_str not in seen_chats:
-                        seen_chats.add(cid_str)
-                        stage4_students.append(s)
-            return stage4_students
+        while True:
+            url = f"{SUPABASE_URL}/rest/v1/students?select=id,name,department,stage,section,telegram_chat_id&telegram_chat_id=not.is.null&offset={offset}&limit={limit}"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if not data:
+                    break
+                all_students.extend(data)
+                if len(data) < limit:
+                    break
+                offset += limit
+
+        stage4_students = []
+        seen_chats = set()
+        for s in all_students:
+            dept = s.get("department") or ""
+            stage = s.get("stage") or ""
+            cid = s.get("telegram_chat_id")
+            is_med = ("أجهزة" in dept or "اجهزة" in dept)
+            is_stg4 = ("4" in stage or "رابع" in stage)
+            if is_med and is_stg4 and cid and str(cid).strip():
+                cid_str = str(cid).strip()
+                if cid_str not in seen_chats:
+                    seen_chats.add(cid_str)
+                    stage4_students.append(s)
+        return stage4_students
     except Exception as e:
         print(f"[ERROR] Failed to fetch students: {e}")
         return []
