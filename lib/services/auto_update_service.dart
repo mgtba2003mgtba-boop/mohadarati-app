@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show File;
+import 'dart:io' show File, Directory;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/app_constants.dart';
-import 'app_notification_service.dart';
+import '../main.dart';
+import '../widgets/in_app_update_dialog.dart';
 
-/// ── خدمة التحديث التلقائي الصامت (Silent In-App Auto-Updater) ──────────────
-/// تفحص وجود أي إصدار أحدث عند الإقلاع، وتقوم بتنزيله صامتاً في الخلفية
-/// دون أي إزعاج أو أزرار، وتُظهر إشعاراً علوياً هادئاً فور اكتمال التنزيل
-/// لتثبيت التحديث بنقرة واحدة عبر النظام مباشرة.
+/// ── خدمة التحديث التلقائي والذاتي (In-App Auto-Update Engine) ───────────────
+/// تقوم بمقارنة رقم versionCode الحقيقي من نظام أندرويد مع السيرفر السحابي،
+/// وتُظهر نافذة التحديث الإجباري المباشرة بشريط تقدم ونسبة مئوية لمنع أي تكرار أو حلقة مفرغة.
 class AutoUpdateService with WidgetsBindingObserver {
   static final AutoUpdateService _instance = AutoUpdateService._internal();
   factory AutoUpdateService() => _instance;
@@ -23,37 +23,66 @@ class AutoUpdateService with WidgetsBindingObserver {
   bool _initialized = false;
   String? _currentBuildNumber;
   DateTime _lastCheckTime = DateTime.fromMillisecondsSinceEpoch(0);
-  bool _isDownloading = false;
-  String? _downloadedApkPath;
+  bool _isShowingDialog = false;
 
-  /// مؤشر لمنع أي إعادة تحميل إجبارية أثناء تفاعل المستخدم، كتابة التبليغات، أو اختيار الملفات
+  /// مؤشر لمنع أي إعادة تحميل إجبارية أثناء تفاعل المستخدم
   static bool isUserBusy = false;
+
+  static Future<String?> getCacheDir() async {
+    try {
+      return await _updaterChannel.invokeMethod<String>('getCacheDir');
+    } catch (e) {
+      debugPrint('[-] Error getting cache dir: $e');
+      return null;
+    }
+  }
+
+  static Future<void> installApkFile(String path) async {
+    try {
+      await _updaterChannel.invokeMethod('installApk', {'filePath': path});
+    } catch (e) {
+      debugPrint('[-] Error launching package installer: $e');
+    }
+  }
+
+  Future<void> installDownloadedUpdate() async {
+    final cacheDir = await getCacheDir();
+    if (cacheDir != null) {
+      try {
+        final dir = Directory(cacheDir);
+        final apks = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.apk'));
+        if (apks.isNotEmpty) {
+          await installApkFile(apks.first.path);
+        }
+      } catch (_) {}
+    }
+  }
 
   void initialize() {
     if (_initialized) return;
     _initialized = true;
     try {
       WidgetsBinding.instance.addObserver(this);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        checkUpdate();
+      });
     } catch (_) {}
-
-    // فحص هادئ عند بدء تشغيل التطبيق
-    checkUpdate();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (!isUserBusy) {
+      if (!isUserBusy && !_isShowingDialog) {
         checkUpdate();
       }
     }
   }
 
   Future<void> checkUpdate() async {
-    if (isUserBusy) return;
+    if (isUserBusy || _isShowingDialog) return;
 
     final now = DateTime.now();
-    if (now.difference(_lastCheckTime).inSeconds < 25) return;
+    if (now.difference(_lastCheckTime).inSeconds < 15) return;
     _lastCheckTime = now;
 
     if (kIsWeb) {
@@ -80,7 +109,7 @@ class AutoUpdateService with WidgetsBindingObserver {
             _currentBuildNumber = serverBuild;
             await prefs.setString('nust_build_number', serverBuild);
           } else if (_currentBuildNumber != serverBuild) {
-            debugPrint('[+] Web version detected: $serverBuild (was: $_currentBuildNumber)');
+            debugPrint('[+] Web version update detected: $serverBuild (was: $_currentBuildNumber)');
             await prefs.setString('nust_build_number', serverBuild);
           }
         }
@@ -91,129 +120,57 @@ class AutoUpdateService with WidgetsBindingObserver {
   }
 
   Future<void> _checkAndroidUpdate(DateTime now) async {
-    if (_isDownloading) return;
-
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _currentBuildNumber ??= prefs.getString('nust_android_build_number') ?? AppConstants.appVersion;
+      // 1. استخراج رقم versionCode الحقيقي المترجم والمثبت على جهاز الطالب عبر نظام أندرويد
+      int localVersionCode = 0;
+      try {
+        localVersionCode = await _updaterChannel.invokeMethod<int>('getVersionCode') ?? 0;
+      } catch (_) {}
+      debugPrint('[*] Local Android OS versionCode: $localVersionCode (AppVersion: ${AppConstants.appVersion})');
 
-      // 1. استعلام رقم الإصدار من السيرفر السحابي
+      // 2. استعلام العقد الرسمي من السيرفر
       final url = Uri.parse('https://mohadarati.vercel.app/version.json?_t=${now.millisecondsSinceEpoch}');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
 
       if (response.statusCode != 200) return;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final serverVersion = data['version']?.toString() ?? '';
-      final serverBuild = data['build_number']?.toString() ?? '';
+      final serverVersionCode = data['android_version_code'] as int? ?? 0;
+      final serverVersion = data['version']?.toString() ?? '1.0.4';
+      final releaseNotes = data['release_notes']?.toString() ?? '';
       final apkUrl = data['apk_url']?.toString() ?? 'https://mohadarati.vercel.app/Mohadarati.apk';
 
-      // مقارنة رقم الإصدار أو رقم البناء
-      final bool hasNewerVersion = _isNewerVersion(serverVersion, AppConstants.appVersion) ||
-          (_currentBuildNumber != null && serverBuild.isNotEmpty && _currentBuildNumber != serverBuild);
-
-      if (!hasNewerVersion) {
-        debugPrint('[*] Android App is up to date (${AppConstants.appVersion}).');
+      // 3. المقارنة الرياضية القطعية: هل إصدار السيرفر أكبر فعلياً من إصدار الجهاز؟
+      if (serverVersionCode <= localVersionCode) {
+        debugPrint('[*] Android is 100% up-to-date (Local: $localVersionCode >= Server: $serverVersionCode). Zero prompt.');
+        // تنظيف أي ملفات تثبيت قديمة موجودة في الكاش
+        final cacheDir = await getCacheDir();
+        if (cacheDir != null) {
+          try {
+            final oldApk = File('$cacheDir/Mohadarati_v$serverVersionCode.apk');
+            if (await oldApk.exists()) await oldApk.delete();
+          } catch (_) {}
+        }
         return;
       }
 
-      debugPrint('[+] New Android update available: $serverVersion ($serverBuild)');
+      debugPrint('[+] New Android update required! (Local: $localVersionCode < Server: $serverVersionCode)');
 
-      // 2. الحصول على مسار الكاش الآمن عبر Native MethodChannel
-      final cacheDir = await _updaterChannel.invokeMethod<String>('getCacheDir');
-      if (cacheDir == null) return;
-
-      final targetFile = File('$cacheDir/Mohadarati_update.apk');
-
-      // 3. التحقق إذا كان الملف محملاً مسبقاً وبحجم سليم (أكبر من 15MB)
-      if (await targetFile.exists()) {
-        final length = await targetFile.length();
-        if (length > 15 * 1024 * 1024) {
-          _downloadedApkPath = targetFile.path;
-          _notifyUserForInstall(serverVersion);
-          return;
-        }
-      }
-
-      // 4. بدء التنزيل الصامت في الخلفية دون أي مقاطعة
-      _isDownloading = true;
-      debugPrint('[*] Starting silent background download of APK from: $apkUrl');
-
-      final apkUri = Uri.parse(apkUrl);
-      final client = http.Client();
-      final req = http.Request('GET', apkUri);
-      final streamedResponse = await client.send(req).timeout(const Duration(seconds: 180));
-
-      if (streamedResponse.statusCode == 200) {
-        final sink = targetFile.openWrite();
-        await streamedResponse.stream.pipe(sink);
-        await sink.flush();
-        await sink.close();
-
-        final fileSize = await targetFile.length();
-        debugPrint('[SUCCESS] APK downloaded successfully ($fileSize bytes) to: ${targetFile.path}');
-
-        if (fileSize > 15 * 1024 * 1024) {
-          _downloadedApkPath = targetFile.path;
-          await prefs.setString('nust_android_build_number', serverBuild);
-          _notifyUserForInstall(serverVersion);
-        }
+      // 4. عرض نافذة التحديث الإجباري بشريط التقدم
+      final context = NustStudentPortalApp.navigatorKey.currentContext;
+      if (context != null && !_isShowingDialog) {
+        _isShowingDialog = true;
+        await InAppUpdateDialog.show(
+          context,
+          version: serverVersion,
+          versionCode: serverVersionCode,
+          releaseNotes: releaseNotes,
+          apkUrl: apkUrl,
+        );
+        _isShowingDialog = false;
       }
     } catch (e) {
-      debugPrint('[-] Error during silent background update: $e');
-    } finally {
-      _isDownloading = false;
-    }
-  }
-
-  bool _isNewerVersion(String server, String local) {
-    if (server.isEmpty || local.isEmpty) return false;
-    try {
-      final sParts = server.replaceAll('v', '').split('.').map(int.parse).toList();
-      final lParts = local.replaceAll('v', '').split('.').map(int.parse).toList();
-      for (int i = 0; i < sParts.length && i < lParts.length; i++) {
-        if (sParts[i] > lParts[i]) return true;
-        if (sParts[i] < lParts[i]) return false;
-      }
-      return sParts.length > lParts.length;
-    } catch (_) {
-      return server != local;
-    }
-  }
-
-  void _notifyUserForInstall(String version) {
-    AppNotificationService.instance.showInAppNotification(
-      AppNotificationItem(
-        id: 'update_${DateTime.now().millisecondsSinceEpoch}',
-        title: '✨ يتوفر تحديث جديد للمنظومة ($version)',
-        message: 'تم تنزيل النسخة الجديدة بنجاح في الخلفية. اضغط هنا للتثبيت الآن.',
-        type: AppNotificationType.update,
-        timestamp: DateTime.now(),
-      ),
-    );
-  }
-
-  /// إطلاق شاشة تثبيت الأندرويد الرسمية للملف المحمل
-  Future<void> installDownloadedUpdate() async {
-    if (_downloadedApkPath == null) {
-      try {
-        final cacheDir = await _updaterChannel.invokeMethod<String>('getCacheDir');
-        if (cacheDir != null) {
-          final file = File('$cacheDir/Mohadarati_update.apk');
-          if (await file.exists() && await file.length() > 15 * 1024 * 1024) {
-            _downloadedApkPath = file.path;
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (_downloadedApkPath != null) {
-      debugPrint('[*] Triggering native package installer for: $_downloadedApkPath');
-      try {
-        await _updaterChannel.invokeMethod('installApk', {'filePath': _downloadedApkPath});
-      } catch (e) {
-        debugPrint('[-] Failed to launch package installer: $e');
-      }
+      debugPrint('[-] Error checking Android update: $e');
     }
   }
 

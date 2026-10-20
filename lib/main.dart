@@ -44,9 +44,12 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 class NustStudentPortalApp extends StatelessWidget {
   const NustStudentPortalApp({super.key});
 
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'محاضراتي',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

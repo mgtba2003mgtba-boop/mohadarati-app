@@ -50,8 +50,10 @@ import time
 build_time = int(time.time())
 version_data = {
     "app_name": "nust_student_portal",
-    "version": "1.0.3",
+    "version": "1.0.4",
+    "android_version_code": 5,
     "build_number": str(build_time),
+    "release_notes": "تحسينات شاملة للأداء وسرعة النشر ونظام التحديث التلقائي المستقر.",
     "apk_url": "https://mohadarati.vercel.app/Mohadarati.apk",
     "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 }

@@ -22,11 +22,11 @@ def add_field(name, val):
     body.append(f"{val}\r\n".encode("utf-8"))
 
 add_field("chat_id", CHAT_ID)
-add_field("caption", "🤖 تطبيق محاضراتي المحدث v1.0.3 (APK)")
+add_field("caption", "🤖 تطبيق محاضراتي المحدث v1.0.4 (APK)")
 
 # File field
 body.append(f"--{boundary}\r\n".encode("utf-8"))
-body.append(f'Content-Disposition: form-data; name="document"; filename="Mohadarati_v1.0.3.apk"\r\n'.encode("utf-8"))
+body.append(f'Content-Disposition: form-data; name="document"; filename="Mohadarati_v1.0.4.apk"\r\n'.encode("utf-8"))
 body.append(b"Content-Type: application/vnd.android.package-archive\r\n\r\n")
 
 with open(APK_PATH, "rb") as f:
