@@ -9,7 +9,6 @@ import '../widgets/study_book_animation.dart';
 import '../widgets/app_loading_overlay.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
-import '../widgets/ios_install_dialog.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -485,21 +484,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(height: 8),
 
-                    // زر تثبيت التطبيق لأجهزة الآيفون
-                    TextButton.icon(
-                      onPressed: () => IosInstallDialog.show(context),
-                      icon: const Icon(Icons.apple_rounded, size: 18, color: AppTheme.textSecondary),
-                      label: Text(
-                        'مستخدم آيفون؟ تثبيت التطبيق بدون متصفح 📲',
-                        style: GoogleFonts.cairo(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
                   ] else ...[
                     // تم التحقق بنجاح من بيانات الطالب
                     Container(
