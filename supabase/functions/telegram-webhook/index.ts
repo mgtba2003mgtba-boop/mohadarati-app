@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJUkGrWr_WW50DUKL86DjSYCHMTvLRPAALErgACgMywSoJ4sLkvJ2z_PQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJUkmrWs-y0RSesTndK6SpsQaQoHDscAALKrgACgMywSgNAfEA8CpwEPQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -886,12 +886,16 @@ async function sendTelegramAnimation(botToken, chatId, animationUrlOrId, caption
   }
 }
 async function sendAndroidApkFile(botToken, chatId) {
-  const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>الإصدار الجديد:</b> v1.0.2 (أحدث إصدار)
-    ⚡ <b>التحسينات:</b> تسريع جذري وسلاسة النشر الفوري\n` +
-    `📅 <b>تاريخ التحديث:</b> ${new Date().toLocaleDateString('ar-EG')}\n` +
-    `━━━━━━━━━━━━━━━━━━━━━\n` +
+  const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (تحديث سحابي دائم)</b>
+` +
+    `━━━━━━━━━━━━━━━━━━━━━
+` +
+    `📦 <b>الإصدار:</b> v1.0.2 (أحدث نسخة هوائية)
+` +
+    `⚡ <b>الميزة:</b> ثبّته مرة واحدة فقط، وسيتحدث التطبيق تلقائياً عند كل تطوير دون الحاجة لإعادة تنزيل الـ APK أبداً!
+` +
+    `━━━━━━━━━━━━━━━━━━━━━
+` +
     `اضغط على الملف أعلاه لتنزيله ثم اختر <b>تثبيت (Install)</b>.`;
   await sendTelegramDocument(botToken, chatId, APK_FILE_ID, caption);
 }

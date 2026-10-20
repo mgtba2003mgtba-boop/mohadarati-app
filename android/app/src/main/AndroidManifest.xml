@@ -3,10 +3,15 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
-    <!-- أذونات المعرض (الستوديو) والذاكرة لرفع بوسترات الواجهة وملفات المحاضرات -->
+    <!-- إذن الكاميرا لبصمة الوجه والتحقق البيومتري -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+    <!-- أذونات المعرض (الستوديو) والذاكرة لرفع بوسترات الواجهة وملفات المحاضرات وتنزيلها -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
 
     <application
         android:label="محاضراتي"
