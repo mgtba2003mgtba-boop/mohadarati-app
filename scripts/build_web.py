@@ -28,7 +28,7 @@ target_cwd = "Z:\\" if os.path.exists("Z:\\") else PROJECT_ROOT
 print(f"[*] Building web in: {target_cwd}")
 
 try:
-    cmd = [FLUTTER_BIN, "build", "web", "--release", "--no-tree-shake-icons"]
+    cmd = [FLUTTER_BIN, "build", "web", "--release", "--no-tree-shake-icons", "--no-wasm-dry-run"]
     res = subprocess.run(cmd, cwd=target_cwd)
     if res.returncode != 0:
         print(f"[!] Build failed with exit code: {res.returncode}")

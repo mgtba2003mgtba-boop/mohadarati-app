@@ -47,13 +47,27 @@ if os.path.exists(apk_src):
 # 4. Generate dynamic version.json and update index.html
 import json
 import time
+import re
+
 build_time = int(time.time())
+app_v = "1.0.5"
+android_vc = 6
+
+pubspec_path = os.path.join(PROJECT_ROOT, "pubspec.yaml")
+if os.path.exists(pubspec_path):
+    with open(pubspec_path, "r", encoding="utf-8") as f:
+        p_content = f.read()
+    m = re.search(r'version:\s*([0-9\.]+)\+([0-9]+)', p_content)
+    if m:
+        app_v = m.group(1)
+        android_vc = int(m.group(2))
+
 version_data = {
     "app_name": "nust_student_portal",
-    "version": "1.0.4",
-    "android_version_code": 5,
+    "version": app_v,
+    "android_version_code": android_vc,
     "build_number": str(build_time),
-    "release_notes": "تحسينات شاملة للأداء وسرعة النشر ونظام التحديث التلقائي المستقر.",
+    "release_notes": "تصميم جديد وعصري لخانة الجداول مع معاينة فورية ومباشرة بدون أزرار، وتكبير تفاعلي بملء الشاشة.",
     "apk_url": "https://mohadarati.vercel.app/Mohadarati.apk",
     "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 }

@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJVamrXUFxGtDmxVHFfl3JYNWITqCO9AAKOowACgMy4Sh6KBZKtoBAhPQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJVl2rXWtCdLTDLkEKaeHKmfxPh35WfAAIJpAACgMy4SpyFP0s5eBKEPQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -890,7 +890,7 @@ async function sendAndroidApkFile(botToken, chatId) {
 ` +
     `━━━━━━━━━━━━━━━━━━━━━
 ` +
-    `📦 <b>الإصدار المستقر:</b> v1.0.4 (النسخة الأصلية السريعة)
+    `📦 <b>الإصدار المستقر:</b> v1.0.5 (النسخة الأصلية السريعة)
 ` +
     `⚡ <b>التحسينات:</b> أداء فائق 60fps، واستجابة ونشر فوري مع استقرار كامل
 ` +
@@ -905,7 +905,7 @@ async function sendAndroidInstallGuide(botToken, chatId) {
 async function sendIosInstallGuide(botToken, chatId) {
   const caption = `🍏 <b>تثبيت وتحديث تطبيق محاضراتي للآيفون (iOS)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>الإصدار الجديد:</b> v1.0.4 (أحدث نسخة)
+    `📦 <b>الإصدار الجديد:</b> v1.0.5 (أحدث نسخة)
     ⚡ <b>التحسينات:</b> تسريع جذري واستجابة فورية\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `1️⃣ اضغط على الزر أدناه ثم اختر <b>(سماح / Allow)</b>.\n` +
