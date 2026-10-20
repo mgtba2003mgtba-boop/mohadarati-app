@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJUfmrWq3PDErGBonQ017bCmeILlRRxAAK8rgACgMywSp9XZYWwc9zcPQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJUkGrWr_WW50DUKL86DjSYCHMTvLRPAALErgACgMywSoJ4sLkvJ2z_PQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -888,7 +888,8 @@ async function sendTelegramAnimation(botToken, chatId, animationUrlOrId, caption
 async function sendAndroidApkFile(botToken, chatId) {
   const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>الإصدار الجديد:</b> v1.0.1\n` +
+    `📦 <b>الإصدار الجديد:</b> v1.0.2 (أحدث إصدار)
+    ⚡ <b>التحسينات:</b> تسريع جذري وسلاسة النشر الفوري\n` +
     `📅 <b>تاريخ التحديث:</b> ${new Date().toLocaleDateString('ar-EG')}\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `اضغط على الملف أعلاه لتنزيله ثم اختر <b>تثبيت (Install)</b>.`;
@@ -900,7 +901,8 @@ async function sendAndroidInstallGuide(botToken, chatId) {
 async function sendIosInstallGuide(botToken, chatId) {
   const caption = `🍏 <b>تثبيت وتحديث تطبيق محاضراتي للآيفون (iOS)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>الإصدار الجديد:</b> v1.0.1 (أحدث نسخة)\n` +
+    `📦 <b>الإصدار الجديد:</b> v1.0.2 (أحدث نسخة)
+    ⚡ <b>التحسينات:</b> تسريع جذري واستجابة فورية\n` +
     `━━━━━━━━━━━━━━━━━━━━━\n` +
     `1️⃣ اضغط على الزر أدناه ثم اختر <b>(سماح / Allow)</b>.\n` +
     `2️⃣ افتح <b>الإعدادات (Settings)</b> ⚙️ على هاتفك.\n` +
@@ -1119,8 +1121,10 @@ async function findAndLinkStudentByNameOrId(query, chatId) {
   }
   return null;
 }
-/**
- * Builds dynamic inline keyboard for the student based only on the days they have lectures!
+/**
+
+ * Builds dynamic inline keyboard for the student based only on the days they have lectures!
+
  */ async function getStudentScheduleInlineKeyboard(chatId) {
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
   const { data: student } = await supabase.from('students').select('department, stage, section').eq('telegram_chat_id', chatId).maybeSingle();
