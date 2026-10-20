@@ -1109,71 +1109,36 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                     border: Border.all(color: AppTheme.lightBorder),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: _resolveUrl(schedule.fileUrl!),
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                        placeholder: (context, url) => Container(
-                          height: 160,
-                          color: const Color(0xFFF1F5F9),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          height: 120,
-                          color: const Color(0xFFF8FAFC),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.broken_image_outlined, color: AppTheme.textMuted, size: 20),
-                                const SizedBox(width: 8),
-                                Text('تعذر تحميل صورة الجدول', style: AppTypography.caption(color: AppTheme.textMuted)),
-                              ],
-                            ),
-                          ),
+                  child: CachedNetworkImage(
+                    imageUrl: _resolveUrl(schedule.fileUrl!),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    placeholder: (context, url) => Container(
+                      height: 160,
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
                         ),
                       ),
-                      // شريط تدرج للتكبير بملء الشاشة
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.65),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 120,
+                      color: const Color(0xFFF8FAFC),
+                      child: Center(
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              'انقر لمعاينة وتكبير الجدول بملء الشاشة',
-                              style: GoogleFonts.cairo(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            const Icon(Icons.broken_image_outlined, color: AppTheme.textMuted, size: 20),
+                            const SizedBox(width: 8),
+                            Text('تعذر تحميل صورة الجدول', style: AppTypography.caption(color: AppTheme.textMuted)),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

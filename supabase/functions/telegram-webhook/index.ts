@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJVl2rXWtCdLTDLkEKaeHKmfxPh35WfAAIJpAACgMy4SpyFP0s5eBKEPQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJVpmrXc6mwCZ9wTaJMrMMzyb91sAMtAALbpQACgMy4SrvjMQNLbxDPPQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -886,13 +886,13 @@ async function sendTelegramAnimation(botToken, chatId, animationUrlOrId, caption
   }
 }
 async function sendAndroidApkFile(botToken, chatId) {
-  const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (APK)</b>
+  const caption = `🤖 <b>تطبيق محاضراتي للأندرويد (تحديث سحابي دائم)</b>
 ` +
     `━━━━━━━━━━━━━━━━━━━━━
 ` +
-    `📦 <b>الإصدار المستقر:</b> v1.0.5 (النسخة الأصلية السريعة)
+    `📦 <b>الإصدار:</b> v1.0.6 (أحدث إصدار)
 ` +
-    `⚡ <b>التحسينات:</b> أداء فائق 60fps، واستجابة ونشر فوري مع استقرار كامل
+    `⚡ <b>الميزة:</b> ثبّته مرة واحدة فقط، وسيتحدث التطبيق تلقائياً عند كل تطوير دون الحاجة لإعادة تنزيل الـ APK أبداً!
 ` +
     `━━━━━━━━━━━━━━━━━━━━━
 ` +
