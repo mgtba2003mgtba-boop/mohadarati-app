@@ -829,8 +829,14 @@ class SupabaseService {
     return await _getCachedData<List<LectureCommentModel>>(
       key: cacheKey,
       fromJson: (json) => (json as List).map((i) {
-        final ann = AnnouncementModel.fromJson(i);
-        return LectureCommentModel.fromAnnouncement(ann);
+        if (i is Map<String, dynamic>) {
+          if (i.containsKey('subject_name')) {
+            final ann = AnnouncementModel.fromJson(i);
+            return LectureCommentModel.fromAnnouncement(ann);
+          }
+          return LectureCommentModel.fromJson(i);
+        }
+        return null;
       }).whereType<LectureCommentModel>().toList(),
     );
   }
@@ -865,6 +871,40 @@ class SupabaseService {
     String cacheKey,
   ) async {
     try {
+      // 1. محاولة استعلام جدول التعليقات المستقل (Normalized Table)
+      try {
+        final res = await client
+            .from('lecture_comments')
+            .select('*')
+            .eq('lecture_id', lectureId)
+            .order('created_at', ascending: true)
+            .timeout(const Duration(seconds: 4));
+
+        if (res.isNotEmpty) {
+          final list = res
+              .whereType<Map<String, dynamic>>()
+              .map((item) => LectureCommentModel.fromJson(item))
+              .toList();
+
+          list.sort((a, b) {
+            if (a.isPinned != b.isPinned) {
+              return a.isPinned ? -1 : 1;
+            }
+            return a.createdAt.compareTo(b.createdAt);
+          });
+
+          await _setCachedData(
+            key: cacheKey,
+            rawData: list,
+            toJson: () => list.map((c) => c.toJson()).toList(),
+          );
+          return list;
+        }
+      } catch (err) {
+        debugPrint('[SupabaseService] Falling back to announcements for lecture comments: $err');
+      }
+
+      // 2. مسار القراءة المتوافق عكسياً من جدول announcements
       final res = await client
           .from('announcements')
           .select('*')
@@ -932,6 +972,24 @@ class SupabaseService {
         encodedContent = '$encodedContent [SECTION:$sec]';
       }
 
+      // 1. كتابة في جدول التعليقات المستقل (Dual-Write)
+      try {
+        final commentDbPayload = {
+          'lecture_id': cleanLecId,
+          'student_id': user.studentId.isNotEmpty ? user.studentId : user.id,
+          'author_name': user.name,
+          'author_role': user.role,
+          'content': text.trim(),
+          'section': sec,
+          'is_pinned': false,
+          'helpful_users': [],
+        };
+        await client.from('lecture_comments').insert(commentDbPayload);
+      } catch (e) {
+        debugPrint('[SupabaseService] Notice: direct lecture_comments insert skipped: $e');
+      }
+
+      // 2. كتابة متزامنة في جدول announcements لضمان التوافق مع الإصدارات السابقة
       final payload = {
         'title': cleanLecId,
         'content': encodedContent,
@@ -978,6 +1036,27 @@ class SupabaseService {
     required String studentId,
   }) async {
     try {
+      // 1. محاولة تحديث جدول lecture_comments المنفصل
+      try {
+        final commentRow = await client
+            .from('lecture_comments')
+            .select('*')
+            .eq('id', commentId)
+            .maybeSingle();
+        if (commentRow != null) {
+          final rawHelpful = commentRow['helpful_users'];
+          List<String> users = [];
+          if (rawHelpful is List) users = rawHelpful.map((e) => e.toString()).toList();
+          if (users.contains(studentId)) {
+            users.remove(studentId);
+          } else {
+            users.add(studentId);
+          }
+          await client.from('lecture_comments').update({'helpful_users': users}).eq('id', commentId);
+        }
+      } catch (_) {}
+
+      // 2. تحديث جدول announcements
       final row = await client
           .from('announcements')
           .select('*')
@@ -1033,6 +1112,12 @@ class SupabaseService {
 
       if (!isAuthorized) return false;
 
+      // 1. محاولة تحديث جدول lecture_comments
+      try {
+        await client.from('lecture_comments').update({'is_pinned': isPinned}).eq('id', commentId);
+      } catch (_) {}
+
+      // 2. تحديث جدول announcements
       final row = await client
           .from('announcements')
           .select('*')
@@ -1072,6 +1157,9 @@ class SupabaseService {
     required String commentId,
     required String lectureId,
   }) async {
+    try {
+      await client.from('lecture_comments').delete().eq('id', commentId);
+    } catch (_) {}
     final ok = await deleteAnnouncement(commentId);
     if (ok) {
       invalidateCachePattern('lecture_comments_$lectureId');
@@ -1127,6 +1215,41 @@ class SupabaseService {
     required String cacheKey,
   }) async {
     try {
+      // 1. محاولة القراءة من جدول الجداول المستقل (Normalized Schedules Table)
+      try {
+        var query = client.from('schedules').select('*');
+        if (department != 'ALL') query = query.eq('department', department);
+        if (stage != 'ALL') query = query.eq('stage', stage);
+        if (type != null && type != 'ALL') query = query.eq('type', type);
+
+        final res = await query
+            .order('created_at', ascending: false)
+            .timeout(const Duration(seconds: 4));
+
+        if (res.isNotEmpty) {
+          final list = res
+              .whereType<Map<String, dynamic>>()
+              .map((item) => ScheduleModel.fromJson(item))
+              .where((s) {
+                if (section == null || section.isEmpty || section == 'ALL') return true;
+                return s.section.toUpperCase() == section.toUpperCase() || s.section.toUpperCase() == 'ALL';
+              })
+              .toList();
+
+          if (list.isNotEmpty) {
+            await _setCachedData(
+              key: cacheKey,
+              rawData: list,
+              toJson: () => list.map((s) => s.toJson()).toList(),
+            );
+            return list;
+          }
+        }
+      } catch (err) {
+        debugPrint('[SupabaseService] Falling back to announcements for schedules: $err');
+      }
+
+      // 2. مسار القراءة المتوافق عكسياً من جدول announcements القديم
       final res = await client
           .from('announcements')
           .select('*')
@@ -1198,9 +1321,30 @@ class SupabaseService {
     }
   }
 
-  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام وتحديث الكاش) ─────────────
+  /// ── حفظ / رفع جدول جديد (مع وسم العزل التام وتحديث الكاش ودعم Dual-Write) ─────────────
   Future<bool> createSchedule(ScheduleModel schedule) async {
     try {
+      // 1. كتابة في جدول الجداول المستقل
+      try {
+        final schedulePayload = {
+          'title': schedule.title,
+          'type': schedule.isExam ? 'exams' : 'lectures',
+          'department': schedule.department,
+          'stage': schedule.stage,
+          'section': schedule.section.toUpperCase(),
+          'file_url': schedule.fileUrl,
+          'file_name': schedule.fileName ?? schedule.title,
+          'uploader_id': schedule.uploaderId ?? 'REP',
+          'uploader_name': schedule.uploaderName ?? 'ممثل الشعبة',
+          'telegram_message_id': schedule.telegramMessageId,
+          'items': schedule.items.map((i) => i.toJson()).toList(),
+        };
+        await client.from('schedules').insert(schedulePayload);
+      } catch (e) {
+        debugPrint('[SupabaseService] Notice: direct schedules insert skipped: $e');
+      }
+
+      // 2. كتابة متزامنة في جدول announcements لضمان التوافق مع الإصدارات السابقة
       final tgTag = schedule.telegramMessageId != null ? ' [TG_MSG_ID:${schedule.telegramMessageId}]' : '';
       final payload = {
         'title': schedule.title,
@@ -1225,8 +1369,12 @@ class SupabaseService {
   }
 
   Future<bool> deleteSchedule(String id) async {
+    try {
+      await client.from('schedules').delete().eq('id', id);
+    } catch (_) {}
     return deleteAnnouncement(id);
   }
+
 
   /// ── جلب المحاضرات (كاش فوري وموحدة لكافة طلبة المرحلة والقسم) ──────────────────
   Future<List<LectureModel>> fetchLectures({

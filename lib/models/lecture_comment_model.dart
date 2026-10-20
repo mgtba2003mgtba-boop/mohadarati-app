@@ -235,4 +235,44 @@ class LectureCommentModel {
       section: extractedSection ?? (a.section.isNotEmpty && a.section != 'ALL' ? a.section : null),
     );
   }
+
+  /// تحويل كائن قاعدة البيانات المفصول أو الكاش إلى نموذج تعليق
+  factory LectureCommentModel.fromJson(Map<String, dynamic> json) {
+    List<String> helpful = [];
+    final rawHelpful = json['helpful_users'];
+    if (rawHelpful is List) {
+      helpful = rawHelpful.map((e) => e.toString()).toList();
+    }
+
+    return LectureCommentModel(
+      id: json['id']?.toString() ?? '',
+      lectureId: json['lecture_id']?.toString() ?? json['title']?.toString() ?? '',
+      authorId: json['student_id']?.toString() ?? json['author_id']?.toString() ?? '',
+      authorName: json['author_name']?.toString() ?? 'طالب',
+      authorRole: json['author_role']?.toString() ?? 'student',
+      content: json['content']?.toString() ?? '',
+      isPinned: json['is_pinned'] == true,
+      helpfulUserIds: helpful,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      section: json['section']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'lecture_id': lectureId,
+      'student_id': authorId,
+      'author_id': authorId,
+      'author_name': authorName,
+      'author_role': authorRole,
+      'content': content,
+      'is_pinned': isPinned,
+      'helpful_users': helpfulUserIds,
+      'section': section,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }

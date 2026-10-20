@@ -1,7 +1,7 @@
+import '../models/representative_activity_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
@@ -16,46 +16,11 @@ import '../widgets/app_fullscreen_modal.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/create_poll_sheet.dart';
 import 'package:file_picker/file_picker.dart';
-import '../models/course_override_model.dart';
 import '../services/course_customization_service.dart';
 import '../widgets/course_customization_sheet.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_tactile_bounce.dart';
 
-
-class RepresentativeActivityItem {
-  final String id;
-  final String type; // 'lecture' | 'announcement'
-  final String title;
-  final String subjectName;
-  final String department;
-  final String stage;
-  final String? section;
-  final String actorName;
-  final String actorId;
-  final String actorRole;
-  final DateTime createdAt;
-  final String? driveUrl;
-  final String? streamUrl;
-  final String? content;
-
-  RepresentativeActivityItem({
-    required this.id,
-    required this.type,
-    required this.title,
-    required this.subjectName,
-    required this.department,
-    required this.stage,
-    this.section,
-    required this.actorName,
-    required this.actorId,
-    required this.actorRole,
-    required this.createdAt,
-    this.driveUrl,
-    this.streamUrl,
-    this.content,
-  });
-}
 
 class DashboardScreen extends StatefulWidget {
   final int initialTabIndex;
