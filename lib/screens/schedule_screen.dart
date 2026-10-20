@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../models/app_user_model.dart';
@@ -1028,121 +1029,219 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   ),
                 ),
 
-                // زر الحذف للمشرفين وممثلي الدفعة
-                if (_user?.canManageLectures == true || _user?.isAdmin == true)
-                  AppTactileBounce(
-                    onTap: () async {
-                      final ok = await SupabaseService().deleteSchedule(schedule.id);
-                      if (ok && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('تم حذف الجدول', style: GoogleFonts.cairo()),
-                            backgroundColor: AppTheme.success,
-                            duration: const Duration(seconds: 2),
+                // أزرار الرأس: تنزيل وحذف
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (schedule.fileUrl != null)
+                      AppTactileBounce(
+                        onTap: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primarySubtle,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.15)),
                           ),
-                        );
-                        _loadSchedules();
-                      }
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.dangerSubtle,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                          child: const Center(
+                            child: Icon(Icons.download_rounded, color: AppTheme.primary, size: 20),
+                          ),
+                        ),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          const Divider(color: AppTheme.lightBorder, height: 1),
-
-          // صف الأزرار: زر معاينة سريعة وزر تنزيل رسمي
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-            child: Row(
-              children: [
-                // زر معاينة
-                Expanded(
-                  child: AppTactileBounce(
-                    onTap: schedule.fileUrl != null
-                        ? () {
-                            AppMediaPreviewModal.show(
-                              context: context,
-                              title: schedule.title,
-                              subtitle: '${schedule.department} • ${schedule.stage}',
-                              url: _resolveUrl(schedule.fileUrl!),
-                              downloadUrl: _resolveUrl(schedule.fileUrl!),
-                              fileName: schedule.fileName ?? schedule.title,
-                              mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
+                    if (_user?.canManageLectures == true || _user?.isAdmin == true) ...[
+                      const SizedBox(width: 8),
+                      AppTactileBounce(
+                        onTap: () async {
+                          final ok = await SupabaseService().deleteSchedule(schedule.id);
+                          if (ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('تم حذف الجدول', style: GoogleFonts.cairo()),
+                                backgroundColor: AppTheme.success,
+                                duration: const Duration(seconds: 2),
+                              ),
                             );
+                            _loadSchedules();
                           }
-                        : null,
-                    child: SizedBox(
-                      height: 42,
-                      child: OutlinedButton.icon(
-                        onPressed: schedule.fileUrl != null
-                            ? () {
-                                AppMediaPreviewModal.show(
-                                  context: context,
-                                  title: schedule.title,
-                                  subtitle: '${schedule.department} • ${schedule.stage}',
-                                  url: _resolveUrl(schedule.fileUrl!),
-                                  downloadUrl: _resolveUrl(schedule.fileUrl!),
-                                  fileName: schedule.fileName ?? schedule.title,
-                                  mimeType: schedule.isPdf ? 'application/pdf' : 'image/jpeg',
-                                );
-                              }
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          side: const BorderSide(color: AppTheme.primary, width: 1.2),
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-                        ),
-                        icon: const Icon(Icons.visibility_rounded, size: 16),
-                        label: Text(
-                          'معاينة سريعة',
-                          style: AppTypography.captionStrong(color: AppTheme.primary),
+                        },
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppTheme.dangerSubtle,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // زر تنزيل
-                Expanded(
-                  child: AppTactileBounce(
-                    onTap: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
-                    child: SizedBox(
-                      height: 42,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _launchUrl(_resolveUrl(schedule.fileUrl)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-                        ),
-                        icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
-                        label: Text(
-                          'تنزيل رسمي',
-                          style: AppTypography.captionStrong(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
+
+          // جسم الجدول المباشر (معاينة مرئية فورية وبسيطة بدل الأزرار القديمة)
+          if (schedule.fileUrl != null && !isPdf) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: AppTactileBounce(
+                onTap: () {
+                  AppMediaPreviewModal.show(
+                    context: context,
+                    title: schedule.title,
+                    subtitle: '${schedule.department} • ${schedule.stage}',
+                    url: _resolveUrl(schedule.fileUrl!),
+                    downloadUrl: _resolveUrl(schedule.fileUrl!),
+                    fileName: schedule.fileName ?? schedule.title,
+                    mimeType: 'image/jpeg',
+                  );
+                },
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 260, minHeight: 140),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: AppTheme.lightBorder),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: _resolveUrl(schedule.fileUrl!),
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        placeholder: (context, url) => Container(
+                          height: 160,
+                          color: const Color(0xFFF1F5F9),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          height: 120,
+                          color: const Color(0xFFF8FAFC),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.broken_image_outlined, color: AppTheme.textMuted, size: 20),
+                                const SizedBox(width: 8),
+                                Text('تعذر تحميل صورة الجدول', style: AppTypography.caption(color: AppTheme.textMuted)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // شريط تدرج للتكبير بملء الشاشة
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.65),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'انقر لمعاينة وتكبير الجدول بملء الشاشة',
+                              style: GoogleFonts.cairo(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ] else if (schedule.fileUrl != null && isPdf) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: AppTactileBounce(
+                onTap: () {
+                  AppMediaPreviewModal.show(
+                    context: context,
+                    title: schedule.title,
+                    subtitle: '${schedule.department} • ${schedule.stage}',
+                    url: _resolveUrl(schedule.fileUrl!),
+                    downloadUrl: _resolveUrl(schedule.fileUrl!),
+                    fileName: schedule.fileName ?? schedule.title,
+                    mimeType: 'application/pdf',
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFEF4444), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              schedule.fileName ?? 'مستند جدول رسمي (PDF)',
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: const Color(0xFF991B1B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'انقر لفتح وقراءة المستند داخل التطبيق',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                color: const Color(0xFFB91C1C).withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFEF4444)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

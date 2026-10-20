@@ -3,7 +3,6 @@ import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import '../core/theme/app_theme.dart';
 import '../services/auto_update_service.dart';
 
 /// ── نافذة التحديث الإجباري التلقائي (Mandatory In-App Update Dialog) ──────────
