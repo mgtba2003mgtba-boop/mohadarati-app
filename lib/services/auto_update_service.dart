@@ -140,9 +140,14 @@ class AutoUpdateService with WidgetsBindingObserver {
       final releaseNotes = data['release_notes']?.toString() ?? '';
       final apkUrl = data['apk_url']?.toString() ?? 'https://mohadarati.vercel.app/Mohadarati.apk';
 
-      // 3. المقارنة الرياضية القطعية: هل إصدار السيرفر أكبر فعلياً من إصدار الجهاز؟
-      if (serverVersionCode <= localVersionCode) {
-        debugPrint('[*] Android is 100% up-to-date (Local: $localVersionCode >= Server: $serverVersionCode). Zero prompt.');
+      // 3. المقارنة الرياضية القطعية مع تطبيع معمارية الـ Split APK (arm64-v8a: 2000+, armeabi-v7a: 1000+)
+      final normServer = serverVersionCode >= 1000 ? (serverVersionCode % 1000) : serverVersionCode;
+      final normLocal = localVersionCode >= 1000 ? (localVersionCode % 1000) : localVersionCode;
+      final bool isUpdateNeeded = (normServer > normLocal) ||
+          (serverVersionCode > localVersionCode && normServer >= normLocal);
+
+      if (!isUpdateNeeded) {
+        debugPrint('[*] Android is 100% up-to-date (Local: $localVersionCode [norm: $normLocal] >= Server: $serverVersionCode [norm: $normServer]). Zero prompt.');
         // تنظيف أي ملفات تثبيت قديمة موجودة في الكاش
         final cacheDir = await getCacheDir();
         if (cacheDir != null) {
@@ -154,7 +159,7 @@ class AutoUpdateService with WidgetsBindingObserver {
         return;
       }
 
-      debugPrint('[+] New Android update required! (Local: $localVersionCode < Server: $serverVersionCode)');
+      debugPrint('[+] New Android update required! (Local: $localVersionCode [norm: $normLocal] < Server: $serverVersionCode [norm: $normServer])');
 
       // 4. عرض نافذة التحديث الإجباري بشريط التقدم
       final context = NustStudentPortalApp.navigatorKey.currentContext;

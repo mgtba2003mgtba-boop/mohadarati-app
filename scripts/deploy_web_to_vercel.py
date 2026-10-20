@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-PROJECT_ROOT = r"c:\Users\Almustaqbal\Downloads\تطبيق الحضور"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BUILD_WEB = os.path.join(PROJECT_ROOT, "build", "web")
 WEB_SRC = os.path.join(PROJECT_ROOT, "web")
 
@@ -61,6 +61,23 @@ if os.path.exists(pubspec_path):
     if m:
         app_v = m.group(1)
         android_vc = int(m.group(2))
+
+# Extract the true compiled versionCode from APK badging if available
+aapt_tool = os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk\build-tools\34.0.0\aapt.exe")
+rel_apk = r"build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+if os.path.exists(rel_apk) and os.path.exists(aapt_tool):
+    try:
+        aapt_res = subprocess.run([aapt_tool, "dump", "badging", rel_apk], capture_output=True, text=True, errors="ignore")
+        vc_match = re.search(r"versionCode='(\d+)'", aapt_res.stdout)
+        if vc_match:
+            android_vc = int(vc_match.group(1))
+            print(f"[+] Extracted compiled APK versionCode: {android_vc}")
+        vn_match = re.search(r"versionName='([^']+)'", aapt_res.stdout)
+        if vn_match:
+            app_v = vn_match.group(1)
+            print(f"[+] Extracted compiled APK versionName: {app_v}")
+    except Exception as e:
+        print(f"[!] Warning extracting APK metadata: {e}")
 
 version_data = {
     "app_name": "nust_student_portal",
