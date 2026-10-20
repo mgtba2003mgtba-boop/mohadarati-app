@@ -1,0 +1,31 @@
+name: CodeRabbit Review Alert
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  check-review-expected:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CodeRabbit review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Wait 10 minutes, then check if CodeRabbit reviewed
+            await new Promise(r => setTimeout(r, 600000));
+
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const crReview = reviews.find(r => r.user.login === 'coderabbitai[bot]');
+
+            if (!crReview) {
+              core.warning(
+                'CodeRabbit has not reviewed this PR after 10 minutes. ' +
+                'Check: App installation, .coderabbit.yaml, base_branches config.'
+              );
+            }
