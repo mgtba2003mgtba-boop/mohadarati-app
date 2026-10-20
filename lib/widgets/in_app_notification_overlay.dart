@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/app_notification_service.dart';
+import '../services/auto_update_service.dart';
 import '../screens/announcements_screen.dart';
 
 /// طبقة عائمة تعرض إشعارات فورية متدفقة أعلى الشاشة بنمط هواتف آيفون وأندرويد
@@ -84,6 +85,8 @@ class _InAppNotificationOverlayState extends State<InAppNotificationOverlay>
         context,
         MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
       );
+    } else if (item.type == AppNotificationType.update) {
+      AutoUpdateService().installDownloadedUpdate();
     }
   }
 
@@ -148,15 +151,19 @@ class _InAppNotificationOverlayState extends State<InAppNotificationOverlay>
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: _currentItem!.type == AppNotificationType.announcement
-                                        ? const Color(0xFF0284C7)
-                                        : const Color(0xFF4F46E5),
+                                    color: _currentItem!.type == AppNotificationType.update
+                                        ? const Color(0xFF10B981)
+                                        : (_currentItem!.type == AppNotificationType.announcement
+                                            ? const Color(0xFF0284C7)
+                                            : const Color(0xFF4F46E5)),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
-                                    _currentItem!.type == AppNotificationType.announcement
-                                        ? Icons.campaign_rounded
-                                        : Icons.menu_book_rounded,
+                                    _currentItem!.type == AppNotificationType.update
+                                        ? Icons.system_update_rounded
+                                        : (_currentItem!.type == AppNotificationType.announcement
+                                            ? Icons.campaign_rounded
+                                            : Icons.menu_book_rounded),
                                     color: Colors.white,
                                     size: 20,
                                   ),

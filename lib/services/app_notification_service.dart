@@ -8,7 +8,7 @@ import '../core/theme/app_theme.dart';
 import '../models/announcement_model.dart';
 import 'web_notification_helper.dart';
 
-enum AppNotificationType { announcement, lecture }
+enum AppNotificationType { announcement, lecture, update }
 
 class AppNotificationItem {
   final String id;
@@ -47,6 +47,11 @@ class AppNotificationService {
 
   RealtimeChannel? _realtimeChannel;
   bool _isSubscribed = false;
+
+  /// إظهار إشعار عائم أعلى الشاشة يدوياً (للتحديثات أو التنبيهات الفورية)
+  void showInAppNotification(AppNotificationItem item) {
+    _notificationController.add(item);
+  }
 
   /// تهيئة الاتصال المباشر بالقناة السحابية
   void initialize() {

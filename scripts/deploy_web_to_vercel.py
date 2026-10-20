@@ -38,14 +38,21 @@ if os.path.exists(icons_src):
     shutil.copytree(icons_src, icons_dst)
     print("[+] Copied icons/ folder")
 
+# 3.5. Ensure latest Android APK is copied for In-App Auto Updates
+apk_src = os.path.join(PROJECT_ROOT, "build", "app", "outputs", "flutter-apk", "app-arm64-v8a-release.apk")
+if os.path.exists(apk_src):
+    shutil.copy2(apk_src, os.path.join(BUILD_WEB, "Mohadarati.apk"))
+    print(f"[+] Copied latest APK ({os.path.getsize(apk_src)} bytes) to build/web/Mohadarati.apk")
+
 # 4. Generate dynamic version.json and update index.html
 import json
 import time
 build_time = int(time.time())
 version_data = {
     "app_name": "nust_student_portal",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "build_number": str(build_time),
+    "apk_url": "https://mohadarati.vercel.app/Mohadarati.apk",
     "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 }
 for target_dir in [BUILD_WEB, WEB_SRC]:
