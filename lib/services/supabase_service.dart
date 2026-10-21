@@ -15,6 +15,7 @@ import '../models/subject_model.dart';
 import '../models/lecture_comment_model.dart';
 import '../core/constants/biometric_subjects.dart';
 import 'telegram_uploader_service.dart';
+import 'offline_sync_service.dart';
 
 class _OtpRecord {
   final String code;
@@ -1881,19 +1882,77 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب كافة المستخدمين (للإدارة والترقية) ──────────────────────────────
-  Future<List<AppUserModel>> fetchAllUsers() async {
-    try {
-      final res = await client
-          .from('app_users')
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(5000);
+  /// ── جلب كافة المستخدمين (للإدارة والترقية) بكاش ذكي وتخفيف حمولة السيرفر ───────────────────
+  Future<List<AppUserModel>> fetchAllUsers({
+    String? department,
+    String? stage,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'app_users_directory_${department ?? "ALL"}_${stage ?? "ALL"}';
 
-      return (res as List).map((item) => AppUserModel.fromJson(item)).toList();
+    if (!forceRefresh) {
+      final cached = await _getCachedData<List<AppUserModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => AppUserModel.fromJson(item)).toList(),
+      );
+      if (cached != null && cached.isNotEmpty) {
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 5)) {
+          _fetchFreshUsersAndCache(department: department, stage: stage, cacheKey: cacheKey)
+              .catchError((_) => <AppUserModel>[]);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshUsersAndCache(
+      department: department,
+      stage: stage,
+      cacheKey: cacheKey,
+    );
+  }
+
+  Future<List<AppUserModel>> _fetchFreshUsersAndCache({
+    String? department,
+    String? stage,
+    required String cacheKey,
+  }) async {
+    try {
+      var query = client
+          .from('app_users')
+          .select('id, student_id, name, department, stage, section, role, can_publish_lectures, can_publish_announcements, semester, created_at, updated_at');
+
+      if (department != null && department != 'ALL') {
+        query = query.eq('department', department);
+      }
+      if (stage != null && stage != 'ALL') {
+        query = query.eq('stage', AppConstants.normalizeStage(stage));
+      }
+
+      final res = await query
+          .order('created_at', ascending: false)
+          .limit(2000)
+          .timeout(const Duration(seconds: 8));
+
+      final list = (res as List)
+          .map((item) => AppUserModel.fromJson(item))
+          .toList();
+
+      if (list.isNotEmpty) {
+        await _setCachedData(
+          key: cacheKey,
+          rawData: list,
+          toJson: () => list.map((u) => u.toJson()).toList(),
+        );
+      }
+      return list;
     } catch (e) {
       debugPrint('[-] Error fetching users: $e');
-      return [];
+      final fallback = await _getCachedData<List<AppUserModel>>(
+        key: cacheKey,
+        fromJson: (json) => (json as List).map((item) => AppUserModel.fromJson(item)).toList(),
+      );
+      return fallback ?? [];
     }
   }
 
@@ -1928,6 +1987,8 @@ class SupabaseService {
       if (department != null) updateData['department'] = department;
 
       await client.from('app_users').update(updateData).eq('student_id', studentId);
+      invalidateCachePattern('app_users_directory');
+      invalidateCachePattern('app_user_');
 
       // تحديث الحالة محلياً إن كان المستخدم هو الحالي
       if (_currentUser != null && _currentUser!.studentId == studentId) {
@@ -2049,6 +2110,9 @@ class SupabaseService {
 
   Future<void> logout() async {
     _currentUser = null;
+    try {
+      OfflineSyncService().clearQueue();
+    } catch (_) {}
     _memoryCache.clear();
     _cacheTimestamps.clear();
     try {
