@@ -49,7 +49,12 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
           .eq('id', studentId)
           .maybeSingle();
 
-      final url = res?['photo_url']?.toString();
+      final rawUrl = res?['photo_url']?.toString();
+      final url = (rawUrl != null && rawUrl.trim().isNotEmpty)
+          ? rawUrl.trim()
+          : (studentId.startsWith('ST-NUST-')
+              ? 'https://f004.backblazeb2.com/file/mujtaba-student-photos/$studentId.jpg'
+              : null);
       _photoCache[studentId] = url;
       if (mounted && url != null && url.isNotEmpty) {
         setState(() {});

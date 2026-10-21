@@ -146,7 +146,11 @@ class AppUserModel {
       canPublishLectures: json['can_publish_lectures'] == true,
       canPublishAnnouncements: json['can_publish_announcements'] == true,
       isApproved: json['is_approved'] != false,
-      photoUrl: json['photo_url']?.toString(),
+      photoUrl: (json['photo_url'] != null && json['photo_url'].toString().trim().isNotEmpty)
+          ? json['photo_url'].toString().trim()
+          : (json['student_id'] != null && json['student_id'].toString().trim().startsWith('ST-NUST-')
+              ? 'https://f004.backblazeb2.com/file/mujtaba-student-photos/${json['student_id'].toString().trim()}.jpg'
+              : null),
       createdAt: created,
       semester: json['semester'] is int
           ? json['semester']

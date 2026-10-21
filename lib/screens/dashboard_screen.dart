@@ -215,9 +215,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final service = SupabaseService();
     try {
       final results = await Future.wait([
-        service.fetchLectures(forceRefresh: forceRefresh),
-        service.fetchAnnouncements(forceRefresh: forceRefresh),
-        service.fetchAllUsers(),
+        service.fetchLectures(forceRefresh: forceRefresh).catchError((e) {
+          debugPrint('[-] Error fetching lectures: $e');
+          return <LectureModel>[];
+        }),
+        service.fetchAnnouncements(forceRefresh: forceRefresh).catchError((e) {
+          debugPrint('[-] Error fetching announcements: $e');
+          return <AnnouncementModel>[];
+        }),
+        service.fetchAllUsers(forceRefresh: forceRefresh).catchError((e) {
+          debugPrint('[-] Error fetching all users: $e');
+          return <AppUserModel>[];
+        }),
       ]);
 
       _allLectures = results[0] as List<LectureModel>;
@@ -2524,8 +2533,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: () {
-                          setState(() => _moderationSegmentIndex = 1);
-                          _tabController.animateTo(2);
+                          setState(() => _courseAndUserSegmentIndex = 1);
+                          _tabController.animateTo(1);
                         },
                         child: Text(
                           'عرض الطلاب',
