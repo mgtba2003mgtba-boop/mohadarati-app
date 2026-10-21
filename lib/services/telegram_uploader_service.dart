@@ -250,9 +250,13 @@ class TelegramUploaderService {
     return null;
   }
 
-  /// جلب رابط مباشر جديد للملف في حال الحاجة لتحديث الرابط
+  /// جلب رابط مباشر جديد للملف في حال الحاجة لتحديث الرابط (مع دعم البروكسي لتجاوز CORS)
   Future<String?> resolveFileUrl(String fileId) async {
     try {
+      if (kIsWeb) {
+        return AppConstants.resolveImageUrl('/api/proxy?file_id=$fileId');
+      }
+
       final botToken = AppConstants.lecturesBotToken;
       final uri = Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId');
       final res = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -266,7 +270,7 @@ class TelegramUploaderService {
     } catch (e) {
       debugPrint('[-] Error resolving file URL: $e');
     }
-    return null;
+    return AppConstants.resolveImageUrl('/api/proxy?file_id=$fileId');
   }
 
   /// كشف نوع الوسائط (MIME Type) من اسم الملف
@@ -328,19 +332,38 @@ class TelegramUploaderService {
           partProgress,
         );
 
-        final fileUrl = await resolveFileUrl(fileId);
-        if (fileUrl == null || fileUrl.isEmpty) {
+        // استخدام رابط البروكسي المباشر لتجاوز CORS وحجب الشبكات في المتصفحات
+        final fileUrl = kIsWeb
+            ? AppConstants.resolveImageUrl('/api/proxy?file_id=$fileId')
+            : (await resolveFileUrl(fileId) ?? AppConstants.resolveImageUrl('/api/proxy?file_id=$fileId'));
+
+        if (fileUrl.isEmpty) {
           throw Exception('تعذر استخراج رابط تحميل الجزء رقم $partNum');
         }
 
-        final res = await http
-            .get(Uri.parse(fileUrl))
-            .timeout(const Duration(minutes: 10));
-        if (res.statusCode != 200) {
-          throw Exception('فشل تنزيل الجزء $partNum كود (${res.statusCode})');
+        http.Response? partRes;
+        dynamic lastErr;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          try {
+            final res = await http
+                .get(Uri.parse(fileUrl))
+                .timeout(const Duration(minutes: 5));
+            if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+              partRes = res;
+              break;
+            }
+          } catch (e) {
+            lastErr = e;
+            debugPrint('[-] Part $partNum download attempt $attempt error: $e');
+            await Future.delayed(Duration(seconds: attempt));
+          }
         }
 
-        fullBuilder.add(res.bodyBytes);
+        if (partRes == null || partRes.statusCode != 200) {
+          throw Exception('فشل تنزيل الجزء $partNum (${partRes?.statusCode ?? lastErr ?? 'timeout'})');
+        }
+
+        fullBuilder.add(partRes.bodyBytes);
         final ratio = (i + 1) / totalParts;
         onProgress?.call('تم تحميل الجزء $partNum من أصل $totalParts بنجاح', ratio);
       }
@@ -349,7 +372,7 @@ class TelegramUploaderService {
       return fullBuilder.takeBytes();
     } catch (e) {
       debugPrint('[-] Error downloading chunked lecture parts: $e');
-      return null;
+      rethrow;
     }
   }
 

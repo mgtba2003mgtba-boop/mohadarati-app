@@ -14,3 +14,19 @@ void saveFileInBrowser(Uint8List bytes, String fileName) {
     // ignore
   }
 }
+
+String? createBlobUrl(Uint8List bytes, [String? mimeType]) {
+  try {
+    final type = (mimeType != null && mimeType.isNotEmpty) ? mimeType : 'application/octet-stream';
+    final blob = html.Blob([bytes], type);
+    return html.Url.createObjectUrlFromBlob(blob);
+  } catch (e) {
+    return null;
+  }
+}
+
+void revokeBlobUrl(String url) {
+  try {
+    html.Url.revokeObjectUrl(url);
+  } catch (_) {}
+}

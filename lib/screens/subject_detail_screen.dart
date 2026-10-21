@@ -323,7 +323,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         : (lecture.driveUrl.startsWith('telegram:parts:') ? lecture.driveUrl : null);
 
     if (partsDesc != null) {
-      await _downloadChunkedLecture(lecture, partsDesc);
+      await _downloadChunkedLecture(lecture, partsDesc, isPreview: !isDownload);
       return;
     }
 
@@ -371,13 +371,19 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
   }
 
-  /// تنزيل المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة في شاشة تفاصيل المادة
-  Future<void> _downloadChunkedLecture(LectureModel lecture, String partsDescriptor) async {
+  /// تنزيل أو معاينة المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة في شاشة تفاصيل المادة
+  Future<void> _downloadChunkedLecture(
+    LectureModel lecture,
+    String partsDescriptor, {
+    bool isPreview = false,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
 
     double dlProgress = 0.05;
-    String dlStatus = 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
+    String dlStatus = isPreview
+        ? 'جاري تجهيز وتجميع المحاضرة للمعاينة الفورية...'
+        : 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
 
     showDialog(
       context: context,
@@ -397,12 +403,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       color: AppTheme.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.downloading_rounded, color: AppTheme.primary, size: 22),
+                    child: Icon(
+                      isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
+                      color: AppTheme.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'تنزيل وتجميع أجزاء المحاضرة',
+                      isPreview ? 'معاينة وتجميع أجزاء المحاضرة' : 'تنزيل وتجميع أجزاء المحاضرة',
                       style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -466,18 +476,42 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       }
 
       if (bytes != null && bytes.isNotEmpty) {
-        if (kIsWeb) {
+        if (isPreview) {
+          if (kIsWeb) {
+            final blobUrl = createBlobUrl(bytes, lecture.mimeType);
+            if (blobUrl != null) {
+              AppMediaPreviewModal.show(
+                context: context,
+                title: lecture.title,
+                subtitle: '${lecture.subjectName} • ${lecture.formattedFileSize}',
+                url: blobUrl,
+                fileName: fileName,
+                mimeType: lecture.mimeType,
+              );
+              return;
+            }
+          }
           saveFileInBrowser(bytes, fileName);
           messenger.showSnackBar(
             SnackBar(
-              content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+              content: Text('تم تحميل $fileName بنجاح 🚀'),
               backgroundColor: AppTheme.primary,
             ),
           );
         } else {
-          if (lecture.telegramMessageId != null) {
-            final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
-            await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+          if (kIsWeb) {
+            saveFileInBrowser(bytes, fileName);
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+                backgroundColor: AppTheme.primary,
+              ),
+            );
+          } else {
+            if (lecture.telegramMessageId != null) {
+              final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
+              await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+            }
           }
         }
       } else {

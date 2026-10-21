@@ -88,6 +88,16 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   /// فتح أو بث المحاضرة مباشرة عبر مشغل الفيديو أو السحابة
   Future<void> _openMediaStream(dynamic target) async {
+    if (target is LectureModel) {
+      final partsDesc = (target.telegramFileId != null && target.telegramFileId!.startsWith('telegram:parts:'))
+          ? target.telegramFileId!
+          : (target.driveUrl.startsWith('telegram:parts:') ? target.driveUrl : null);
+      if (partsDesc != null) {
+        await _downloadChunkedLecture(target, partsDesc, isPreview: true);
+        return;
+      }
+    }
+
     String? url;
     if (target is LectureModel) {
       if (target.telegramFileId != null && target.telegramFileId!.isNotEmpty) {
@@ -178,13 +188,19 @@ class _LecturesScreenState extends State<LecturesScreen> {
     }
   }
 
-  /// تنزيل المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة
-  Future<void> _downloadChunkedLecture(LectureModel lecture, String partsDescriptor) async {
+  /// تنزيل أو معاينة المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة
+  Future<void> _downloadChunkedLecture(
+    LectureModel lecture,
+    String partsDescriptor, {
+    bool isPreview = false,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
 
     double dlProgress = 0.05;
-    String dlStatus = 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
+    String dlStatus = isPreview
+        ? 'جاري تجهيز وتجميع المحاضرة للمعاينة الفورية...'
+        : 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
 
     showDialog(
       context: context,
@@ -204,12 +220,16 @@ class _LecturesScreenState extends State<LecturesScreen> {
                       color: AppTheme.primaryLight.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.downloading_rounded, color: AppTheme.primaryLight, size: 22),
+                    child: Icon(
+                      isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
+                      color: AppTheme.primaryLight,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'تنزيل وتجميع المحاضرة',
+                      isPreview ? 'معاينة وتجميع المحاضرة' : 'تنزيل وتجميع المحاضرة',
                       style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -273,18 +293,42 @@ class _LecturesScreenState extends State<LecturesScreen> {
       }
 
       if (bytes != null && bytes.isNotEmpty) {
-        if (kIsWeb) {
+        if (isPreview) {
+          if (kIsWeb) {
+            final blobUrl = createBlobUrl(bytes, lecture.mimeType);
+            if (blobUrl != null) {
+              AppMediaPreviewModal.show(
+                context: context,
+                title: lecture.title,
+                subtitle: '${lecture.subjectName} • ${lecture.formattedFileSize}',
+                url: blobUrl,
+                fileName: fileName,
+                mimeType: lecture.mimeType,
+              );
+              return;
+            }
+          }
           saveFileInBrowser(bytes, fileName);
           messenger.showSnackBar(
             SnackBar(
-              content: Text('تم تنزيل $fileName بنجاح 🚀'),
+              content: Text('تم تحميل $fileName بنجاح 🚀'),
               backgroundColor: AppTheme.primary,
             ),
           );
         } else {
-          if (lecture.telegramMessageId != null) {
-            final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
-            await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+          if (kIsWeb) {
+            saveFileInBrowser(bytes, fileName);
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+                backgroundColor: AppTheme.primary,
+              ),
+            );
+          } else {
+            if (lecture.telegramMessageId != null) {
+              final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
+              await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+            }
           }
         }
       } else {
