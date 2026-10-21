@@ -13,6 +13,7 @@ import '../models/lecture_model.dart';
 import '../models/schedule_model.dart';
 import '../models/subject_model.dart';
 import '../models/lecture_comment_model.dart';
+import '../models/grade_model.dart';
 import '../core/constants/biometric_subjects.dart';
 import 'telegram_uploader_service.dart';
 import 'offline_sync_service.dart';
@@ -2064,6 +2065,95 @@ class SupabaseService {
     } catch (e) {
       debugPrint('[-] Error batch updating semester: $e');
       return false;
+    }
+  }
+
+  /// ── جلب تقسيم الدرجات ودرجة الطالب للمادة (تظهر فقط إذا فعّلها الأستاذ is_published = true) ───
+  Future<SubjectGradeViewData?> fetchSubjectGradeForStudent({
+    required String studentId,
+    required String subjectName,
+    String? displayName,
+    required String department,
+    required String stage,
+    bool forceRefresh = false,
+  }) async {
+    final cleanStudentId = studentId.trim();
+    final cleanDept = department.trim();
+    final normStage = AppConstants.normalizeStage(stage);
+    final stageAliases = AppConstants.getStageAliases(normStage);
+
+    try {
+      // 1. استعلام إعدادات المواد المفعّلة حصراً (is_published = true) من سيرفر الحضور
+      final cfgRows = await _attendanceClient
+          .from('subject_grade_configs')
+          .select('*')
+          .eq('is_published', true)
+          .timeout(const Duration(seconds: 8));
+
+      final configs = (cfgRows as List)
+          .map((r) => SubjectGradeConfigModel.fromJson(Map<String, dynamic>.from(r as Map)))
+          .where((c) => c.isPublished)
+          .toList();
+
+      SubjectGradeConfigModel? matchedConfig;
+      for (final c in configs) {
+        final deptMatch = c.department.isEmpty ||
+            c.department == 'ALL' ||
+            AppConstants.arabicEquals(c.department, cleanDept) ||
+            AppConstants.arabicContains(c.department, cleanDept) ||
+            AppConstants.arabicContains(cleanDept, c.department);
+
+        final stageMatch = c.stage.isEmpty ||
+            c.stage == 'ALL' ||
+            stageAliases.contains(c.stage) ||
+            AppConstants.normalizeStage(c.stage) == normStage;
+
+        final subMatch = AppConstants.matchesSubject(
+          c.subjectName,
+          subjectName,
+          displayName: displayName,
+        );
+
+        if (deptMatch && stageMatch && subMatch) {
+          matchedConfig = c;
+          break;
+        }
+      }
+
+      // بوابة الإخفاء الصارمة: إذا لم يقم الأستاذ بتفعيل الدرجات لهذه المادة، نُرجع null فتبقى الخانة مخفية تماماً
+      if (matchedConfig == null) {
+        return null;
+      }
+
+      // 2. جلب درجة الطالب الحالي حصراً في هذه المادة
+      StudentSubjectGradeModel? studentGrade;
+      if (cleanStudentId.isNotEmpty) {
+        final gradeRows = await _attendanceClient
+            .from('student_subject_grades')
+            .select('*')
+            .eq('student_id', cleanStudentId)
+            .timeout(const Duration(seconds: 8));
+
+        final gradesList = (gradeRows as List)
+            .map((r) => StudentSubjectGradeModel.fromJson(Map<String, dynamic>.from(r as Map)))
+            .toList();
+
+        for (final g in gradesList) {
+          if (g.subjectId == matchedConfig.subjectId ||
+              AppConstants.matchesSubject(g.subjectName, subjectName, displayName: displayName)) {
+            studentGrade = g;
+            break;
+          }
+        }
+      }
+
+      return SubjectGradeViewData(
+        config: matchedConfig,
+        studentGrade: studentGrade,
+      );
+    } catch (e) {
+      debugPrint('[-] Error fetching subject grade for student: $e');
+      return null;
     }
   }
 

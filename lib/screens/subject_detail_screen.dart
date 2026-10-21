@@ -12,6 +12,7 @@ import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../models/announcement_model.dart';
 import '../models/attendance_model.dart';
+import '../models/grade_model.dart';
 import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
@@ -52,7 +53,7 @@ class SubjectDetailScreen extends StatefulWidget {
 }
 
 class _SubjectDetailScreenState extends State<SubjectDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
 
@@ -60,6 +61,26 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   List<LectureModel> _subjectLectures = [];
   List<AnnouncementModel> _subjectAnnouncements = [];
   List<AttendanceRecordModel> _subjectAttendanceRecords = [];
+  SubjectGradeViewData? _subjectGradeData;
+
+  bool get _showGradesTab =>
+      _subjectGradeData != null && _subjectGradeData!.config.isPublished;
+
+  void _updateTabControllerIfNeeded() {
+    final targetLength = _showGradesTab ? 4 : 3;
+    if (_tabController.length != targetLength) {
+      final oldIndex = _tabController.index;
+      _tabController.dispose();
+      _tabController = TabController(
+        length: targetLength,
+        initialIndex: oldIndex < targetLength ? oldIndex : 0,
+        vsync: this,
+      );
+      _tabController.addListener(() {
+        if (mounted) setState(() {});
+      });
+    }
+  }
 
   String _lectureTypeFilter = 'ALL'; // 'ALL', 'theory', 'practical'
   String _selectedSectionFilter = 'ALL'; // 'ALL', 'A', 'B', 'C', 'D', 'UNIFIED'
@@ -225,6 +246,19 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       if (_user != null) {
         final records = await service.fetchStudentAttendance(_user!.studentId, forceRefresh: forceRefresh);
         _subjectAttendanceRecords = records.where((r) => _matchesSubject(r.subjectName)).toList();
+      }
+
+      // 4. جلب تقسيم الدرجات ودرجة الطالب (تظهر فقط إذا فعّلها الأستاذ من تطبيق الحضور)
+      _subjectGradeData = await service.fetchSubjectGradeForStudent(
+        studentId: _user?.studentId ?? '',
+        subjectName: widget.subjectName,
+        displayName: widget.displayName,
+        department: dept,
+        stage: stage,
+        forceRefresh: forceRefresh,
+      );
+      if (mounted) {
+        _updateTabControllerIfNeeded();
       }
     } catch (e) {
       debugPrint('[-] Error loading subject hub: $e');
@@ -628,10 +662,21 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ],
               ),
             ),
+            if (_showGradesTab)
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.workspace_premium_rounded, size: 16),
+                    SizedBox(width: 6),
+                    Text('الدرجات'),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
-      floatingActionButton: (_canPublish && _tabController.index != 2)
+      floatingActionButton: (_canPublish && (_tabController.index == 0 || _tabController.index == 1))
           ? (_tabController.index == 0
               ? FloatingActionButton.extended(
                   onPressed: () => _showPublishSheet(initialMode: 'lecture'),
@@ -664,6 +709,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 _buildLecturesTab(),
                 _buildAnnouncementsTab(),
                 _buildAttendanceTab(),
+                if (_showGradesTab) _buildGradesTab(),
               ],
             ),
     );
@@ -1352,6 +1398,263 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // تبويب 4: الدرجات والسعي الفصلي (يظهر فقط عند تفعيله من الأستاذ)
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildGradesTab() {
+    final data = _subjectGradeData;
+    if (data == null || !data.config.isPublished) {
+      return const SizedBox.shrink();
+    }
+
+    final config = data.config;
+    final grade = data.studentGrade;
+    final columns = config.columns;
+    final maxTotal = config.maxTotal;
+    final earnedTotal = data.earnedTotal;
+    final hasScores = data.hasAnyEnteredScore;
+    final ratio = maxTotal > 0 ? (earnedTotal / maxTotal).clamp(0.0, 1.0) : 0.0;
+
+    String formatNum(double v) {
+      if (v == v.roundToDouble()) return v.toInt().toString();
+      return v.toStringAsFixed(1);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. بطاقة مجموع السعي النهائي
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primary,
+                  AppTheme.primary.withValues(alpha: 0.85),
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withValues(alpha: 0.22),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'مجموع السعي والدرجات',
+                            style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            widget.displayName ?? widget.subjectName,
+                            style: GoogleFonts.cairo(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        hasScores
+                            ? '${formatNum(earnedTotal)} / ${formatNum(maxTotal)}'
+                            : '- / ${formatNum(maxTotal)}',
+                        style: GoogleFonts.cairo(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: hasScores ? ratio : 0.0,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.22),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // 2. عنوان تفصيل الدرجات حسب تقسيم الأستاذ
+          Row(
+            children: [
+              const Icon(Icons.fact_check_rounded, size: 18, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'تفصيل الدرجات حسب تقسيم أستاذ المادة',
+                style: GoogleFonts.cairo(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // 3. بطاقات كل خانة من خانات التقسيم
+          ...columns.map((col) {
+            final scoreVal = grade?.scores[col.id];
+            final hasColScore = scoreVal != null;
+            final colRatio = (hasColScore && col.maxScore > 0)
+                ? (scoreVal / col.maxScore).clamp(0.0, 1.0)
+                : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.lightBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          col.title,
+                          style: GoogleFonts.cairo(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: hasColScore
+                              ? AppTheme.primary.withValues(alpha: 0.1)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          hasColScore
+                              ? '${formatNum(scoreVal)} / ${formatNum(col.maxScore)}'
+                              : 'لم تُرصد (${formatNum(col.maxScore)})',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: hasColScore ? AppTheme.primary : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: colRatio,
+                      minHeight: 5,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colRatio >= 0.5 ? AppTheme.primary : AppTheme.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // 4. ملاحظة أستاذ المادة إن وجدت
+          if (grade != null && grade.note.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.comment_rounded, color: AppTheme.primary, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ملاحظة أستاذ المادة:',
+                          style: GoogleFonts.cairo(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          grade.note,
+                          style: GoogleFonts.cairo(
+                            fontSize: 12.5,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
