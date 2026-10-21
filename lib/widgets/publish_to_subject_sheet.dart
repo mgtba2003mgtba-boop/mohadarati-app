@@ -65,6 +65,11 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
   Map<String, int> _fileSizes = {};
   bool _isPickingFile = false;
   String _uploadStatus = '';
+  double _uploadProgress = 0.0;
+  int _currentFileBytesSent = 0;
+  int _currentFileTotalBytes = 0;
+  int _currentFileIndex = 0;
+  String _currentFileName = '';
 
   // حقول التبليغ
   final _announceContentController = TextEditingController();
@@ -187,36 +192,32 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
       }
     }
 
-    // ── نمط Optimistic UI الفائق: إغلاق النافذة فوراً ونقل المهمة للخلفية (في حال ملف مفرد أو رابط سحابي) ──
-    if (widget.onOptimisticLecture != null && (_isDriveLinkMode || _selectedFiles.length == 1)) {
-      final singleFile = _isDriveLinkMode ? null : _selectedFiles.first;
-      final singleSize = singleFile != null ? (_fileSizes[singleFile.name] ?? (singleFile.lengthSync() ?? 0)) : 0;
-      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-      final optimisticLecture = LectureModel(
-        id: tempId,
-        title: title,
-        subjectName: widget.subjectName,
-        department: widget.department,
-        stage: widget.stage,
-        section: _targetSection,
-        semester: widget.semester,
-        type: _lectureType,
-        driveUrl: _isDriveLinkMode ? (driveUrl ?? '') : '',
-        description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
-        uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-        uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
-        uploaderRole: widget.currentUser?.role ?? 'representative',
-        fileName: singleFile?.name,
-        fileSizeBytes: singleSize > 0 ? singleSize : null,
-        createdAt: DateTime.now(),
-      );
-
-      Navigator.pop(context, true);
-      widget.onOptimisticLecture!(optimisticLecture, singleFile, _isDriveLinkMode ? driveUrl : null);
-      return;
-    }
-
+    // ── في حال وضع الرابط السحابي (Google Drive): نشر فوري سريع ──
     if (_isDriveLinkMode) {
+      if (widget.onOptimisticLecture != null) {
+        final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+        final optimisticLecture = LectureModel(
+          id: tempId,
+          title: title,
+          subjectName: widget.subjectName,
+          department: widget.department,
+          stage: widget.stage,
+          section: _targetSection,
+          semester: widget.semester,
+          type: _lectureType,
+          driveUrl: driveUrl!,
+          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+          uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
+          uploaderRole: widget.currentUser?.role ?? 'representative',
+          createdAt: DateTime.now(),
+        );
+
+        Navigator.pop(context, true);
+        widget.onOptimisticLecture!(optimisticLecture, null, driveUrl);
+        return;
+      }
+
       setState(() => _isSubmitting = true);
       try {
         final newLecture = LectureModel(
@@ -251,61 +252,97 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
           _showSnack('خطأ أثناء النشر: $e', isError: true);
         }
       }
-    } else {
-      // رفع ملف واحد أو دفعة ملفات مع تتبع حي ومباشر
-      setState(() {
-        _isSubmitting = true;
-        _uploadStatus = _selectedFiles.length > 1
-            ? 'جاري تجهيز رفع ${_selectedFiles.length} ملفات...'
-            : 'جاري رفع المحاضرة...';
-      });
+      return;
+    }
 
-      int successCount = 0;
-      List<String> failedFiles = [];
+    // ── وضع رفع الملفات المباشر: تتبع حي للبايتات ونسبة التقدم حتى 100% ──
+    setState(() {
+      _isSubmitting = true;
+      _uploadProgress = 0.05;
+      _currentFileIndex = 0;
+      _uploadStatus = _selectedFiles.length > 1
+          ? 'جاري تجهيز رفع ${_selectedFiles.length} ملفات...'
+          : 'جاري قراءة وتجهيز ملف المحاضرة...';
+    });
 
-      for (int i = 0; i < _selectedFiles.length; i++) {
-        final file = _selectedFiles[i];
-        final fileTitle = _selectedFiles.length == 1
-            ? title
-            : (_selectedFiles.length > 1 && title.isNotEmpty
-                ? '$title (${i + 1}/${_selectedFiles.length})'
-                : file.name);
+    int successCount = 0;
+    List<String> failedFiles = [];
 
-        if (mounted) {
-          setState(() {
-            _uploadStatus = 'جاري رفع (${i + 1}/${_selectedFiles.length}): ${file.name}';
-          });
-        }
+    for (int i = 0; i < _selectedFiles.length; i++) {
+      final file = _selectedFiles[i];
+      final fileTitle = _selectedFiles.length == 1
+          ? title
+          : (_selectedFiles.length > 1 && title.isNotEmpty
+              ? '$title (${i + 1}/${_selectedFiles.length})'
+              : file.name);
 
-        try {
-          final res = await TelegramUploaderService().uploadLecture(
-            file: file,
-            title: fileTitle,
-            subjectName: widget.subjectName,
-            department: widget.department,
-            stage: widget.stage,
-            section: _targetSection,
-            semester: widget.semester,
-            lectureType: _lectureType,
-            description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
-            uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-            uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
-            uploaderRole: widget.currentUser?.role ?? 'representative',
-          );
-
-          if (!res.success) {
-            throw Exception(res.message);
-          }
-          successCount++;
-        } catch (err) {
-          debugPrint('[-] Error uploading file ${file.name}: $err');
-          failedFiles.add(file.name);
-        }
-      }
+      final fileSize = _fileSizes[file.name] ?? (file.lengthSync() ?? 0);
 
       if (mounted) {
-        setState(() => _isSubmitting = false);
-        if (successCount > 0) {
+        setState(() {
+          _currentFileIndex = i;
+          _currentFileName = file.name;
+          _currentFileBytesSent = 0;
+          _currentFileTotalBytes = fileSize;
+          _uploadProgress = 0.05;
+          _uploadStatus = 'جاري رفع (${i + 1}/${_selectedFiles.length}): ${file.name}';
+        });
+      }
+
+      try {
+        final res = await TelegramUploaderService().uploadLecture(
+          file: file,
+          title: fileTitle,
+          subjectName: widget.subjectName,
+          department: widget.department,
+          stage: widget.stage,
+          section: _targetSection,
+          semester: widget.semester,
+          lectureType: _lectureType,
+          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+          uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
+          uploaderRole: widget.currentUser?.role ?? 'representative',
+          onProgress: (status, prog) {
+            if (mounted) {
+              setState(() {
+                _uploadStatus = status;
+                if (prog != null) _uploadProgress = prog;
+              });
+            }
+          },
+          onDetailedProgress: (sent, total, prog, status) {
+            if (mounted) {
+              setState(() {
+                _currentFileBytesSent = sent;
+                _currentFileTotalBytes = total;
+                _uploadProgress = prog;
+                _uploadStatus = status;
+              });
+            }
+          },
+        );
+
+        if (!res.success) {
+          throw Exception(res.message);
+        }
+        successCount++;
+      } catch (err) {
+        debugPrint('[-] Error uploading file ${file.name}: $err');
+        failedFiles.add(file.name);
+      }
+    }
+
+    if (mounted) {
+      if (successCount > 0) {
+        setState(() {
+          _uploadProgress = 1.0;
+          _uploadStatus = _selectedFiles.length == 1
+              ? 'تم رفع ونشر المحاضرة بنجاح 🚀'
+              : 'تم رفع بنجاح $successCount من أصل ${_selectedFiles.length} محاضرات 🚀';
+        });
+        await Future.delayed(const Duration(milliseconds: 900));
+        if (mounted) {
           Navigator.pop(context, true);
           final msg = _selectedFiles.length == 1
               ? 'تم رفع ونشر المحاضرة بنجاح 🚀'
@@ -316,9 +353,10 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
               backgroundColor: AppTheme.primary,
             ),
           );
-        } else {
-          _showSnack('فشل رفع الملفات: ${failedFiles.join(", ")}', isError: true);
         }
+      } else {
+        setState(() => _isSubmitting = false);
+        _showSnack('فشل رفع الملفات: ${failedFiles.join(", ")}', isError: true);
       }
     }
   }
@@ -426,72 +464,74 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        top: 12,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // مقبض السحب
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.only(
+          top: 12,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // مقبض السحب
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-            // رأس النافذة
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primarySubtle,
-                    borderRadius: BorderRadius.circular(12),
+              // رأس النافذة
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.post_add_rounded, color: AppTheme.primary, size: 22),
                   ),
-                  child: const Icon(Icons.post_add_rounded, color: AppTheme.primary, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'نشر جديد في: ${widget.subjectName}',
-                        style: GoogleFonts.cairo(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'نشر جديد في: ${widget.subjectName}',
+                          style: GoogleFonts.cairo(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${widget.department} • ${widget.stage}',
-                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
-                      ),
-                    ],
+                        Text(
+                          '${widget.department} • ${widget.stage}',
+                          style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                    onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             const SizedBox(height: 16),
 
             // التبديل بين رفع محاضرة وإضافة تبليغ
@@ -836,6 +876,122 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
               ),
               const SizedBox(height: 16),
 
+              if (_isSubmitting) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primary.withValues(alpha: 0.25),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.cloud_upload_rounded,
+                              color: AppTheme.primaryLight,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedFiles.length > 1
+                                      ? 'جاري رفع المحاضرة (${_currentFileIndex + 1} من ${_selectedFiles.length})'
+                                      : 'جاري رفع المحاضرة إلى سحابة تيليجرام',
+                                  style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (_currentFileName.isNotEmpty)
+                                  Text(
+                                    _currentFileName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.cairo(color: Colors.white70, fontSize: 11),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.4)),
+                            ),
+                            child: Text(
+                              '${(_uploadProgress * 100).toInt()}%',
+                              style: GoogleFonts.cairo(
+                                color: AppTheme.primaryLight,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: _uploadProgress.clamp(0.0, 1.0),
+                          backgroundColor: Colors.white.withValues(alpha: 0.12),
+                          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
+                          minHeight: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _uploadStatus.isNotEmpty ? _uploadStatus : 'جاري تدفق البيانات...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
+                            ),
+                          ),
+                          if (_currentFileTotalBytes > 0) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_formatFileSize(_currentFileBytesSent)} / ${_formatFileSize(_currentFileTotalBytes)}',
+                              style: GoogleFonts.cairo(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
@@ -998,7 +1154,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
           ],
         ),
       ),
-    );
+    ),);
   }
 }
 

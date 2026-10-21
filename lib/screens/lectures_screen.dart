@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../models/app_user_model.dart';
 import '../models/lecture_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
+import '../services/web_file_saver.dart';
 import '../widgets/app_media_preview_modal.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -126,6 +128,13 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   /// تحميل المحاضرة مباشرة من سحابة تيليجرام
   Future<void> _openMediaDownload(dynamic target) async {
+    if (target is LectureModel) {
+      if (target.telegramFileId != null && target.telegramFileId!.startsWith('telegram:parts:')) {
+        await _downloadChunkedLecture(target);
+        return;
+      }
+    }
+
     String? url;
     if (target is LectureModel) {
       url = target.downloadUrl;
@@ -161,6 +170,131 @@ class _LecturesScreenState extends State<LecturesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('خطأ في التحميل: $e')),
+        );
+      }
+    }
+  }
+
+  /// تنزيل المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة
+  Future<void> _downloadChunkedLecture(LectureModel lecture) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final fileName = lecture.fileName ?? '${lecture.title}.pdf';
+
+    double dlProgress = 0.05;
+    String dlStatus = 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.downloading_rounded, color: AppTheme.primaryLight, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'تنزيل وتجميع المحاضرة',
+                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: dlProgress.clamp(0.0, 1.0),
+                      backgroundColor: Colors.white12,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
+                      minHeight: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dlStatus,
+                          style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
+                        ),
+                      ),
+                      Text(
+                        '${(dlProgress * 100).toInt()}%',
+                        style: GoogleFonts.cairo(color: AppTheme.primaryLight, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      final bytes = await TelegramUploaderService().downloadChunkedLectureParts(
+        partsDescriptor: lecture.telegramFileId!,
+        onProgress: (status, prog) {
+          dlStatus = status;
+          dlProgress = prog;
+        },
+      );
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        if (kIsWeb) {
+          saveFileInBrowser(bytes, fileName);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('تم تنزيل $fileName بنجاح 🚀'),
+              backgroundColor: AppTheme.primary,
+            ),
+          );
+        } else {
+          if (lecture.telegramMessageId != null) {
+            final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
+            await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+          }
+        }
+      } else {
+        throw Exception('تعذر استخراج بيانات المحاضرة');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('تعذر تحميل المحاضرة: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
         );
       }
     }
@@ -719,10 +853,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
     );
   }
 
-  void _showPublishLectureSheet(BuildContext context) {
+  void _showPublishLectureSheet(BuildContext context) async {
     if (_user == null) return;
-    final messenger = ScaffoldMessenger.of(context);
-    showModalBottomSheet(
+    final res = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -731,82 +864,17 @@ class _LecturesScreenState extends State<LecturesScreen> {
         initialDepartment: _selectedDept == 'ALL' ? (_user!.department.isNotEmpty ? _user!.department : AppConstants.departments.first) : _selectedDept,
         initialStage: _selectedStage == 'ALL' ? (_user!.stage.isNotEmpty ? _user!.stage : AppConstants.stages.first) : _selectedStage,
         initialSemester: _selectedSemester,
-        onOptimisticSubmit: (optimisticLecture, file, driveUrl) async {
-          // 1. إدراج فوري تفاؤلي في القائمة المحلية بنمط Optimistic UI (استجابة فائقة السرعة)
+        onOptimisticSubmit: (optimisticLecture, file, driveUrl) {
           setState(() {
             _lectures.insert(0, optimisticLecture);
           });
-          HapticFeedback.lightImpact();
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text('تم النشر بنجاح'),
-              backgroundColor: AppTheme.primary,
-              duration: Duration(seconds: 2),
-            ),
-          );
-
-          // 2. المزامنة في الخلفية بأمان
-          try {
-            if (file != null) {
-              final res = await TelegramUploaderService().uploadLecture(
-                file: file,
-                title: optimisticLecture.title,
-                subjectName: optimisticLecture.subjectName,
-                department: optimisticLecture.department,
-                stage: optimisticLecture.stage,
-                section: optimisticLecture.section,
-                semester: optimisticLecture.semester,
-                lectureType: optimisticLecture.type,
-                description: optimisticLecture.description,
-                uploaderId: optimisticLecture.uploaderId,
-                uploaderName: optimisticLecture.uploaderName,
-                uploaderRole: optimisticLecture.uploaderRole,
-              );
-              if (!res.success) {
-                throw Exception(res.message);
-              }
-            } else if (driveUrl != null && driveUrl.isNotEmpty) {
-              final finalLecture = LectureModel(
-                id: '',
-                title: optimisticLecture.title,
-                subjectName: optimisticLecture.subjectName,
-                department: optimisticLecture.department,
-                stage: optimisticLecture.stage,
-                section: optimisticLecture.section,
-                semester: optimisticLecture.semester,
-                type: optimisticLecture.type,
-                driveUrl: driveUrl,
-                description: optimisticLecture.description,
-                uploaderId: optimisticLecture.uploaderId,
-                uploaderName: optimisticLecture.uploaderName,
-                uploaderRole: optimisticLecture.uploaderRole,
-                createdAt: DateTime.now(),
-              );
-              final ok = await SupabaseService().createLecture(finalLecture);
-              if (!ok) throw Exception('تعذر حفظ بيانات المحاضرة في السحابة');
-            }
-
-            // 3. تأكيد المزامنة وإعادة التحميل الصامت
-            if (mounted) {
-              _loadLectures(forceRefresh: true);
-            }
-          } catch (e) {
-            debugPrint('[-] Background lecture upload error: $e');
-            if (mounted) {
-              setState(() {
-                _lectures.removeWhere((l) => l.id == optimisticLecture.id);
-              });
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text('تعذر إكمال النشر: $e'),
-                  backgroundColor: AppTheme.danger,
-                ),
-              );
-            }
-          }
         },
       ),
     );
+
+    if (res == true && mounted) {
+      _loadLectures(forceRefresh: true);
+    }
   }
 }
 
@@ -852,6 +920,11 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
   PlatformFile? _selectedFile;
   int _selectedFileSize = 0;
   bool _isPickingFile = false;
+  bool _isSubmitting = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatus = '';
+  int _bytesSent = 0;
+  int _totalBytes = 0;
 
   @override
   void initState() {
@@ -999,82 +1072,161 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
       createdAt: DateTime.now(),
     );
 
-    // إغلاق النافذة فورياً بنمط وتجربة التطبيقات العالمية دون انتظار الرفع السحابي
-    Navigator.pop(context);
-    widget.onOptimisticSubmit(optimisticLecture, _selectedFile, _isDriveMode ? driveUrl : null);
+    if (_isDriveMode) {
+      Navigator.pop(context, true);
+      widget.onOptimisticSubmit(optimisticLecture, null, driveUrl);
+      return;
+    }
+
+    // وضع رفع الملف المباشر مع تتبع حي لنسبة التحميل وبايتات التدفق
+    setState(() {
+      _isSubmitting = true;
+      _uploadProgress = 0.05;
+      _uploadStatus = 'جاري قراءة وتجهيز ملف المحاضرة...';
+      _bytesSent = 0;
+      _totalBytes = _selectedFileSize;
+    });
+
+    try {
+      final res = await TelegramUploaderService().uploadLecture(
+        file: _selectedFile!,
+        title: title,
+        subjectName: subject,
+        department: _dept,
+        stage: _stage,
+        section: _section,
+        semester: _semester,
+        lectureType: _lectureType,
+        description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+        uploaderId: widget.currentUser.studentId.isNotEmpty ? widget.currentUser.studentId : 'ADMIN',
+        uploaderName: widget.currentUser.name.isNotEmpty ? widget.currentUser.name : 'ممثل الشعبة',
+        uploaderRole: widget.currentUser.role,
+        onProgress: (status, prog) {
+          if (mounted) {
+            setState(() {
+              _uploadStatus = status;
+              if (prog != null) _uploadProgress = prog;
+            });
+          }
+        },
+        onDetailedProgress: (sent, total, prog, status) {
+          if (mounted) {
+            setState(() {
+              _bytesSent = sent;
+              _totalBytes = total;
+              _uploadProgress = prog;
+              _uploadStatus = status;
+            });
+          }
+        },
+      );
+
+      if (!res.success) {
+        throw Exception(res.message);
+      }
+
+      if (mounted) {
+        setState(() {
+          _uploadProgress = 1.0;
+          _uploadStatus = 'تم رفع ونشر المحاضرة بنجاح 🚀';
+        });
+        await Future.delayed(const Duration(milliseconds: 900));
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم رفع ونشر المحاضرة بنجاح 🚀'),
+              backgroundColor: AppTheme.primary,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر إكمال النشر: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isAdmin = widget.currentUser.isAdmin;
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        top: 12,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // مقبض السحب
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.only(
+          top: 12,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // مقبض السحب
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-            // رأس النافذة
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primarySubtle,
-                    borderRadius: BorderRadius.circular(12),
+              // رأس النافذة
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySubtle,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.upload_file_rounded, color: AppTheme.primary, size: 22),
                   ),
-                  child: const Icon(Icons.upload_file_rounded, color: AppTheme.primary, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'نشر محاضرة دراسية جديدة',
-                        style: GoogleFonts.cairo(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'نشر محاضرة دراسية جديدة',
+                          style: GoogleFonts.cairo(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '$_dept • $_stage • الفصل $_semester',
-                        style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
-                      ),
-                    ],
+                        Text(
+                          '$_dept • $_stage • الفصل $_semester',
+                          style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                    onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
             // عنوان المحاضرة
             TextField(
@@ -1360,22 +1512,140 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
             ),
             const SizedBox(height: 16),
 
+            if (_isSubmitting) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.3)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.25),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.cloud_upload_rounded,
+                            color: AppTheme.primaryLight,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'جاري رفع المحاضرة إلى سحابة تيليجرام',
+                                style: GoogleFonts.cairo(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (_selectedFile != null)
+                                Text(
+                                  _selectedFile!.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.cairo(color: Colors.white70, fontSize: 11),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            '${(_uploadProgress * 100).toInt()}%',
+                            style: GoogleFonts.cairo(
+                              color: AppTheme.primaryLight,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _uploadProgress.clamp(0.0, 1.0),
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
+                        minHeight: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _uploadStatus.isNotEmpty ? _uploadStatus : 'جاري تدفق البيانات...',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
+                          ),
+                        ),
+                        if (_totalBytes > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_formatFileSize(_bytesSent)} / ${_formatFileSize(_totalBytes)}',
+                            style: GoogleFonts.cairo(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _submit,
-              icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
               label: Text(
-                _isDriveMode ? 'نشر رابط المحاضرة السحابي 🚀' : 'نشر المحاضرة للطلبة 🚀',
+                _isSubmitting
+                    ? (_uploadStatus.isNotEmpty ? _uploadStatus : 'جاري النشر والمزامنة...')
+                    : (_isDriveMode ? 'نشر رابط المحاضرة السحابي 🚀' : 'نشر المحاضرة للطلبة 🚀'),
                 style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
         ),
       ),
-    );
+    ),);
   }
 }
