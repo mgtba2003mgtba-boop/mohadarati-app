@@ -7,6 +7,7 @@ import '../models/app_user_model.dart';
 import '../models/announcement_model.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
+import '../services/image_optimizer_service.dart';
 import 'app_network_image.dart';
 import 'app_fullscreen_modal.dart';
 
@@ -38,6 +39,8 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
   String _selectedBannerStage = 'ALL';
   List<AnnouncementModel> _existingBanners = [];
   bool _isLoadingBanners = false;
+  OptimizedImageResult? _optimizedBanner;
+  bool _isOptimizing = false;
 
   String _formatFileSize(int bytes) {
     if (bytes >= 1024 * 1024 * 1024) {
@@ -97,6 +100,8 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
           _isPickingBannerImage = false;
           _selectedBannerImage = file;
           _selectedBannerImageSize = size;
+          _optimizedBanner = null;
+          _isOptimizing = true;
           if (_bannerTitleController.text.trim().isEmpty) {
             final nameWithoutExt = file.name.contains('.')
                 ? file.name.substring(0, file.name.lastIndexOf('.'))
@@ -110,6 +115,26 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
             }
           }
         });
+
+        // ضغط وتحسين الصورة محلياً في الذاكرة لمنع أي بطء أو ثقل
+        try {
+          final rawBytes = await file.readAsBytes();
+          final opt = await ImageOptimizerService.optimizeBannerImage(
+            rawBytes: rawBytes,
+            originalFileName: file.name,
+          );
+          if (mounted) {
+            setState(() {
+              _optimizedBanner = opt;
+              _isOptimizing = false;
+            });
+          }
+        } catch (e) {
+          debugPrint('[-] Error optimizing banner image: $e');
+          if (mounted) {
+            setState(() => _isOptimizing = false);
+          }
+        }
       } else {
         setState(() => _isPickingBannerImage = false);
       }
@@ -131,6 +156,8 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
 
     final res = await TelegramUploaderService().uploadFileToTelegram(
       file: _selectedBannerImage!,
+      overrideBytes: _optimizedBanner?.bytes,
+      overrideFileName: _optimizedBanner?.fileName,
       caption: title,
       fileType: 'banner',
     );
@@ -173,6 +200,8 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
       setState(() {
         _selectedBannerImage = null;
         _selectedBannerImageSize = 0;
+        _optimizedBanner = null;
+        _isOptimizing = false;
       });
       widget.onShowSnackbar?.call('تم رفع ونشر البوستر في الواجهة الرئيسية بنجاح عبر سيرفر تيليجرام');
       _loadBanners();
@@ -286,64 +315,163 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
           ),
           const SizedBox(height: 12),
 
-          GestureDetector(
-            onTap: _isPickingBannerImage ? null : _pickBannerImage,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _selectedBannerImage != null ? AppTheme.success : AppTheme.lightBorder,
-                  width: _selectedBannerImage != null ? 1.5 : 1,
-                ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _selectedBannerImage != null ? AppTheme.success : AppTheme.lightBorder,
+                width: _selectedBannerImage != null ? 1.5 : 1,
               ),
-              child: _selectedBannerImage == null
-                  ? Column(
+            ),
+            child: _isOptimizing
+                ? Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
                       children: [
-                        const Icon(Icons.add_photo_alternate_rounded, size: 40, color: AppTheme.primaryLight),
-                        const SizedBox(height: 8),
-                        Text(
-                          _isPickingBannerImage ? 'جاري فتح المعرض...' : 'اضغط لاختيار صورة البوستر أو الإعلان',
-                          style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primary),
                         ),
-                        Text(
-                          'PNG, JPG, WEBP (سيرفر تيليجرام فائق السرعة وبلا قيود)',
-                          style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _selectedBannerImage!.name,
-                                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                'جاري ضغط وتحسين الصورة محلياً في الذاكرة...',
+                                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                               ),
                               Text(
-                                _formatFileSize(_selectedBannerImageSize),
+                                'تجهيز أبعاد البانر لسرعة تحميل فائقة على هواتف الطلبة',
                                 style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
                               ),
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, color: AppTheme.danger),
-                          onPressed: () => setState(() {
-                            _selectedBannerImage = null;
-                            _selectedBannerImageSize = 0;
-                          }),
-                        ),
                       ],
                     ),
-            ),
+                  )
+                : _selectedBannerImage == null
+                    ? InkWell(
+                        onTap: _isPickingBannerImage ? null : _pickBannerImage,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.add_photo_alternate_rounded, size: 42, color: AppTheme.primaryLight),
+                              const SizedBox(height: 8),
+                              Text(
+                                _isPickingBannerImage ? 'جاري فتح المعرض...' : 'اضغط لاختيار صورة البوستر أو الإعلان',
+                                style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ضغط ذكي تلقائي مدمج يضمن سرعة التحميل الفورية للطلبة',
+                                style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // معاينة حية وفورية للصورة المضغوطة
+                            if (_optimizedBanner != null) ...[
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  height: 140,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Image.memory(
+                                    _optimizedBanner!.bytes,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 24),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedBannerImage!.name,
+                                    style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, color: AppTheme.danger, size: 20),
+                                  tooltip: 'إلغاء واختيار صورة أخرى',
+                                  onPressed: () => setState(() {
+                                    _selectedBannerImage = null;
+                                    _selectedBannerImageSize = 0;
+                                    _optimizedBanner = null;
+                                    _isOptimizing = false;
+                                  }),
+                                ),
+                              ],
+                            ),
+
+                            // شريط مؤشرات التحسين والضغط
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.success.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    'الحجم المحسّن: ${_formatFileSize(_optimizedBanner?.optimizedSizeBytes ?? _selectedBannerImageSize)} ⚡',
+                                    style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.success),
+                                  ),
+                                ),
+                                if (_optimizedBanner != null && _optimizedBanner!.savedPercentage > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'توفير ${_optimizedBanner!.savedPercentage.toStringAsFixed(0)}% من سرعة التحميل 🚀',
+                                      style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                    ),
+                                  ),
+                                if (_optimizedBanner != null && _optimizedBanner!.width > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${_optimizedBanner!.width} × ${_optimizedBanner!.height} px',
+                                      style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B)),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
           ),
           const SizedBox(height: 12),
 

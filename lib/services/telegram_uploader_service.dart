@@ -267,13 +267,16 @@ class TelegramUploaderService {
   /// رفع أي ملف أو صورة مباشرة إلى سحابة تيليجرام (للجداول والبوسترات)
   Future<UploadGeneralFileResult> uploadFileToTelegram({
     required PlatformFile file,
+    Uint8List? overrideBytes,
+    String? overrideFileName,
     String? caption,
     String fileType = 'general', // 'schedule' أو 'banner' أو 'general'
     void Function(String status, double? progress)? onProgress,
   }) async {
     try {
       onProgress?.call('جاري قراءة وتجهيز الملف...', 0.1);
-      final Uint8List fileBytes = await _getFileBytes(file);
+      final Uint8List fileBytes = overrideBytes ?? await _getFileBytes(file);
+      final String finalFileName = overrideFileName ?? file.name;
       if (fileBytes.isEmpty) {
         return UploadGeneralFileResult(
           success: false,
@@ -309,7 +312,7 @@ class TelegramUploaderService {
         chatId: channelId.toString(),
         caption: fullCaption,
         fileBytes: fileBytes,
-        fileName: file.name,
+        fileName: finalFileName,
         maxAttempts: 3,
         onProgress: onProgress,
       );

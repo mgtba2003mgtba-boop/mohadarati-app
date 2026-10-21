@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PageController _bannerController;
   Timer? _bannerTimer;
   int _currentBannerPage = 0;
+  Timer? _resumeBannerTimer;
 
   // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد وصور التبليغات والجداول)
   List<AnnouncementModel>? _cachedBanners;
@@ -111,9 +113,38 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
     _bannerTimer?.cancel();
+    _resumeBannerTimer?.cancel();
     _bannerController.dispose();
     _homeScrollController.dispose();
     super.dispose();
+  }
+
+  void _pauseBannerAutoScroll() {
+    _bannerTimer?.cancel();
+    _resumeBannerTimer?.cancel();
+  }
+
+  void _resumeBannerAutoScroll() {
+    _resumeBannerTimer?.cancel();
+    _resumeBannerTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        _startBannerTimer(_carouselBanners.length);
+      }
+    });
+  }
+
+  void _precacheBanners(List<AnnouncementModel> banners) {
+    if (!mounted) return;
+    for (final b in banners) {
+      if (b.imageUrl != null && b.imageUrl!.isNotEmpty) {
+        final url = AppConstants.resolveImageUrl(b.imageUrl);
+        if (url.isNotEmpty) {
+          try {
+            precacheImage(NetworkImage(url), context);
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   void _startBannerTimer(int count) {
@@ -169,8 +200,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _lectures = results[1] as List<LectureModel>;
         _cachedBanners = null;
 
-        // بدء تحريك كاروسيل الإعلانات الرسمية فقط
+        // بدء تحريك كاروسيل الإعلانات الرسمية والتحميل الاستباقي للصور
         _startBannerTimer(_carouselBanners.length);
+        _precacheBanners(_carouselBanners);
       } catch (e) {
         debugPrint('[-] Error loading home data in parallel: $e');
       }
@@ -435,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// بانر الإعلانات والبوسترات الرسمية بصور حقيقية (ممنوع أي صور عشوائية)
+  /// بانر الإعلانات والبوسترات الرسمية بتصميم نخبوي فائق السلاسة ومقاوم للقص
   Widget _buildAnnouncementsMovingCarousel() {
     final banners = _carouselBanners;
 
@@ -446,162 +478,219 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return RepaintBoundary(
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // حاوية الكاروسيل المنظمة والمرتبة مباشرة
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
-            controller: _bannerController,
-            itemCount: banners.length,
-            onPageChanged: (idx) => setState(() => _currentBannerPage = idx),
-            itemBuilder: (context, index) {
-              final announcement = banners[index];
-              final imageSrc = announcement.imageUrl!;
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // حاوية الكاروسيل الذكية مع فيزياء لمس متفاعلة
+          Listener(
+            onPointerDown: (_) => _pauseBannerAutoScroll(),
+            onPointerUp: (_) => _resumeBannerAutoScroll(),
+            onPointerCancel: (_) => _resumeBannerAutoScroll(),
+            child: SizedBox(
+              height: 200,
+              child: PageView.builder(
+                controller: _bannerController,
+                physics: const BouncingScrollPhysics(),
+                itemCount: banners.length,
+                onPageChanged: (idx) => setState(() => _currentBannerPage = idx),
+                itemBuilder: (context, index) {
+                  final announcement = banners[index];
+                  final imageSrc = announcement.imageUrl!;
 
-              final rawTitle = announcement.title;
-              final rawContent = announcement.displayContent;
+                  final rawTitle = announcement.title;
+                  final rawContent = announcement.displayContent;
 
-              final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
-                  rawContent.contains('إعلان بوستر رسمي') ||
-                  rawContent.contains('بوستر رسمي') ||
-                  rawContent.trim() == '[HOME_BANNER]' ||
-                  rawContent.toLowerCase().trim() == 'home banner' ||
-                  rawContent.toLowerCase().trim() == 'home_banner' ||
-                  rawContent.toLowerCase().trim() == 'banner';
-              final content = isBoilerplate
-                  ? ''
-                  : rawContent
-                      .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                  final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
+                      rawContent.contains('إعلان بوستر رسمي') ||
+                      rawContent.contains('بوستر رسمي') ||
+                      rawContent.trim() == '[HOME_BANNER]' ||
+                      rawContent.toLowerCase().trim() == 'home banner' ||
+                      rawContent.toLowerCase().trim() == 'home_banner' ||
+                      rawContent.toLowerCase().trim() == 'banner';
+                  final content = isBoilerplate
+                      ? ''
+                      : rawContent
+                          .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                          .replaceAll('إعلان وبوستر رسمي', '')
+                          .replaceAll('إعلان بوستر رسمي', '')
+                          .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
+                          .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
+                          .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
+                          .trim();
+
+                  String title = rawTitle
                       .replaceAll('إعلان وبوستر رسمي', '')
                       .replaceAll('إعلان بوستر رسمي', '')
                       .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
                       .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
                       .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
                       .trim();
+                  if (title.isEmpty || RegExp(r'^\d+$').hasMatch(title)) {
+                    title = 'الكلية التقنية الهندسية';
+                  }
 
-              String title = rawTitle
-                  .replaceAll('إعلان وبوستر رسمي', '')
-                  .replaceAll('إعلان بوستر رسمي', '')
-                  .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
-                  .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
-                  .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
-                  .trim();
-              if (title.isEmpty || RegExp(r'^\d+$').hasMatch(title)) {
-                title = 'الكلية التقنية الهندسية';
-              }
+                  final isPureBanner = content.isEmpty || isBoilerplate;
 
-              final isPureBanner = content.isEmpty || isBoilerplate;
-
-              return GestureDetector(
-                onTap: () {
-                  _showAnnouncementDetails(announcement, imageSrc);
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.cardShadow,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // الصورة الرسمية المرفوعة
-                        AppNetworkImage(
-                          imageUrl: imageSrc,
-                          fit: BoxFit.cover,
-                          errorWidget: Container(
-                            color: AppTheme.primary,
-                            child: const Center(
-                              child: Icon(Icons.image_outlined, color: Colors.white54, size: 40),
-                            ),
-                          ),
-                        ),
-
-                        // تدرج لوني لطيف وأنيق لجعل المحتوى مقروءاً بنقاء
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.black.withValues(alpha: 0.8),
-                                Colors.black.withValues(alpha: 0.15),
-                                Colors.transparent,
-                              ],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            ),
-                          ),
-                        ),
-
-                        // تفاصيل البوستر / الإعلان فقط
-                        Positioned(
-                          bottom: 12,
-                          right: 14,
-                          left: 14,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                title,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (!isPureBanner && content.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  content,
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 11,
-                                    color: const Color(0xFFE2E8F0),
-                                    shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
+                  return GestureDetector(
+                    onTap: () {
+                      _showAnnouncementDetails(announcement, imageSrc);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppTheme.lightBorder.withValues(alpha: 0.8), width: 1),
+                        boxShadow: AppShadows.card,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // 1. طبقة الخلفية الضبابية المحيطية (Atmospheric Ambient Blurred Backdrop)
+                            Positioned.fill(
+                              child: ImageFiltered(
+                                imageFilter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                                child: Transform.scale(
+                                  scale: 1.18,
+                                  child: AppNetworkImage(
+                                    imageUrl: imageSrc,
+                                    fit: BoxFit.cover,
+                                    errorWidget: Container(color: const Color(0xFF0F172A)),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ],
-                          ),
+                              ),
+                            ),
+
+                            // 2. تظليل تباين معتم لتثبيت الألوان
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black.withValues(alpha: 0.32),
+                              ),
+                            ),
+
+                            // 3. الصورة الأصلية الحادة كاملة دون أي قص للأطراف (Full Aspect-Preserved Artwork)
+                            Center(
+                              child: AppNetworkImage(
+                                imageUrl: imageSrc,
+                                fit: BoxFit.contain,
+                                placeholder: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+                                ),
+                                errorWidget: const Center(
+                                  child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 36),
+                                ),
+                              ),
+                            ),
+
+                            // 4. تدرج زجاجي سفلي مع نصوص واضحة وزر تكبير تفاعلي
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(14, 28, 14, 12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.85),
+                                      Colors.black.withValues(alpha: 0.35),
+                                      Colors.transparent,
+                                    ],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            title,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                              shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (!isPureBanner && content.isNotEmpty) ...[
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              content,
+                                              style: GoogleFonts.cairo(
+                                                fontSize: 10.5,
+                                                color: const Color(0xFFE2E8F0),
+                                                shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.22),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'تكبير',
+                                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
+                  );
+                },
+              ),
+            ),
+          ),
+          if (banners.length > 1) ...[
+            const SizedBox(height: 10),
+            // مؤشرات كبسولية تفاعلية حديثة
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(banners.length, (i) {
+                final isActive = i == _currentBannerPage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isActive ? 24 : 6,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isActive ? AppTheme.primary : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (banners.length > 1) ...[
-          const SizedBox(height: 10),
-          // مؤشرات النقاط عند وجود أكثر من بوستر
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(banners.length, (i) {
-              final isActive = i == _currentBannerPage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: isActive ? 20 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: isActive ? AppTheme.primary : const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              );
-            }),
-          ),
+                );
+              }),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
   }
 
   /// بطاقة الهوية الجامعية الرسمية الافتراضية الأنيقة (بدون أي صور عشوائية)
