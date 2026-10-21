@@ -6,7 +6,7 @@ import 'biometric_subjects.dart';
 /// ثوابت وإعدادات المنظومة الجامعية الموحدة
 class AppConstants {
   static const String appName = 'محاضراتي';
-  static const String appVersion = '1.0.9';
+  static const String appVersion = '1.0.10';
   static const String universityName = 'الجامعة الوطنية للعلوم والتكنولوجيا';
   static const String collegeName = 'الكلية التقنية الهندسية (NUST)';
 
