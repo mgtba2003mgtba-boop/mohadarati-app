@@ -1,7 +1,7 @@
 name: nust_student_portal
 description: "منظومة بوابة الطالب الأكاديمية ونظام الحضور والمحاضرات - الجامعة الوطنية للعلوم والتكنولوجيا (NUST)"
 publish_to: 'none'
-version: 1.0.6+7
+version: 1.0.7+8
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
