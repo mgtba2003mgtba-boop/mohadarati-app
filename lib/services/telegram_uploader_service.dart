@@ -51,41 +51,51 @@ class TelegramUploaderService {
   factory TelegramUploaderService() => _instance;
   TelegramUploaderService._internal();
 
-  /// اختيار ملف محاضرة من ذاكرة الجهاز (مستند PDF/Office أو صورة توضيحية)
-  Future<PlatformFile?> pickLectureFile({bool allowAny = false}) async {
+  /// اختيار ملف أو ملفات متعددة للمحاضرة من ذاكرة الجهاز دون تقييد بالحجم أو العدد
+  Future<List<PlatformFile>> pickLectureFiles({bool allowAny = false}) async {
+    final extensions = [
+      'pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip',
+      'mp4', 'mkv', 'avi', 'mov', 'webm', 'rar', '7z',
+      'PDF', 'DOCX', 'DOC', 'PPTX', 'PPT', 'PNG', 'JPG', 'JPEG', 'WEBP', 'ZIP',
+      'MP4', 'MKV', 'AVI', 'MOV', 'WEBM', 'RAR', '7Z',
+    ];
+
     if (allowAny) {
       try {
-        final List<PlatformFile> files = await FilePicker.pickFiles(type: FileType.any);
-        return files.isNotEmpty ? files.first : null;
+        final List<PlatformFile> files = await FilePicker.pickFiles(
+          type: FileType.any,
+        );
+        return files;
       } catch (e) {
         debugPrint('[-] FilePicker (any) error: $e');
-        return null;
+        return [];
       }
     }
 
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: [
-          'pdf', 'docx', 'doc', 'pptx', 'ppt', 'png', 'jpg', 'jpeg', 'webp', 'zip',
-          'PDF', 'DOCX', 'DOC', 'PPTX', 'PPT', 'PNG', 'JPG', 'JPEG', 'WEBP', 'ZIP',
-        ],
+        allowedExtensions: extensions,
       );
-
-      if (files.isNotEmpty) {
-        return files.first;
-      }
-      return null;
+      return files;
     } catch (e) {
       debugPrint('[-] FilePicker custom error: $e - falling back to FileType.any');
       try {
-        final List<PlatformFile> fallbackFiles = await FilePicker.pickFiles(type: FileType.any);
-        return fallbackFiles.isNotEmpty ? fallbackFiles.first : null;
+        final List<PlatformFile> fallback = await FilePicker.pickFiles(
+          type: FileType.any,
+        );
+        return fallback;
       } catch (e2) {
         debugPrint('[-] FilePicker fallback error: $e2');
-        return null;
+        return [];
       }
     }
+  }
+
+  /// للتوافق مع الواجهات القديمة: اختيار ملف فردي واحد
+  Future<PlatformFile?> pickLectureFile({bool allowAny = false}) async {
+    final list = await pickLectureFiles(allowAny: allowAny);
+    return list.isNotEmpty ? list.first : null;
   }
 
   /// اختيار صورة أو ملف PDF (للجداول الأسبوعية وجداول الامتحانات والبوسترات)
@@ -161,10 +171,14 @@ class TelegramUploaderService {
 
   /// تنسيق حجم الملف للعرض البشري
   String _formatBytes(int bytes) {
-    if (bytes >= 1024 * 1024) {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} غيغابايت';
+    } else if (bytes >= 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميغابايت';
-    } else {
+    } else if (bytes >= 1024) {
       return '${(bytes / 1024).toStringAsFixed(0)} كيلوبايت';
+    } else {
+      return '$bytes بايت';
     }
   }
 
@@ -202,7 +216,7 @@ class TelegramUploaderService {
           ),
         );
 
-        final streamedResponse = await request.send().timeout(const Duration(minutes: 5));
+        final streamedResponse = await request.send().timeout(const Duration(minutes: 30));
         final response = await http.Response.fromStream(streamedResponse);
         lastResponse = response;
 
@@ -267,10 +281,11 @@ class TelegramUploaderService {
         );
       }
 
-      if (fileBytes.length > 50 * 1024 * 1024) {
+      // دعم الملفات الكبيرة حتى 2 غيغابايت دون تقييد
+      if (fileBytes.length > 2048 * 1024 * 1024) {
         return UploadGeneralFileResult(
           success: false,
-          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع السحابي (50 ميغابايت).',
+          message: 'حجم الملف (${_formatBytes(fileBytes.length)}) يتجاوز الحد الأقصى المسموح به عالمياً في تيليجرام (2 غيغابايت).',
         );
       }
 
@@ -429,6 +444,76 @@ class TelegramUploaderService {
     }
   }
 
+  /// رفع المحاضرة الكبيرة جداً عبر سيرفر البث التابع للمنظومة (Telethon MTProto يدعم حتى 2000MB بدون تقييد)
+  Future<UploadLectureResult?> _uploadViaStreamer({
+    required Uint8List fileBytes,
+    required String fileName,
+    required String title,
+    required String subjectName,
+    required String department,
+    required String stage,
+    required String section,
+    required int semester,
+    required String lectureType,
+    String? description,
+    required String uploaderId,
+    required String uploaderName,
+    required String uploaderRole,
+    void Function(String status, double? progress)? onProgress,
+  }) async {
+    try {
+      final streamerUrl = '${AppConstants.telegramStreamerBaseUrl}/api/upload-lecture';
+      final uri = Uri.parse(streamerUrl);
+
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['title'] = title.trim();
+      request.fields['subject_name'] = subjectName.trim();
+      request.fields['department'] = department;
+      request.fields['stage'] = stage;
+      request.fields['section'] = section;
+      request.fields['semester'] = semester.toString();
+      request.fields['lecture_type'] = lectureType;
+      if (description != null && description.trim().isNotEmpty) {
+        request.fields['description'] = description.trim();
+      }
+      request.fields['uploader_id'] = uploaderId;
+      request.fields['uploader_name'] = uploaderName;
+      request.fields['uploader_role'] = uploaderRole;
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          fileBytes,
+          filename: fileName,
+        ),
+      );
+
+      onProgress?.call('جاري رفع وتدفق الملف عبر خادم البث (${_formatBytes(fileBytes.length)})...', 0.4);
+
+      final streamedResponse = await request.send().timeout(const Duration(minutes: 30));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['ok'] == true || data['success'] == true) {
+          final msgId = data['telegram_message_id'] as int?;
+          final fileId = data['file_id']?.toString();
+          return UploadLectureResult(
+            success: true,
+            telegramMessageId: msgId,
+            fileId: fileId,
+            fileName: fileName,
+            fileSizeBytes: fileBytes.length,
+            message: 'تم رفع ونشر المحاضرة بنجاح عبر السيرفر السحابي',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[-] Streamer upload attempt failed: $e');
+    }
+    return null;
+  }
+
   /// رفع ملف المحاضرة والميتا داتا مباشرة إلى سحابة تيليجرام وقاعدة بيانات سوبابيز
   Future<UploadLectureResult> uploadLecture({
     required PlatformFile file,
@@ -456,11 +541,37 @@ class TelegramUploaderService {
         );
       }
 
-      if (fileBytes.length > 50 * 1024 * 1024) {
+      // الحد الأقصى المسموح به عالمياً في سحابة تيليجرام (2048 ميغابايت / 2GB)
+      if (fileBytes.length > 2048 * 1024 * 1024) {
         return UploadLectureResult(
           success: false,
-          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى ضغط الملف أو استخدام رابط Google Drive للملفات الكبيرة جداً.',
+          message: 'حجم الملف (${_formatBytes(fileBytes.length)}) يتجاوز الحد الأقصى المسموح به عالمياً في سحابة تيليجرام (2 غيغابايت).',
         );
+      }
+
+      // إذا كان الملف أكبر من 50MB، نحاول رفعه عبر خادم البث وMTProto أولاً لكسر حاجز البوت
+      if (fileBytes.length > 50 * 1024 * 1024) {
+        onProgress?.call('جاري رفع وتدفق الملف الكبير (${_formatBytes(fileBytes.length)}) عبر مسار البث...', 0.3);
+        final streamerRes = await _uploadViaStreamer(
+          fileBytes: fileBytes,
+          fileName: file.name,
+          title: title,
+          subjectName: subjectName,
+          department: department,
+          stage: stage,
+          section: section,
+          semester: semester,
+          lectureType: lectureType,
+          description: description,
+          uploaderId: uploaderId,
+          uploaderName: uploaderName,
+          uploaderRole: uploaderRole,
+          onProgress: onProgress,
+        );
+        if (streamerRes != null && streamerRes.success) {
+          return streamerRes;
+        }
+        debugPrint('[~] Streamer upload unavailable or failed, continuing with direct Telegram pipeline...');
       }
 
       // 1. صياغة التسمية والوصف لقناة تيليجرام
@@ -598,7 +709,7 @@ class TelegramUploaderService {
       final body = response?.body ?? '';
       String friendlyMessage = 'فشل الرفع من سحابة تيليجرام ($statusCode)';
       if (statusCode == 400 && body.contains('file is too big')) {
-        friendlyMessage = 'حجم الملف يتجاوز الحد المسموح به في تيليجرام (50 ميغابايت). يرجى ضغط الملف أو استخدام رابط درايف.';
+        friendlyMessage = 'حجم الملف (${_formatBytes(fileBytes.length)}) يتجاوز حد تيليجرام المباشر. يرجى التأكد من تشغيل سيرفر البث أو التبديل لخيار رابط درايف.';
       } else if (statusCode == 429) {
         friendlyMessage = 'تم تجاوز معدل الطلبات المسموح به مؤقتاً، يرجى الانتظار دقيقة والمحاولة مجدداً.';
       } else if (body.isNotEmpty) {

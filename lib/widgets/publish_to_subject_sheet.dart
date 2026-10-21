@@ -61,9 +61,10 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
   String _lectureType = 'theory'; // 'theory', 'practical'
   String _targetSection = 'ALL';
   bool _isDriveLinkMode = false;
-  PlatformFile? _selectedFile;
-  int _selectedFileSize = 0;
+  List<PlatformFile> _selectedFiles = [];
+  Map<String, int> _fileSizes = {};
   bool _isPickingFile = false;
+  String _uploadStatus = '';
 
   // حقول التبليغ
   final _announceContentController = TextEditingController();
@@ -99,18 +100,27 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
 
   Future<void> _pickFile() async {
     setState(() => _isPickingFile = true);
-    final file = await TelegramUploaderService().pickLectureFile();
+    final files = await TelegramUploaderService().pickLectureFiles();
     if (mounted) {
-      if (file != null) {
-        final size = await TelegramUploaderService().getFileSize(file);
+      if (files.isNotEmpty) {
+        final Map<String, int> newSizes = Map.from(_fileSizes);
+        for (final f in files) {
+          final size = await TelegramUploaderService().getFileSize(f);
+          newSizes[f.name] = size;
+        }
         setState(() {
           _isPickingFile = false;
-          _selectedFile = file;
-          _selectedFileSize = size;
-          if (_titleController.text.trim().isEmpty) {
-            final nameWithoutExt = file.name.contains('.')
-                ? file.name.substring(0, file.name.lastIndexOf('.'))
-                : file.name;
+          for (final f in files) {
+            if (!_selectedFiles.any((existing) => existing.name == f.name)) {
+              _selectedFiles.add(f);
+            }
+          }
+          _fileSizes = newSizes;
+          if (_titleController.text.trim().isEmpty && _selectedFiles.isNotEmpty) {
+            final firstFile = _selectedFiles.first;
+            final nameWithoutExt = firstFile.name.contains('.')
+                ? firstFile.name.substring(0, firstFile.name.lastIndexOf('.'))
+                : firstFile.name;
             _titleController.text = nameWithoutExt;
           }
         });
@@ -120,13 +130,34 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
     }
   }
 
+  int get _totalSelectedSize {
+    return _selectedFiles.fold<int>(0, (int sum, PlatformFile f) => sum + (_fileSizes[f.name] ?? (f.lengthSync() ?? 0)));
+  }
+
+  IconData _getFileIcon(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) return Icons.picture_as_pdf_rounded;
+    if (lower.endsWith('.mp4') || lower.endsWith('.mkv') || lower.endsWith('.avi') || lower.endsWith('.mov') || lower.endsWith('.webm')) {
+      return Icons.video_collection_rounded;
+    }
+    if (lower.endsWith('.doc') || lower.endsWith('.docx')) return Icons.description_rounded;
+    if (lower.endsWith('.ppt') || lower.endsWith('.pptx')) return Icons.slideshow_rounded;
+    if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z')) return Icons.folder_zip_rounded;
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) {
+      return Icons.image_rounded;
+    }
+    return Icons.insert_drive_file_rounded;
+  }
+
   String _formatFileSize(int bytes) {
     if (bytes >= 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} غيغابايت';
     } else if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميغابايت';
+    } else if (bytes >= 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} كيلوبايت';
     } else {
-      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+      return '$bytes بايت';
     }
   }
 
@@ -150,22 +181,16 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
         return;
       }
     } else {
-      if (_selectedFile == null) {
-        _showSnack('يرجى اختيار ملف المحاضرة (PDF / مستند / صورة)', isError: true);
-        return;
-      }
-
-      if (_selectedFileSize > 50 * 1024 * 1024) {
-        _showSnack(
-          'حجم الملف (${_formatFileSize(_selectedFileSize)}) يتجاوز حد تيليجرام المباشر (50MB). يرجى التبديل لخيار "رابط سحابي / Google Drive".',
-          isError: true,
-        );
+      if (_selectedFiles.isEmpty) {
+        _showSnack('يرجى اختيار ملف المحاضرة (أو عدة ملفات)', isError: true);
         return;
       }
     }
 
-    // ── نمط Optimistic UI الفائق: إغلاق النافذة فوراً ونقل المهمة للخلفية ──
-    if (widget.onOptimisticLecture != null) {
+    // ── نمط Optimistic UI الفائق: إغلاق النافذة فوراً ونقل المهمة للخلفية (في حال ملف مفرد أو رابط سحابي) ──
+    if (widget.onOptimisticLecture != null && (_isDriveLinkMode || _selectedFiles.length == 1)) {
+      final singleFile = _isDriveLinkMode ? null : _selectedFiles.first;
+      final singleSize = singleFile != null ? (_fileSizes[singleFile.name] ?? (singleFile.lengthSync() ?? 0)) : 0;
       final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
       final optimisticLecture = LectureModel(
         id: tempId,
@@ -181,13 +206,13 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
         uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
         uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
         uploaderRole: widget.currentUser?.role ?? 'representative',
-        fileName: _selectedFile?.name,
-        fileSizeBytes: _selectedFileSize > 0 ? _selectedFileSize : null,
+        fileName: singleFile?.name,
+        fileSizeBytes: singleSize > 0 ? singleSize : null,
         createdAt: DateTime.now(),
       );
 
-      Navigator.pop(context);
-      widget.onOptimisticLecture!(optimisticLecture, _selectedFile, _isDriveLinkMode ? driveUrl : null);
+      Navigator.pop(context, true);
+      widget.onOptimisticLecture!(optimisticLecture, singleFile, _isDriveLinkMode ? driveUrl : null);
       return;
     }
 
@@ -227,40 +252,72 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
         }
       }
     } else {
-      setState(() => _isSubmitting = true);
-      try {
-        final res = await TelegramUploaderService().uploadLecture(
-          file: _selectedFile!,
-          title: title,
-          subjectName: widget.subjectName,
-          department: widget.department,
-          stage: widget.stage,
-          section: _targetSection,
-          semester: widget.semester,
-          lectureType: _lectureType,
-          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
-          uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
-          uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
-          uploaderRole: widget.currentUser?.role ?? 'representative',
-        );
+      // رفع ملف واحد أو دفعة ملفات مع تتبع حي ومباشر
+      setState(() {
+        _isSubmitting = true;
+        _uploadStatus = _selectedFiles.length > 1
+            ? 'جاري تجهيز رفع ${_selectedFiles.length} ملفات...'
+            : 'جاري رفع المحاضرة...';
+      });
 
-        if (!res.success) {
-          throw Exception(res.message);
-        }
+      int successCount = 0;
+      List<String> failedFiles = [];
+
+      for (int i = 0; i < _selectedFiles.length; i++) {
+        final file = _selectedFiles[i];
+        final fileTitle = _selectedFiles.length == 1
+            ? title
+            : (_selectedFiles.length > 1 && title.isNotEmpty
+                ? '$title (${i + 1}/${_selectedFiles.length})'
+                : file.name);
 
         if (mounted) {
+          setState(() {
+            _uploadStatus = 'جاري رفع (${i + 1}/${_selectedFiles.length}): ${file.name}';
+          });
+        }
+
+        try {
+          final res = await TelegramUploaderService().uploadLecture(
+            file: file,
+            title: fileTitle,
+            subjectName: widget.subjectName,
+            department: widget.department,
+            stage: widget.stage,
+            section: _targetSection,
+            semester: widget.semester,
+            lectureType: _lectureType,
+            description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+            uploaderId: widget.currentUser?.studentId ?? 'ADMIN',
+            uploaderName: widget.currentUser?.name ?? 'ممثل الشعبة',
+            uploaderRole: widget.currentUser?.role ?? 'representative',
+          );
+
+          if (!res.success) {
+            throw Exception(res.message);
+          }
+          successCount++;
+        } catch (err) {
+          debugPrint('[-] Error uploading file ${file.name}: $err');
+          failedFiles.add(file.name);
+        }
+      }
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        if (successCount > 0) {
           Navigator.pop(context, true);
+          final msg = _selectedFiles.length == 1
+              ? 'تم رفع ونشر المحاضرة بنجاح 🚀'
+              : 'تم رفع بنجاح $successCount من أصل ${_selectedFiles.length} محاضرات 🚀';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم رفع ونشر المحاضرة بنجاح')),
+            SnackBar(
+              content: Text(msg),
+              backgroundColor: AppTheme.primary,
+            ),
           );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isSubmitting = false);
-          _showSnack(
-            'خطأ أثناء النشر: $e. يمكنك استخدام خيار "رابط سحابي / Google Drive" كبديل مباشر.',
-            isError: true,
-          );
+        } else {
+          _showSnack('فشل رفع الملفات: ${failedFiles.join(", ")}', isError: true);
         }
       }
     }
@@ -664,7 +721,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                   ),
                 ),
               ] else ...[
-                if (_selectedFile == null)
+                if (_selectedFiles.isEmpty) ...[
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -675,50 +732,91 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.cloud_upload_rounded, color: AppTheme.primary),
                     label: Text(
-                      'اختر ملف المحاضرة (PDF / مستند / صورة)',
+                      'اختر ملفات المحاضرة (ملازم، PDF، عروض، فيديوهات)',
                       style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                     ),
                     onPressed: _isPickingFile ? null : _pickFile,
-                  )
-                else
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, right: 4),
+                    child: Text(
+                      '💡 يمكنك اختيار ملف واحد أو عدة ملفات معاً دفعة واحدة وبأي حجم',
+                      style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ] else ...[
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primarySubtle,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      color: AppTheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 22),
-                        const SizedBox(width: 10),
+                        const Icon(Icons.folder_copy_rounded, color: AppTheme.primary, size: 18),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _selectedFile!.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                _formatFileSize(_selectedFileSize),
-                                style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
-                              ),
-                            ],
+                          child: Text(
+                            '${_selectedFiles.length} ملفات محددة • الحجم الإجمالي: ${_formatFileSize(_totalSelectedSize)}',
+                            style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.danger),
-                          onPressed: () => setState(() {
-                            _selectedFile = null;
-                            _selectedFileSize = 0;
-                          }),
+                        TextButton.icon(
+                          onPressed: _isPickingFile ? null : _pickFile,
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: Text('إضافة ملفات', style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold)),
+                          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  ...List.generate(_selectedFiles.length, (idx) {
+                    final file = _selectedFiles[idx];
+                    final size = _fileSizes[file.name] ?? (file.lengthSync() ?? 0);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.lightBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(_getFileIcon(file.name), color: AppTheme.primary, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  file.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.cairo(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  _formatFileSize(size),
+                                  style: GoogleFonts.cairo(fontSize: 9.5, color: AppTheme.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.danger),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => setState(() {
+                              _selectedFiles.removeAt(idx);
+                              _fileSizes.remove(file.name);
+                            }),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ],
               const SizedBox(height: 12),
 
@@ -750,8 +848,12 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                     : const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
                 label: Text(
                   _isSubmitting
-                      ? 'جاري النشر والمزامنة...'
-                      : (_isDriveLinkMode ? 'نشر رابط المحاضرة السحابي للمادة' : 'نشر المحاضرة للمادة'),
+                      ? (_uploadStatus.isNotEmpty ? _uploadStatus : 'جاري النشر والمزامنة...')
+                      : (_isDriveLinkMode
+                          ? 'نشر رابط المحاضرة السحابي للمادة'
+                          : (_selectedFiles.length > 1
+                              ? 'نشر ${_selectedFiles.length} محاضرات للمادة دفعة واحدة 🚀'
+                              : 'نشر المحاضرة للمادة')),
                   style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),

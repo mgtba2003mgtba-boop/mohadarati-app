@@ -412,6 +412,7 @@ async def upload_lecture(
     subject_name: str = Form(...),
     department: str = Form("ALL"),
     stage: str = Form("ALL"),
+    section: str = Form("ALL"),
     semester: int = Form(1),
     lecture_type: str = Form("theory"),
     professor_name: Optional[str] = Form(None),
@@ -449,6 +450,8 @@ async def upload_lecture(
             f"📖 المقرر: {subject_name}",
             f"🏛 القسم: {department} | المرحلة: {stage}",
         ]
+        if section and section != "ALL":
+            caption_lines.append(f"🏷️ الشعبة: {section}")
         if professor_name and professor_name.strip():
             caption_lines.append(f"👨‍🏫 الأستاذ: {professor_name.strip()}")
         if description and description.strip():
@@ -479,6 +482,7 @@ async def upload_lecture(
             "subject_name": subject_name,
             "department": department,
             "stage": stage,
+            "section": section,
             "semester": semester,
             "type": lecture_type,
             "professor_name": professor_name or None,

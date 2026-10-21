@@ -297,12 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (file != null) {
         final size = await TelegramUploaderService().getFileSize(file);
-        if (size > 50 * 1024 * 1024) {
-          _showSnackbar(
-            'تنبيه: حجم الملف المختار (${_formatFileSize(size)}) يتجاوز الحد الأقصى للرفع المباشر (50 ميغابايت). يرجى ضغط الملف أو تقليل حجمه.',
-            isError: true,
-          );
-        }
+
         setState(() {
           _isPickingFile = false;
           _selectedFile = file;
@@ -414,13 +409,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return;
     }
 
-    if (_selectedFileSize > 50 * 1024 * 1024) {
-      _showSnackbar(
-        'حجم الملف المختار (${_formatFileSize(_selectedFileSize)}) يتجاوز الحد الأقصى المسموح به للرفع المباشر (50 ميغابايت). يرجى التبديل لخيار "رابط سحابي / Drive" لنشر الفيديوهات والملفات الكبيرة.',
-        isError: true,
-      );
-      return;
-    }
+
 
     setState(() {
       _isLoading = true;
@@ -1000,7 +989,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   onPressed: () => setState(() => _uploadDirectFile = true),
                   icon: Icon(Icons.attach_file_rounded, size: 18, color: _uploadDirectFile ? AppTheme.primary : AppTheme.textSecondary),
                   label: Text(
-                    'ملف مباشر (أقل من 50MB)',
+                    'ملف مباشر من الجهاز',
                     style: GoogleFonts.cairo(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -1155,19 +1144,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: _selectedFileSize > 50 * 1024 * 1024
-                                      ? AppTheme.danger.withValues(alpha: 0.2)
-                                      : AppTheme.success.withValues(alpha: 0.15),
+                                  color: AppTheme.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  _selectedFileSize > 50 * 1024 * 1024
-                                      ? 'الحجم: ${_formatFileSize(_selectedFileSize)} (يتجاوز 50MB)'
-                                      : 'الحجم: ${_formatFileSize(_selectedFileSize)}',
+                                  'الحجم: ${_formatFileSize(_selectedFileSize)}',
                                   style: GoogleFonts.cairo(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: _selectedFileSize > 50 * 1024 * 1024 ? AppTheme.danger : AppTheme.success,
+                                    color: AppTheme.primary,
                                   ),
                                 ),
                               ),

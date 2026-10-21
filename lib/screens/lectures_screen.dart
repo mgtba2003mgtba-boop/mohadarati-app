@@ -976,15 +976,7 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
         );
         return;
       }
-      if (_selectedFileSize > 50 * 1024 * 1024) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حجم الملف (${_formatFileSize(_selectedFileSize)}) يتجاوز حد تيليجرام المباشر (50MB). يرجى التبديل لخيار "رابط سحابي / Drive".'),
-            backgroundColor: AppTheme.danger,
-          ),
-        );
-        return;
-      }
+
     }
 
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
@@ -1207,7 +1199,7 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
                     onPressed: () => setState(() => _isDriveMode = false),
                     icon: Icon(Icons.attach_file_rounded, size: 16, color: !_isDriveMode ? AppTheme.primary : AppTheme.textSecondary),
                     label: Text(
-                      'ملف مباشر (أقل من 50MB)',
+                      'ملف مباشر من الجهاز',
                       style: GoogleFonts.cairo(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
