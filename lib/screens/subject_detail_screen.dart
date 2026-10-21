@@ -164,28 +164,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   bool _matchesSubject(String? name) {
-    if (name == null || name.trim().isEmpty) return false;
-    final clean = name.trim();
-    final normClean = AppConstants.normalizeArabic(clean);
-    final normSubject = AppConstants.normalizeArabic(widget.subjectName);
-    if (normClean.isEmpty || normSubject.isEmpty) return false;
-
-    if (normClean == normSubject ||
-        normClean.contains(normSubject) ||
-        (normClean.length >= 4 && normSubject.contains(normClean))) {
-      return true;
-    }
-    if (widget.displayName != null && widget.displayName!.trim().isNotEmpty) {
-      final normDisp = AppConstants.normalizeArabic(widget.displayName!.trim());
-      if (normDisp.isNotEmpty) {
-        if (normClean == normDisp ||
-            normClean.contains(normDisp) ||
-            (normClean.length >= 4 && normDisp.contains(normClean))) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return AppConstants.matchesSubject(
+      name,
+      widget.subjectName,
+      displayName: widget.displayName,
+    );
   }
 
   Future<void> _loadSubjectData({bool forceRefresh = false, bool showSpinner = false}) async {

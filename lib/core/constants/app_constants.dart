@@ -256,5 +256,51 @@ class AppConstants {
     if (normTarget.isEmpty) return true;
     return normSource.contains(normTarget);
   }
+
+  /// مطابقة اسم مقرر دراسي أو جلسة حضور بمرونة ومقاومة الفروقات الطفيفة
+  static bool matchesSubject(String? candidate, String? target, {String? displayName}) {
+    if (candidate == null || target == null) return false;
+    final cleanCandidate = candidate.trim();
+    final cleanTarget = target.trim();
+    if (cleanCandidate.isEmpty || cleanTarget.isEmpty) return false;
+
+    // 1. تطابق مباشر
+    if (cleanCandidate == cleanTarget) return true;
+
+    // 2. تطبيع مع إزالة اللواحق التوضيحية مثل [اختياري] أو (اختياري)
+    String cleanSubj(String s) => normalizeArabic(s)
+        .replaceAll(RegExp(r'\[.*?\]'), '')
+        .replaceAll(RegExp(r'\(.*?\)'), '')
+        .trim();
+
+    final normCand = cleanSubj(cleanCandidate);
+    final normTarg = cleanSubj(cleanTarget);
+    if (normCand.isEmpty || normTarg.isEmpty) return false;
+
+    if (normCand == normTarg) return true;
+
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      final normDisp = cleanSubj(displayName.trim());
+      if (normDisp.isNotEmpty && (normCand == normDisp)) return true;
+    }
+
+    // 3. احتواء جزئي ذكي إذا كان الطول كافياً لمنع المطابقات الخاطئة
+    if (normCand.length >= 6 && normTarg.length >= 6) {
+      if (normCand.contains(normTarg) || normTarg.contains(normCand)) {
+        return true;
+      }
+    }
+
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      final normDisp = cleanSubj(displayName.trim());
+      if (normDisp.length >= 6 && normCand.length >= 6) {
+        if (normCand.contains(normDisp) || normDisp.contains(normCand)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
 }
 

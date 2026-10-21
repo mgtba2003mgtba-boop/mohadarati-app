@@ -443,9 +443,11 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           itemBuilder: (context, index) {
                             final item = courses[index];
                             final statsList = _attendanceSummary?.subjectsStats
-                                .where((s) =>
-                                    s.subjectName.trim().toLowerCase() == item.originalName.toLowerCase() ||
-                                    s.subjectName.trim().toLowerCase() == item.displayName.toLowerCase())
+                                .where((s) => AppConstants.matchesSubject(
+                                      s.subjectName,
+                                      item.originalName,
+                                      displayName: item.displayName,
+                                    ))
                                 .toList();
                             final hasAttendance = statsList != null && statsList.isNotEmpty;
                             final stats = hasAttendance ? statsList.first : null;

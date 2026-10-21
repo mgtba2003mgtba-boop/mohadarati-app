@@ -2472,9 +2472,25 @@ void main() {
       expect(studentUser.canManageLectures, isFalse);
       expect(studentUser.canManageAnnouncements, isFalse);
     });
+
+    test('اختبار محرك المزامنة التامة وتطابق أسماء المقررات وسجلات الحضور البيومترية (Biometric Subject Synchronization & Fault-Tolerant Matcher)', () {
+      // 1. تطابق مباشر وتطابق مع لواحق المواد الاختيارية
+      expect(AppConstants.matchesSubject('الحوسبة المتوازية', 'الحوسبة المتوازية [اختياري]'), isTrue);
+      expect(AppConstants.matchesSubject('أنظمة الزمن الحقيقي [اختياري]', 'أنظمة الزمن الحقيقي'), isTrue);
+      expect(AppConstants.matchesSubject('الذكاء الاصطناعي [اختياري]', 'الذكاء الاصطناعي'), isTrue);
+      expect(AppConstants.matchesSubject('أنظمة الحوسبة الموزعة [اختياري]', 'أنظمة الحوسبة الموزعة'), isTrue);
+
+      // 2. مرونة الهمزات والتاء المربوطة والألف
+      expect(AppConstants.matchesSubject('الادارة الهندسية', 'الإدارة الهندسية'), isTrue);
+      expect(AppConstants.matchesSubject('مبادىء الرقمية', 'مباديء الرقمية'), isTrue);
+      expect(AppConstants.matchesSubject('أنظمة الليزر الطبية', 'انظمة الليزر الطبية'), isTrue);
+
+      // 3. دعم الاسم المخصص (displayName)
+      expect(AppConstants.matchesSubject('ماتلاب مبتدئ', 'برمجة الحاسوب وتطبيقاته (ماتلاب مبتدئ)', displayName: 'ماتلاب مبتدئ'), isTrue);
+
+      // 4. منع المطابقات الخاطئة للكلمات القصيرة أو المختلفة كلياً
+      expect(AppConstants.matchesSubject('فيزياء', 'كيمياء'), isFalse);
+      expect(AppConstants.matchesSubject('نظم السيطرة', 'دوائر إلكترونية I'), isFalse);
+    });
   });
 }
-
-
-
-
