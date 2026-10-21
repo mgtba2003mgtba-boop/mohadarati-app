@@ -15,6 +15,15 @@ res_subst = subprocess.run(["subst", "Z:", PROJECT_ROOT], capture_output=True, t
 if res_subst.returncode != 0:
     print(f"[!] Warning: subst failed: {res_subst.stderr}")
 
+import shutil
+flutter_build_dir = os.path.join(PROJECT_ROOT, ".dart_tool", "flutter_build")
+if os.path.exists(flutter_build_dir):
+    try:
+        shutil.rmtree(flutter_build_dir)
+        print("[*] Cleaned stale .dart_tool/flutter_build cache")
+    except Exception as e:
+        print(f"[!] Warning cleaning flutter_build: {e}")
+
 target_cwd = "Z:\\" if os.path.exists("Z:\\") else PROJECT_ROOT
 print(f"[*] Building APK in: {target_cwd}")
 

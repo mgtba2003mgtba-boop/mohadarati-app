@@ -8,7 +8,7 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 const TELEGRAM_API = 'https://api.telegram.org/bot';
-const APK_FILE_ID = 'BQACAgIAAxkDAAJWeGrYpnStz0nWKfnAPFoRDc66gAwLAAL1pwACkOXJSsz4mGUWw1tjPQQ';
+const APK_FILE_ID = 'BQACAgIAAxkDAAJWnGrZCALkmpwZ2fFaWEgP0RSboMQqAAJbrAACkOXJSjpQuStNSxXkPQQ';
 const IOS_CONFIG_FILE_ID = 'BQACAgIAAxkDAAI6DGrP1TOyxB1MG6R6pgblY3xYbmc_AAJJowACYkqBSoPUmsJkUUNGPQQ';
 const IOS_GUIDE_FILE_ID = 'CgACAgIAAxkDAAI6i2rP-ZNOURKYV1SPv6wLh7ToHDAjAAJ5pQACYkqBSpHFCPiQdXgfPQQ';
 const dayArabic = {
@@ -890,7 +890,7 @@ async function sendAndroidApkFile(botToken, chatId) {
 ` +
     `━━━━━━━━━━━━━━━━━━━━━
 ` +
-    `📦 <b>الإصدار:</b> v1.0.8 (أحدث إصدار)
+    `📦 <b>الإصدار:</b> v1.0.9 (أحدث إصدار)
 ` +
     `⚡ <b>الميزة:</b> ثبّته مرة واحدة فقط، وسيتحدث التطبيق تلقائياً عند كل تطوير دون الحاجة لإعادة تنزيل الـ APK أبداً!
 ` +
