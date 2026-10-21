@@ -260,9 +260,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
       _isSubmitting = true;
       _uploadProgress = 0.05;
       _currentFileIndex = 0;
-      _uploadStatus = _selectedFiles.length > 1
-          ? 'جاري تجهيز رفع ${_selectedFiles.length} ملفات...'
-          : 'جاري قراءة وتجهيز ملف المحاضرة...';
+      _uploadStatus = 'جاري الرفع...';
     });
 
     int successCount = 0;
@@ -285,7 +283,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
           _currentFileBytesSent = 0;
           _currentFileTotalBytes = fileSize;
           _uploadProgress = 0.05;
-          _uploadStatus = 'جاري رفع (${i + 1}/${_selectedFiles.length}): ${file.name}';
+          _uploadStatus = 'جاري الرفع...';
         });
       }
 
@@ -337,19 +335,14 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
       if (successCount > 0) {
         setState(() {
           _uploadProgress = 1.0;
-          _uploadStatus = _selectedFiles.length == 1
-              ? 'تم رفع ونشر المحاضرة بنجاح 🚀'
-              : 'تم رفع بنجاح $successCount من أصل ${_selectedFiles.length} محاضرات 🚀';
+          _uploadStatus = 'تم الرفع';
         });
-        await Future.delayed(const Duration(milliseconds: 900));
+        await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
           Navigator.pop(context, true);
-          final msg = _selectedFiles.length == 1
-              ? 'تم رفع ونشر المحاضرة بنجاح 🚀'
-              : 'تم رفع بنجاح $successCount من أصل ${_selectedFiles.length} محاضرات 🚀';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(msg),
+            const SnackBar(
+              content: Text('تم الرفع بنجاح'),
               backgroundColor: AppTheme.primary,
             ),
           );
@@ -879,7 +872,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
               if (_isSubmitting) ...[
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F172A),
                     borderRadius: BorderRadius.circular(16),
@@ -906,32 +899,20 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                             child: const Icon(
                               Icons.cloud_upload_rounded,
                               color: AppTheme.primaryLight,
-                              size: 22,
+                              size: 20,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _selectedFiles.length > 1
-                                      ? 'جاري رفع المحاضرة (${_currentFileIndex + 1} من ${_selectedFiles.length})'
-                                      : 'جاري رفع المحاضرة إلى سحابة تيليجرام',
-                                  style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (_currentFileName.isNotEmpty)
-                                  Text(
-                                    _currentFileName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.cairo(color: Colors.white70, fontSize: 11),
-                                  ),
-                              ],
+                            child: Text(
+                              _selectedFiles.length > 1
+                                  ? 'رفع (${_currentFileIndex + 1}/${_selectedFiles.length})'
+                                  : 'جاري الرفع...',
+                              style: GoogleFonts.cairo(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           Container(
@@ -945,7 +926,7 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                               '${(_uploadProgress * 100).toInt()}%',
                               style: GoogleFonts.cairo(
                                 color: AppTheme.primaryLight,
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -959,33 +940,8 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                           value: _uploadProgress.clamp(0.0, 1.0),
                           backgroundColor: Colors.white.withValues(alpha: 0.12),
                           valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
-                          minHeight: 8,
+                          minHeight: 6,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _uploadStatus.isNotEmpty ? _uploadStatus : 'جاري تدفق البيانات...',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
-                            ),
-                          ),
-                          if (_currentFileTotalBytes > 0) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              '${_formatFileSize(_currentFileBytesSent)} / ${_formatFileSize(_currentFileTotalBytes)}',
-                              style: GoogleFonts.cairo(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ],
                       ),
                     ],
                   ),
@@ -1001,15 +957,15 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
                 onPressed: _isSubmitting ? null : _submitLecture,
                 icon: _isSubmitting
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+                    : const Icon(Icons.upload_file_rounded, color: Colors.white, size: 18),
                 label: Text(
                   _isSubmitting
-                      ? (_uploadStatus.isNotEmpty ? _uploadStatus : 'جاري النشر والمزامنة...')
+                      ? 'جاري الرفع...'
                       : (_isDriveLinkMode
-                          ? 'نشر رابط المحاضرة السحابي للمادة'
+                          ? 'نشر الرابط'
                           : (_selectedFiles.length > 1
-                              ? 'نشر ${_selectedFiles.length} محاضرات للمادة دفعة واحدة 🚀'
-                              : 'نشر المحاضرة للمادة')),
+                              ? 'رفع ${_selectedFiles.length} ملفات'
+                              : 'رفع المحاضرة')),
                   style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),

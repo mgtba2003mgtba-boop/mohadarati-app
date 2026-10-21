@@ -229,7 +229,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-          tooltip: 'إغلاق المعاينة',
+          tooltip: 'إغلاق',
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -267,12 +267,12 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           if (_isImage) ...[
             IconButton(
               icon: const Icon(Icons.rotate_right_rounded, color: Colors.white70, size: 20),
-              tooltip: 'تدوير الصورة',
+              tooltip: 'تدوير',
               onPressed: _rotateImage,
             ),
             IconButton(
               icon: const Icon(Icons.restart_alt_rounded, color: Colors.white70, size: 20),
-              tooltip: 'إعادة ضبط الحجم',
+              tooltip: 'إعادة ضبط',
               onPressed: _resetZoom,
             ),
           ],
@@ -280,7 +280,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           // فتح المعاينة في تبويب مستقل عند الحاجة
           IconButton(
             icon: const Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 20),
-            tooltip: 'فتح المعاينة بملء الشاشة',
+            tooltip: 'ملء الشاشة',
             onPressed: () {
               if (_isImage) {
                 _launchExternal(resolvedImageUrl);
@@ -293,7 +293,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           // خيار اختياري هادئ لحفظ نسخة على الجهاز
           IconButton(
             icon: const Icon(Icons.download_rounded, color: Colors.white60, size: 20),
-            tooltip: 'حفظ نسخة على جهازك',
+            tooltip: 'تنزيل',
             onPressed: () => _launchExternal(_downloadTargetUrl),
           ),
         ],
@@ -323,20 +323,8 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
               fit: BoxFit.contain,
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
-                      const SizedBox(height: 14),
-                      Text(
-                        _useFallback
-                            ? 'جاري فتح الصورة عبر المسار السحابي البديل...'
-                            : 'جاري فتح ومعاينة الصورة...',
-                        style: GoogleFonts.cairo(color: Colors.white70, fontSize: 13),
-                      ),
-                    ],
-                  ),
+                return const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
                 );
               },
               errorBuilder: (context, error, stackTrace) {
@@ -349,21 +337,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                       });
                     }
                   });
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
-                        const SizedBox(height: 14),
-                        Text(
-                          'تذبذب في الشبكة، جاري التحويل للمسار البديل...',
-                          style: GoogleFonts.cairo(color: Colors.white70, fontSize: 13),
-                        ),
-                      ],
-                    ),
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
                   );
                 }
-                return _buildErrorState('تعذر فتح الصورة في المعاينة');
+                return _buildErrorState('تعذر فتح الملف');
               },
             ),
           ),
@@ -457,7 +435,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                   ),
                   icon: const Icon(Icons.remove_red_eye_rounded, size: 20),
                   label: Text(
-                    'معاينة وقراءة المحاضرة الآن',
+                    'معاينة',
                     style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -477,7 +455,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                   ),
                   icon: const Icon(Icons.menu_book_rounded, size: 18, color: AppTheme.accent),
                   label: Text(
-                    'فتح في قارئ الـ PDF الخاص بالهاتف',
+                    'فتح في تطبيق خارجي',
                     style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -495,7 +473,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                   ),
                   icon: const Icon(Icons.download_rounded, size: 16),
                   label: Text(
-                    'تنزيل وحفظ نسخة على الجهاز',
+                    'تنزيل',
                     style: GoogleFonts.cairo(fontSize: 12),
                   ),
                 ),

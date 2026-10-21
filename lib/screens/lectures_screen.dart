@@ -198,9 +198,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
 
     double dlProgress = 0.05;
-    String dlStatus = isPreview
-        ? 'جاري تجهيز وتجميع المحاضرة للمعاينة الفورية...'
-        : 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
 
     showDialog(
       context: context,
@@ -212,38 +209,37 @@ class _LecturesScreenState extends State<LecturesScreen> {
             child: AlertDialog(
               backgroundColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryLight.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
-                      color: AppTheme.primaryLight,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      isPreview ? 'معاينة وتجميع المحاضرة' : 'تنزيل وتجميع المحاضرة',
-                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
+                          color: AppTheme.primaryLight,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          isPreview ? 'جاري الفتح...' : 'جاري التحميل...',
+                          style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Text(
+                        '${(dlProgress * 100).toInt()}%',
+                        style: GoogleFonts.cairo(color: AppTheme.primaryLight, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   ClipRRect(
@@ -252,24 +248,8 @@ class _LecturesScreenState extends State<LecturesScreen> {
                       value: dlProgress.clamp(0.0, 1.0),
                       backgroundColor: Colors.white12,
                       valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
-                      minHeight: 8,
+                      minHeight: 6,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dlStatus,
-                          style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
-                        ),
-                      ),
-                      Text(
-                        '${(dlProgress * 100).toInt()}%',
-                        style: GoogleFonts.cairo(color: AppTheme.primaryLight, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -283,7 +263,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
       final bytes = await TelegramUploaderService().downloadChunkedLectureParts(
         partsDescriptor: partsDescriptor,
         onProgress: (status, prog) {
-          dlStatus = status;
           dlProgress = prog;
         },
       );
@@ -300,7 +279,6 @@ class _LecturesScreenState extends State<LecturesScreen> {
               AppMediaPreviewModal.show(
                 context: context,
                 title: lecture.title,
-                subtitle: '${lecture.subjectName} • ${lecture.formattedFileSize}',
                 url: blobUrl,
                 fileName: fileName,
                 mimeType: lecture.mimeType,
@@ -310,8 +288,8 @@ class _LecturesScreenState extends State<LecturesScreen> {
           }
           saveFileInBrowser(bytes, fileName);
           messenger.showSnackBar(
-            SnackBar(
-              content: Text('تم تحميل $fileName بنجاح 🚀'),
+            const SnackBar(
+              content: Text('تم التحميل بنجاح'),
               backgroundColor: AppTheme.primary,
             ),
           );
@@ -319,8 +297,8 @@ class _LecturesScreenState extends State<LecturesScreen> {
           if (kIsWeb) {
             saveFileInBrowser(bytes, fileName);
             messenger.showSnackBar(
-              SnackBar(
-                content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+              const SnackBar(
+                content: Text('تم التحميل بنجاح'),
                 backgroundColor: AppTheme.primary,
               ),
             );
@@ -1129,7 +1107,7 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
     setState(() {
       _isSubmitting = true;
       _uploadProgress = 0.05;
-      _uploadStatus = 'جاري قراءة وتجهيز ملف المحاضرة...';
+      _uploadStatus = 'جاري الرفع...';
       _bytesSent = 0;
       _totalBytes = _selectedFileSize;
     });
@@ -1175,14 +1153,14 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
       if (mounted) {
         setState(() {
           _uploadProgress = 1.0;
-          _uploadStatus = 'تم رفع ونشر المحاضرة بنجاح 🚀';
+          _uploadStatus = 'تم الرفع';
         });
-        await Future.delayed(const Duration(milliseconds: 900));
+        await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
           Navigator.pop(context, true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم رفع ونشر المحاضرة بنجاح 🚀'),
+              content: Text('تم الرفع بنجاح'),
               backgroundColor: AppTheme.primary,
             ),
           );
@@ -1589,30 +1567,18 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
                           child: const Icon(
                             Icons.cloud_upload_rounded,
                             color: AppTheme.primaryLight,
-                            size: 22,
+                            size: 20,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'جاري رفع المحاضرة إلى سحابة تيليجرام',
-                                style: GoogleFonts.cairo(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              if (_selectedFile != null)
-                                Text(
-                                  _selectedFile!.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.cairo(color: Colors.white70, fontSize: 11),
-                                ),
-                            ],
+                          child: Text(
+                            'جاري الرفع...',
+                            style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Container(
@@ -1626,7 +1592,7 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
                             '${(_uploadProgress * 100).toInt()}%',
                             style: GoogleFonts.cairo(
                               color: AppTheme.primaryLight,
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -1640,33 +1606,8 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
                         value: _uploadProgress.clamp(0.0, 1.0),
                         backgroundColor: Colors.white.withValues(alpha: 0.12),
                         valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryLight),
-                        minHeight: 8,
+                        minHeight: 6,
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _uploadStatus.isNotEmpty ? _uploadStatus : 'جاري تدفق البيانات...',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.cairo(color: Colors.white60, fontSize: 11),
-                          ),
-                        ),
-                        if (_totalBytes > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '${_formatFileSize(_bytesSent)} / ${_formatFileSize(_totalBytes)}',
-                            style: GoogleFonts.cairo(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ],
                     ),
                   ],
                 ),
@@ -1682,11 +1623,11 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
               onPressed: _isSubmitting ? null : _submit,
               icon: _isSubmitting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+                  : const Icon(Icons.upload_file_rounded, color: Colors.white, size: 18),
               label: Text(
                 _isSubmitting
-                    ? (_uploadStatus.isNotEmpty ? _uploadStatus : 'جاري النشر والمزامنة...')
-                    : (_isDriveMode ? 'نشر رابط المحاضرة السحابي 🚀' : 'نشر المحاضرة للطلبة 🚀'),
+                    ? 'جاري الرفع...'
+                    : (_isDriveMode ? 'نشر الرابط' : 'رفع المحاضرة'),
                 style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),

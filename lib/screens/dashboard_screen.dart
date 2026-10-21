@@ -413,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     setState(() {
       _isLoading = true;
-      _uploadStatusMessage = 'جاري التحضير ورفع المحاضرة إلى السحابة...';
+      _uploadStatusMessage = 'جاري الرفع...';
       _uploadProgress = 0.1;
     });
 
@@ -532,7 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (!uploadRes.success || uploadRes.fileUrl == null) {
         if (mounted) {
           setState(() => _isLoading = false);
-          _showSnackbar(uploadRes.message.isNotEmpty ? uploadRes.message : 'فشل رفع صورة التبليغ إلى سحابة تيليجرام', isError: true);
+          _showSnackbar(uploadRes.message.isNotEmpty ? uploadRes.message : 'فشل الرفع', isError: true);
         }
         return;
       }
@@ -1432,7 +1432,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                         child: Text(
                           _uploadStatusMessage.isNotEmpty
                               ? _uploadStatusMessage
-                              : 'جاري رفع المحاضرة إلى سحابة المنظومة ومزامنتها...',
+                              : 'جاري الرفع...',
                           style: GoogleFonts.cairo(
                             color: AppTheme.textPrimary,
                             fontSize: 12,
@@ -1573,7 +1573,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '${_formatFileSize(_selectedAnnouncementImageSize)} • جاهزة للرفع إلى سحابة تيليجرام',
+                          '${_formatFileSize(_selectedAnnouncementImageSize)} ',
                           style: GoogleFonts.cairo(fontSize: 10, color: AppTheme.textSecondary),
                         ),
                       ],

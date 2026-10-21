@@ -381,9 +381,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
 
     double dlProgress = 0.05;
-    String dlStatus = isPreview
-        ? 'جاري تجهيز وتجميع المحاضرة للمعاينة الفورية...'
-        : 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
 
     showDialog(
       context: context,
@@ -395,38 +392,37 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             child: AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
-                      color: AppTheme.primary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      isPreview ? 'معاينة وتجميع أجزاء المحاضرة' : 'تنزيل وتجميع أجزاء المحاضرة',
-                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isPreview ? Icons.visibility_rounded : Icons.downloading_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          isPreview ? 'جاري الفتح...' : 'جاري التحميل...',
+                          style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Text(
+                        '${(dlProgress * 100).toInt()}%',
+                        style: GoogleFonts.cairo(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   ClipRRect(
@@ -435,24 +431,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       value: dlProgress.clamp(0.0, 1.0),
                       backgroundColor: AppTheme.lightBorder,
                       valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
-                      minHeight: 8,
+                      minHeight: 6,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dlStatus,
-                          style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 11),
-                        ),
-                      ),
-                      Text(
-                        '${(dlProgress * 100).toInt()}%',
-                        style: GoogleFonts.cairo(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -466,7 +446,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final bytes = await TelegramUploaderService().downloadChunkedLectureParts(
         partsDescriptor: partsDescriptor,
         onProgress: (status, prog) {
-          dlStatus = status;
           dlProgress = prog;
         },
       );
@@ -483,7 +462,6 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               AppMediaPreviewModal.show(
                 context: context,
                 title: lecture.title,
-                subtitle: '${lecture.subjectName} • ${lecture.formattedFileSize}',
                 url: blobUrl,
                 fileName: fileName,
                 mimeType: lecture.mimeType,
@@ -493,8 +471,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           }
           saveFileInBrowser(bytes, fileName);
           messenger.showSnackBar(
-            SnackBar(
-              content: Text('تم تحميل $fileName بنجاح 🚀'),
+            const SnackBar(
+              content: Text('تم التحميل بنجاح'),
               backgroundColor: AppTheme.primary,
             ),
           );
@@ -502,8 +480,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           if (kIsWeb) {
             saveFileInBrowser(bytes, fileName);
             messenger.showSnackBar(
-              SnackBar(
-                content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+              const SnackBar(
+                content: Text('تم التحميل بنجاح'),
                 backgroundColor: AppTheme.primary,
               ),
             );

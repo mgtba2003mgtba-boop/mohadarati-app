@@ -328,7 +328,7 @@ class TelegramUploaderService {
 
         final partProgress = i / totalParts;
         onProgress?.call(
-          'جاري تنزيل الجزء $partNum من أصل $totalParts من سحابة تيليجرام...',
+          'جاري التحميل...',
           partProgress,
         );
 
@@ -365,10 +365,10 @@ class TelegramUploaderService {
 
         fullBuilder.add(partRes.bodyBytes);
         final ratio = (i + 1) / totalParts;
-        onProgress?.call('تم تحميل الجزء $partNum من أصل $totalParts بنجاح', ratio);
+        onProgress?.call('جاري التحميل...', ratio);
       }
 
-      onProgress?.call('اكتمل تنزيل وتجميع أجزاء المحاضرة بنجاح!', 1.0);
+      onProgress?.call('تم التحميل', 1.0);
       return fullBuilder.takeBytes();
     } catch (e) {
       debugPrint('[-] Error downloading chunked lecture parts: $e');
@@ -387,13 +387,13 @@ class TelegramUploaderService {
     void Function(int bytesSent, int totalBytes, double progress, String status)? onDetailedProgress,
   }) async {
     try {
-      onProgress?.call('جاري قراءة وتجهيز الملف...', 0.1);
+      onProgress?.call('جاري الرفع...', 0.1);
       final Uint8List fileBytes = overrideBytes ?? await _getFileBytes(file);
       final String finalFileName = overrideFileName ?? file.name;
       if (fileBytes.isEmpty) {
         return UploadGeneralFileResult(
           success: false,
-          message: 'تعذر قراءة بيانات الملف من المتصفح، يرجى المحاولة مرة أخرى.',
+          message: 'تعذر قراءة بيانات الملف.',
         );
       }
 
@@ -401,7 +401,7 @@ class TelegramUploaderService {
       if (fileBytes.length > 2048 * 1024 * 1024) {
         return UploadGeneralFileResult(
           success: false,
-          message: 'حجم الملف (${_formatBytes(fileBytes.length)}) يتجاوز الحد الأقصى المسموح به عالمياً في تيليجرام (2 غيغابايت).',
+          message: 'حجم الملف يتجاوز الحد الأقصى (2 غيغابايت).',
         );
       }
 
@@ -430,7 +430,7 @@ class TelegramUploaderService {
         onProgress: onProgress,
         onBytesProgress: (sent, total, ratio) {
           final mappedProg = (ratio * 0.85).clamp(0.1, 0.85);
-          final status = 'جاري تدفق الملف إلى السحابة (${_formatBytes(sent)} من أصل ${_formatBytes(total)})...';
+          const status = 'جاري الرفع...';
           onProgress?.call(status, mappedProg);
           onDetailedProgress?.call(sent, total, mappedProg, status);
         },
@@ -481,11 +481,11 @@ class TelegramUploaderService {
 
           directUrl ??= '';
 
-          onProgress?.call('تم رفع الملف بنجاح!', 1.0);
+          onProgress?.call('تم الرفع', 1.0);
 
           return UploadGeneralFileResult(
             success: true,
-            message: 'تم رفع الملف إلى سحابة تيليجرام بنجاح',
+            message: 'تم الرفع بنجاح',
             telegramMessageId: msgId,
             fileUrl: directUrl,
             fileName: file.name,
@@ -497,9 +497,9 @@ class TelegramUploaderService {
 
       final statusCode = response?.statusCode ?? 500;
       final body = response?.body ?? '';
-      String friendlyMessage = 'فشل الرفع من سحابة تيليجرام ($statusCode)';
+      String friendlyMessage = 'فشل الرفع ($statusCode)';
       if (statusCode == 400 && body.contains('file is too big')) {
-        friendlyMessage = 'حجم الملف يتجاوز الحد المسموح به في تيليجرام (50 ميغابايت).';
+        friendlyMessage = 'حجم الملف يتجاوز الحد المسموح به (50 ميغابايت).';
       } else if (body.isNotEmpty) {
         friendlyMessage = '$friendlyMessage: $body';
       }
@@ -512,7 +512,7 @@ class TelegramUploaderService {
       debugPrint('[-] Telegram cloud general file upload error: $e');
       return UploadGeneralFileResult(
         success: false,
-        message: 'انقطع الاتصال بالسحابة أثناء الرفع بعد عدة محاولات تلقائية. يرجى التأكد من استقرار شبكة الإنترنت وإعادة المحاولة.',
+        message: 'انقطع الاتصال أثناء الرفع. يرجى إعادة المحاولة.',
       );
     }
   }
@@ -610,7 +610,7 @@ class TelegramUploaderService {
         ),
       );
 
-      onProgress?.call('جاري رفع وتدفق الملف عبر خادم البث (${_formatBytes(fileBytes.length)})...', 0.4);
+      onProgress?.call('جاري الرفع...', 0.4);
 
       final streamedResponse = await request.send().timeout(const Duration(minutes: 30));
       final response = await http.Response.fromStream(streamedResponse);
@@ -626,7 +626,7 @@ class TelegramUploaderService {
             fileId: fileId,
             fileName: fileName,
             fileSizeBytes: fileBytes.length,
-            message: 'تم رفع ونشر المحاضرة بنجاح عبر السيرفر السحابي',
+            message: 'تم الرفع بنجاح',
           );
         }
       }
@@ -656,13 +656,13 @@ class TelegramUploaderService {
     void Function(int bytesSent, int totalBytes, double progress, String status)? onDetailedProgress,
   }) async {
     try {
-      onProgress?.call('جاري قراءة وتجهيز بيانات ملف المحاضرة...', 0.05);
+      onProgress?.call('جاري الرفع...', 0.05);
       final Uint8List fileBytes = await _getFileBytes(file);
       final totalBytes = fileBytes.length;
       if (fileBytes.isEmpty) {
         return UploadLectureResult(
           success: false,
-          message: 'تعذر قراءة بيانات ملف المحاضرة من المتصفح، يرجى إعادة اختيار الملف.',
+          message: 'تعذر قراءة بيانات الملف. يرجى إعادة اختيار الملف.',
         );
       }
 
@@ -670,7 +670,7 @@ class TelegramUploaderService {
       if (totalBytes > 2048 * 1024 * 1024) {
         return UploadLectureResult(
           success: false,
-          message: 'حجم الملف (${_formatBytes(totalBytes)}) يتجاوز الحد الأقصى المسموح به عالمياً في سحابة تيليجرام (2 غيغابايت).',
+          message: 'حجم الملف يتجاوز الحد الأقصى المسموح به (2 غيغابايت).',
         );
       }
 
@@ -719,7 +719,7 @@ class TelegramUploaderService {
         captionLines.add('👤 نُشر بواسطة: $uploaderName ($uploaderRole)');
         final caption = captionLines.join('\n');
 
-        final initialStatus = 'جاري رفع المحاضرة (${_formatBytes(totalBytes)}) إلى السحابة...';
+        const initialStatus = 'جاري الرفع...';
         onProgress?.call(initialStatus, 0.05);
         onDetailedProgress?.call(0, totalBytes, 0.05, initialStatus);
 
@@ -733,7 +733,7 @@ class TelegramUploaderService {
           onProgress: onProgress,
           onBytesProgress: (sent, total, ratio) {
             final mappedProg = (ratio * 0.85).clamp(0.05, 0.85);
-            final status = 'جاري تدفق بيانات المحاضرة (${_formatBytes(sent)} من أصل ${_formatBytes(total)})...';
+            const status = 'جاري الرفع...';
             onProgress?.call(status, mappedProg);
             onDetailedProgress?.call(sent, total, mappedProg, status);
           },
@@ -761,8 +761,8 @@ class TelegramUploaderService {
               }
             }
 
-            onProgress?.call('تم رفع الملف بنجاح! جاري معالجة المعرّف السحابي...', 0.90);
-            onDetailedProgress?.call(totalBytes, totalBytes, 0.90, 'تم رفع الملف بنجاح! جاري معالجة المعرّف السحابي...');
+            onProgress?.call('جاري المعالجة...', 0.90);
+            onDetailedProgress?.call(totalBytes, totalBytes, 0.90, 'جاري المعالجة...');
 
             String? directUrl;
             if (fileId != null) {
@@ -806,16 +806,16 @@ class TelegramUploaderService {
             if (!dbOk) {
               return UploadLectureResult(
                 success: false,
-                message: 'تم رفع الملف بنجاح إلى السحابة، ولكن تعذر حفظ بيانات المحاضرة في قاعدة البيانات. يرجى المحاولة مرة أخرى.',
+                message: 'تعذر حفظ بيانات المحاضرة في قاعدة البيانات. يرجى المحاولة مرة أخرى.',
               );
             }
 
-            onProgress?.call('تم نشر المحاضرة ومزامنتها بنجاح!', 1.0);
-            onDetailedProgress?.call(totalBytes, totalBytes, 1.0, 'تم نشر المحاضرة ومزامنتها بنجاح!');
+            onProgress?.call('تم الرفع', 1.0);
+            onDetailedProgress?.call(totalBytes, totalBytes, 1.0, 'تم الرفع');
 
             return UploadLectureResult(
               success: true,
-              message: 'تم نشر ورفع المحاضرة إلى السحابة بنجاح ومزامنتها للطلبة',
+              message: 'تم الرفع بنجاح',
               telegramMessageId: msgId,
               fileId: fileId,
               fileName: file.name,
@@ -828,7 +828,7 @@ class TelegramUploaderService {
         final body = response?.body ?? '';
         return UploadLectureResult(
           success: false,
-          message: 'فشل الرفع من سحابة تيليجرام ($statusCode): $body',
+          message: 'فشل الرفع ($statusCode): $body',
         );
       }
 
@@ -838,7 +838,7 @@ class TelegramUploaderService {
       final List<Map<String, dynamic>> uploadedParts = [];
       int overallBytesSentSoFar = 0;
 
-      final startStatus = 'تجهيز رفع المحاضرة الكبيرة (${_formatBytes(totalBytes)}) على $totalParts أجزاء متسلسلة...';
+      const startStatus = 'جاري الرفع...';
       onProgress?.call(startStatus, 0.05);
       onDetailedProgress?.call(0, totalBytes, 0.05, startStatus);
 
@@ -875,7 +875,7 @@ class TelegramUploaderService {
             final currentTotalSent = overallBytesSentSoFar + sent;
             final overallRatio = (currentTotalSent / totalBytes).clamp(0.0, 1.0);
             final mappedProg = (overallRatio * 0.85).clamp(0.05, 0.85);
-            final status = 'جاري رفع الجزء $partNum من $totalParts (${_formatBytes(currentTotalSent)} من أصل ${_formatBytes(totalBytes)})...';
+            const status = 'جاري الرفع...';
             onProgress?.call(status, mappedProg);
             onDetailedProgress?.call(currentTotalSent, totalBytes, mappedProg, status);
           },
@@ -884,7 +884,7 @@ class TelegramUploaderService {
         if (partResponse == null || partResponse.statusCode != 200) {
           return UploadLectureResult(
             success: false,
-            message: 'تعذر رفع الجزء $partNum من أصل $totalParts بعد عدة محاولات تلقائية. كود (${partResponse?.statusCode ?? 500}).',
+            message: 'تعذر رفع الجزء $partNum ($totalParts) كود (${partResponse?.statusCode ?? 500}).',
           );
         }
 
@@ -908,8 +908,8 @@ class TelegramUploaderService {
       final partsJson = jsonEncode(uploadedParts);
       final partsDescriptor = 'telegram:parts:$partsJson';
 
-      onProgress?.call('تم رفع كافة أجزاء المحاضرة بنجاح! جاري مزامنة السجل الأكاديمي...', 0.90);
-      onDetailedProgress?.call(totalBytes, totalBytes, 0.90, 'تم رفع كافة أجزاء المحاضرة بنجاح! جاري مزامنة السجل الأكاديمي...');
+      onProgress?.call('جاري المعالجة...', 0.90);
+      onDetailedProgress?.call(totalBytes, totalBytes, 0.90, 'جاري المعالجة...');
 
       final lecturePayload = {
         'title': title.trim(),
@@ -948,16 +948,16 @@ class TelegramUploaderService {
       if (!dbOk) {
         return UploadLectureResult(
           success: false,
-          message: 'تم رفع أجزاء الملف بنجاح إلى سحابة تيليجرام، ولكن تعذر حفظ بيانات المحاضرة في قاعدة البيانات. يرجى المحاولة مرة أخرى.',
+          message: 'تعذر حفظ بيانات المحاضرة في قاعدة البيانات. يرجى المحاولة مرة أخرى.',
         );
       }
 
-      onProgress?.call('تم نشر المحاضرة ومزامنتها بنجاح!', 1.0);
-      onDetailedProgress?.call(totalBytes, totalBytes, 1.0, 'تم نشر المحاضرة ومزامنتها بنجاح!');
+      onProgress?.call('تم الرفع', 1.0);
+      onDetailedProgress?.call(totalBytes, totalBytes, 1.0, 'تم الرفع');
 
       return UploadLectureResult(
         success: true,
-        message: 'تم نشر ورفع المحاضرة الكبيرة بنجاح ($totalParts أجزاء في سحابة تيليجرام)',
+        message: 'تم الرفع بنجاح',
         telegramMessageId: primaryMsgId,
         fileId: partsDescriptor,
         fileName: file.name,
@@ -967,7 +967,7 @@ class TelegramUploaderService {
       debugPrint('[-] Upload lecture cloud error: $e');
       return UploadLectureResult(
         success: false,
-        message: 'انقطع الاتصال بالسحابة أثناء الرفع بعد عدة محاولات تلقائية. يرجى التأكد من استقرار شبكة الإنترنت وإعادة المحاولة.',
+        message: 'انقطع الاتصال أثناء الرفع. يرجى إعادة المحاولة.',
       );
     }
   }
