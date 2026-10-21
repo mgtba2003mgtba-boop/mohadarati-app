@@ -43,15 +43,8 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
   void initState() {
     super.initState();
     _isLectureMode = widget.initialMode != 'announcement';
-    if (widget.section != null && widget.section!.isNotEmpty && widget.section != 'ALL') {
-      _targetSection = widget.section!;
-    } else if (widget.currentUser?.isAdmin == true) {
-      _targetSection = 'ALL';
-    } else if (widget.currentUser?.assignedSections.isNotEmpty == true) {
-      _targetSection = widget.currentUser!.assignedSections.first;
-    } else {
-      _targetSection = 'ALL';
-    }
+    // توحيد نطاق النشر لكافة الشعب بنفس القسم والمرحلة افتراضياً
+    _targetSection = 'ALL';
   }
 
   // حقول المحاضرة
@@ -357,13 +350,13 @@ class PublishToSubjectSheetState extends State<PublishToSubjectSheet> {
   Future<void> _submitAnnouncement() async {
     final content = _announceContentController.text.trim();
 
-    if (content.isEmpty) {
-      _showSnack('يرجى كتابة نص التبليغ', isError: true);
+    if (content.isEmpty && _selectedAnnouncementImage == null) {
+      _showSnack('يرجى كتابة نص التبليغ أو إرفاق صورة', isError: true);
       return;
     }
 
     // استخراج عنوان تلقائي لقاعدة البيانات دون الحاجة لإدخاله يدوياً
-    final firstLine = content.split('\n').first.trim();
+    final firstLine = content.isNotEmpty ? content.split('\n').first.trim() : '';
     final autoTitle = firstLine.length > 50
         ? '${firstLine.substring(0, 47)}...'
         : (firstLine.isNotEmpty ? firstLine : widget.subjectName);

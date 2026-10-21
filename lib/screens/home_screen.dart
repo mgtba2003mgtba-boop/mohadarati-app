@@ -530,10 +530,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   final isPureBanner = content.isEmpty || isBoilerplate;
 
-                  return GestureDetector(
-                    onTap: () {
-                      _showAnnouncementDetails(announcement, imageSrc);
-                    },
+                  return IgnorePointer(
+                    ignoring: true,
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       decoration: BoxDecoration(
@@ -634,26 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.22),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'تكبير',
-                                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+
                                   ],
                                 ),
                               ),

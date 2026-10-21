@@ -762,17 +762,17 @@ class _DirectPublishAnnouncementSheetState extends State<_DirectPublishAnnouncem
 
   void _submit() {
     final content = _contentController.text.trim();
-    if (content.isEmpty) {
+    if (content.isEmpty && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى كتابة نص التبليغ أولاً'), backgroundColor: AppTheme.danger),
+        const SnackBar(content: Text('يرجى كتابة نص التبليغ أو إرفاق صورة'), backgroundColor: AppTheme.danger),
       );
       return;
     }
 
-    final firstLine = content.split('\n').first.trim();
+    final firstLine = content.isNotEmpty ? content.split('\n').first.trim() : '';
     final autoTitle = firstLine.length > 50
         ? '${firstLine.substring(0, 47)}...'
-        : (firstLine.isNotEmpty ? firstLine : 'تبليغ أكاديمي');
+        : (firstLine.isNotEmpty ? firstLine : 'إعلان مصور');
 
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final optimisticAnnounce = AnnouncementModel(

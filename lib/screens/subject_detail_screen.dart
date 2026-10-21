@@ -120,10 +120,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    final sec = widget.section ?? (AdminPreviewService().isCustomActive ? AdminPreviewService().section : null);
-    if (sec != null && sec.isNotEmpty) {
-      _selectedSectionFilter = sec;
-    }
+    _selectedSectionFilter = 'ALL';
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -187,10 +184,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final activeSemester = widget.semester ?? _user?.semester ?? 1;
 
       // 1. جلب محاضرات المادة (مع حصر الشعبة للطلبة والممثلين ودعم التطبيع العربي المزدوج)
+      // توحيد جلب المحاضرات لكافة الشعب بنفس القسم والمرحلة
       final allLectures = await service.fetchLectures(
         department: dept,
         stage: stage,
-        section: userSection,
+        section: null,
         semester: activeSemester,
         forceRefresh: forceRefresh,
       );
@@ -246,17 +244,12 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           _lectureTypeFilter == 'ALL' || l.type == _lectureTypeFilter;
 
       final bool matchesSection;
-      if (isAdmin) {
-        matchesSection = _selectedSectionFilter == 'ALL' ||
-            (_selectedSectionFilter == 'UNIFIED'
-                ? (l.section == 'ALL' || l.section.isEmpty)
-                : (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL'));
+      if (_selectedSectionFilter == 'ALL' || _selectedSectionFilter.isEmpty) {
+        matchesSection = true;
+      } else if (_selectedSectionFilter == 'UNIFIED') {
+        matchesSection = (l.section == 'ALL' || l.section.isEmpty);
       } else {
-        final bool isAuthor = _user != null && (_user!.studentId == l.uploaderId);
-        matchesSection = isAuthor ||
-            l.section == 'ALL' ||
-            l.section.isEmpty ||
-            (_user != null && _user!.hasSectionAccess(l.section));
+        matchesSection = (l.section.toUpperCase() == _selectedSectionFilter.toUpperCase() || l.section == 'ALL' || l.section.isEmpty);
       }
 
       final matchesSearch = cleanQuery.isEmpty || l.searchToken.contains(cleanQuery);

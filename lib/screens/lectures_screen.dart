@@ -46,7 +46,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
     if (_user != null) {
       _selectedDept = _user!.isAdmin ? 'ALL' : _user!.department;
       _selectedStage = _user!.isAdmin ? 'ALL' : _user!.stage;
-      _selectedSection = _user!.isAdmin ? 'ALL' : (_user!.section ?? 'ALL');
+      _selectedSection = 'ALL';
       _selectedSemester = _user!.semester;
     }
 
@@ -60,9 +60,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
     final list = await service.fetchLectures(
       department: _selectedDept == 'ALL' ? null : _selectedDept,
       stage: _selectedStage == 'ALL' ? null : _selectedStage,
-      section: (_user?.isAdmin == true && _selectedSection != 'ALL')
-          ? _selectedSection
-          : (_user?.isAdmin == true ? null : _user?.section),
+      section: (_selectedSection != 'ALL') ? _selectedSection : null,
       semester: _selectedSemester,
       forceRefresh: forceRefresh,
     );
@@ -958,15 +956,8 @@ class _DirectPublishLectureSheetState extends State<_DirectPublishLectureSheet> 
     _stage = widget.initialStage;
     _semester = widget.initialSemester;
 
-    if (widget.currentUser.isAdmin) {
-      _section = 'ALL';
-    } else if (widget.currentUser.assignedSections.isNotEmpty) {
-      _section = widget.currentUser.assignedSections.first;
-    } else if (widget.currentUser.section != null && widget.currentUser.section!.isNotEmpty) {
-      _section = widget.currentUser.section!;
-    } else {
-      _section = 'ALL';
-    }
+    // توحيد نطاق المحاضرة لكافة الشعب افتراضياً
+    _section = 'ALL';
 
     _loadSubjectNames();
   }

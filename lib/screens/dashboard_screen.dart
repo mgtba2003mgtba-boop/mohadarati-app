@@ -504,13 +504,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final content = _announcementContentController.text.trim();
     final subject = _announcementSubjectController.text.trim();
 
-    if (content.isEmpty) {
-      _showSnackbar('يرجى كتابة نص التبليغ بالتفصيل', isError: true);
+    if (content.isEmpty && _selectedAnnouncementImage == null) {
+      _showSnackbar('يرجى كتابة نص التبليغ أو إرفاق صورة الإعلان', isError: true);
       return;
     }
 
     // استخراج عنوان تلقائي لقاعدة البيانات دون الحاجة لإدخاله يدوياً
-    final firstLine = content.split('\n').first.trim();
+    final firstLine = content.isNotEmpty ? content.split('\n').first.trim() : '';
     final autoTitle = firstLine.length > 50
         ? '${firstLine.substring(0, 47)}...'
         : (firstLine.isNotEmpty ? firstLine : (subject.isNotEmpty ? subject : 'تبليغ أكاديمي'));

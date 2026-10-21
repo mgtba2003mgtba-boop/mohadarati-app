@@ -146,10 +146,17 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
       widget.onShowSnackbar?.call('يرجى اختيار صورة البوستر أولاً', isError: true);
       return;
     }
-    final title = _bannerTitleController.text.trim();
+    String title = _bannerTitleController.text.trim();
     if (title.isEmpty) {
-      widget.onShowSnackbar?.call('يرجى كتابة عنوان البوستر', isError: true);
-      return;
+      if (_selectedBannerImage != null) {
+        final nameWithoutExt = _selectedBannerImage!.name.contains('.')
+            ? _selectedBannerImage!.name.substring(0, _selectedBannerImage!.name.lastIndexOf('.'))
+            : _selectedBannerImage!.name;
+        final clean = nameWithoutExt.replaceAll(RegExp(r'[_-]'), ' ').trim();
+        title = clean.isNotEmpty ? clean : 'بوستر رسمي';
+      } else {
+        title = 'بوستر رسمي';
+      }
     }
 
     setState(() => _isLoading = true);
