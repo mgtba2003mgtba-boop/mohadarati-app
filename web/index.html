@@ -573,8 +573,13 @@
               var current = localStorage.getItem('nust_build_number');
               if (current && current !== String(data.build_number)) {
                 console.log('[*] New build detected:', data.build_number, 'Current registered:', current);
-                // حفظ رقم البناء الأحدث بسلاسة دون إعادة تحميل الصفحة أثناء عمل المستخدم
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    names.forEach(function(name) { caches.delete(name); });
+                  });
+                }
                 localStorage.setItem('nust_build_number', String(data.build_number));
+                window.location.reload();
               } else if (!current) {
                 localStorage.setItem('nust_build_number', String(data.build_number));
               }

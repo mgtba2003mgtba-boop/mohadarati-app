@@ -129,8 +129,11 @@ class _LecturesScreenState extends State<LecturesScreen> {
   /// تحميل المحاضرة مباشرة من سحابة تيليجرام
   Future<void> _openMediaDownload(dynamic target) async {
     if (target is LectureModel) {
-      if (target.telegramFileId != null && target.telegramFileId!.startsWith('telegram:parts:')) {
-        await _downloadChunkedLecture(target);
+      final partsDesc = (target.telegramFileId != null && target.telegramFileId!.startsWith('telegram:parts:'))
+          ? target.telegramFileId!
+          : (target.driveUrl.startsWith('telegram:parts:') ? target.driveUrl : null);
+      if (partsDesc != null) {
+        await _downloadChunkedLecture(target, partsDesc);
         return;
       }
     }
@@ -176,7 +179,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
   }
 
   /// تنزيل المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة
-  Future<void> _downloadChunkedLecture(LectureModel lecture) async {
+  Future<void> _downloadChunkedLecture(LectureModel lecture, String partsDescriptor) async {
     final messenger = ScaffoldMessenger.of(context);
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
 
@@ -258,7 +261,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
     try {
       final bytes = await TelegramUploaderService().downloadChunkedLectureParts(
-        partsDescriptor: lecture.telegramFileId!,
+        partsDescriptor: partsDescriptor,
         onProgress: (status, prog) {
           dlStatus = status;
           dlProgress = prog;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -15,6 +16,7 @@ import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../services/admin_preview_service.dart';
+import '../services/web_file_saver.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
 import '../widgets/telegram_poll_card.dart';
@@ -315,6 +317,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   Future<void> _launchLectureMedia(LectureModel lecture, {required bool isDownload}) async {
+    // التحقق أولاً إن كانت المحاضرة مقسمة إلى أجزاء سحابية (ملف كبير > 19MB تم رفعه بنجاح)
+    final partsDesc = (lecture.telegramFileId != null && lecture.telegramFileId!.startsWith('telegram:parts:'))
+        ? lecture.telegramFileId!
+        : (lecture.driveUrl.startsWith('telegram:parts:') ? lecture.driveUrl : null);
+
+    if (partsDesc != null) {
+      await _downloadChunkedLecture(lecture, partsDesc);
+      return;
+    }
+
     String? targetUrl;
 
     if (lecture.telegramFileId != null && lecture.telegramFileId!.isNotEmpty) {
@@ -354,6 +366,131 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('رابط المحاضرة غير متوفر')),
+        );
+      }
+    }
+  }
+
+  /// تنزيل المحاضرات الكبيرة المجزأة وتجميعها بسلاسة للطلبة في شاشة تفاصيل المادة
+  Future<void> _downloadChunkedLecture(LectureModel lecture, String partsDescriptor) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final fileName = lecture.fileName ?? '${lecture.title}.pdf';
+
+    double dlProgress = 0.05;
+    String dlStatus = 'جاري الاتصال بسحابة تيليجرام وتجهيز الأجزاء...';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.downloading_rounded, color: AppTheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'تنزيل وتجميع أجزاء المحاضرة',
+                      style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: dlProgress.clamp(0.0, 1.0),
+                      backgroundColor: AppTheme.lightBorder,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                      minHeight: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dlStatus,
+                          style: GoogleFonts.cairo(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                      ),
+                      Text(
+                        '${(dlProgress * 100).toInt()}%',
+                        style: GoogleFonts.cairo(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      final bytes = await TelegramUploaderService().downloadChunkedLectureParts(
+        partsDescriptor: partsDescriptor,
+        onProgress: (status, prog) {
+          dlStatus = status;
+          dlProgress = prog;
+        },
+      );
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (bytes != null && bytes.isNotEmpty) {
+        if (kIsWeb) {
+          saveFileInBrowser(bytes, fileName);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('تم تنزيل وتجميع $fileName بنجاح 🚀'),
+              backgroundColor: AppTheme.primary,
+            ),
+          );
+        } else {
+          if (lecture.telegramMessageId != null) {
+            final tgUrl = 'https://t.me/c/3875986734/${lecture.telegramMessageId}';
+            await launchUrl(Uri.parse(tgUrl), mode: LaunchMode.externalApplication);
+          }
+        }
+      } else {
+        throw Exception('تعذر استخراج بيانات المحاضرة');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('تعذر تحميل المحاضرة: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
         );
       }
     }

@@ -822,7 +822,7 @@ class TelegramUploaderService {
       for (int partIdx = 0; partIdx < totalParts; partIdx++) {
         final start = partIdx * chunkSize;
         final end = (start + chunkSize > totalBytes) ? totalBytes : start + chunkSize;
-        final partBytes = fileBytes.sublist(start, end);
+        final partBytes = Uint8List.view(fileBytes.buffer, fileBytes.offsetInBytes + start, end - start);
         final partNum = partIdx + 1;
         final partFileName = '${file.name}.part$partNum';
 
