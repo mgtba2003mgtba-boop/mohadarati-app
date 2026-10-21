@@ -8,6 +8,8 @@ import '../models/announcement_model.dart';
 import '../models/student_model.dart';
 import '../services/supabase_service.dart';
 import 'app_tactile_bounce.dart';
+import 'app_network_image.dart';
+import 'app_fullscreen_modal.dart';
 
 /// ── تبويب دليل وإدارة الطلاب وممثلي الشعب (صلاحيات المشرف العام) ───────────
 class DashboardRepsDirectoryTab extends StatefulWidget {
@@ -33,6 +35,130 @@ class DashboardRepsDirectoryTab extends StatefulWidget {
 }
 
 class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
+  final Map<String, String?> _photoCache = {};
+  final Set<String> _pendingPhotoRequests = {};
+
+  Future<void> _resolveStudentPhoto(String studentId) async {
+    if (studentId.isEmpty || _pendingPhotoRequests.contains(studentId)) return;
+    _pendingPhotoRequests.add(studentId);
+
+    try {
+      final res = await SupabaseService().attendanceClient
+          .from('students')
+          .select('photo_url')
+          .eq('id', studentId)
+          .maybeSingle();
+
+      final url = res?['photo_url']?.toString();
+      _photoCache[studentId] = url;
+      if (mounted && url != null && url.isNotEmpty) {
+        setState(() {});
+      }
+    } catch (_) {
+      _photoCache[studentId] = null;
+    } finally {
+      _pendingPhotoRequests.remove(studentId);
+    }
+  }
+
+  Widget _buildStudentAvatar(AppUserModel rep, Color avatarColor, {double size = 48}) {
+    final photo = (rep.photoUrl != null && rep.photoUrl!.trim().isNotEmpty)
+        ? rep.photoUrl
+        : _photoCache[rep.studentId];
+    final bool hasValidPhoto = photo != null && photo.trim().isNotEmpty;
+
+    if (!hasValidPhoto && !_photoCache.containsKey(rep.studentId)) {
+      _resolveStudentPhoto(rep.studentId);
+    }
+
+    return GestureDetector(
+      onTap: hasValidPhoto
+          ? () {
+              AppFullscreenModal.show(
+                context: context,
+                title: rep.name,
+                subtitle: '${rep.studentId} • ${rep.department} • ${rep.stage} (${rep.section ?? "غير محدد"})',
+                imageUrl: photo,
+              );
+            }
+          : null,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: avatarColor.withValues(alpha: 0.12),
+              border: Border.all(
+                color: hasValidPhoto ? AppTheme.accent : avatarColor.withValues(alpha: 0.35),
+                width: hasValidPhoto ? 2 : 1,
+              ),
+              boxShadow: hasValidPhoto
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipOval(
+              child: hasValidPhoto
+                  ? AppNetworkImage(
+                      imageUrl: photo,
+                      width: size,
+                      height: size,
+                      fit: BoxFit.cover,
+                      errorWidget: Center(
+                        child: Text(
+                          rep.name.isNotEmpty ? rep.name[0] : 'S',
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            fontSize: size * 0.4,
+                            color: avatarColor,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        rep.name.isNotEmpty ? rep.name[0] : 'S',
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.bold,
+                          fontSize: size * 0.4,
+                          color: avatarColor,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          if (hasValidPhoto)
+            Positioned(
+              bottom: -1,
+              right: -1,
+              child: Container(
+                padding: const EdgeInsets.all(1.5),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Container(
+                  width: size * 0.25,
+                  height: size * 0.25,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
   String _repDeptFilter = 'ALL';
   String _repSearchQuery = '';
   String _userDirectoryRoleFilter = 'ALL'; // 'ALL', 'REPS', 'STUDENTS'
@@ -589,6 +715,9 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
       avatarColor = AppTheme.accent;
     }
 
+    final lecturesCount = widget.allLectures.where((l) => l.uploaderId == rep.studentId).length;
+    final announcesCount = widget.allAnnouncements.where((a) => a.authorId == rep.studentId).length;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -597,22 +726,19 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isAdmin
-              ? Colors.greenAccent.withValues(alpha: 0.4)
+              ? Colors.greenAccent.withValues(alpha: 0.5)
               : (isRep ? AppTheme.accent.withValues(alpha: 0.4) : AppTheme.lightBorder),
+          width: isAdmin || isRep ? 1.5 : 1.0,
         ),
+        boxShadow: AppShadows.subtle,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: avatarColor.withValues(alpha: 0.15),
-                child: Text(
-                  rep.name.isNotEmpty ? rep.name[0] : 'S',
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: avatarColor),
-                ),
-              ),
+              _buildStudentAvatar(rep, avatarColor, size: 48),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -623,7 +749,11 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
                         Expanded(
                           child: Text(
                             rep.name,
-                            style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                            style: GoogleFonts.cairo(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
                         Container(
@@ -711,9 +841,39 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
                         ),
                       ],
                     ),
-                    Text(
-                      '${rep.studentId} • ${rep.department} • ${rep.stage} • شعبة (${rep.section ?? "غير محدد"})',
-                      style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          rep.studentId,
+                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                        ),
+                        Text('•', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFCBD5E1))),
+                        Text(
+                          rep.department,
+                          style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                        Text('•', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFCBD5E1))),
+                        Text(
+                          rep.stage,
+                          style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                        Text('•', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFCBD5E1))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightSurface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppTheme.lightBorder),
+                          ),
+                          child: Text(
+                            'شعبة (${rep.section ?? "غير محدد"})',
+                            style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -721,26 +881,47 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'المحاضرات: ${widget.allLectures.where((l) => l.uploaderId == rep.studentId).length} | التبليغات: ${widget.allAnnouncements.where((a) => a.authorId == rep.studentId).length}',
-                  style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textSecondary),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.lightSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.lightBorder),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.menu_book_rounded, size: 14, color: AppTheme.primary),
+                      const SizedBox(width: 4),
+                      Text('محاضرات: $lecturesCount', style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textSecondary)),
+                      const SizedBox(width: 10),
+                      const Icon(Icons.campaign_rounded, size: 14, color: AppTheme.accent),
+                      const SizedBox(width: 4),
+                      Text('تبليغات: $announcesCount', style: GoogleFonts.cairo(fontSize: 10.5, color: AppTheme.textSecondary)),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.manage_accounts_rounded, color: AppTheme.primary, size: 22),
-                tooltip: 'إدارة الصلاحيات والترقية',
-                onPressed: () => _showPromoteDialog(rep),
-              ),
-              if (isRep && !isAdmin)
                 IconButton(
-                  icon: const Icon(Icons.person_remove_rounded, color: AppTheme.danger, size: 20),
-                  tooltip: 'سحب التكليف',
-                  onPressed: () => _confirmDemoteRep(rep),
+                  icon: const Icon(Icons.manage_accounts_rounded, color: AppTheme.primary, size: 20),
+                  tooltip: 'إدارة الصلاحيات والترقية',
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  onPressed: () => _showPromoteDialog(rep),
                 ),
-            ],
+                if (isRep && !isAdmin) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.person_remove_rounded, color: AppTheme.danger, size: 18),
+                    tooltip: 'سحب التكليف',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => _confirmDemoteRep(rep),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -984,14 +1165,7 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
                               ),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppTheme.accent.withValues(alpha: 0.2),
-                                    backgroundImage: rep.photoUrl != null && rep.photoUrl!.isNotEmpty ? NetworkImage(rep.photoUrl!) : null,
-                                    child: rep.photoUrl == null || rep.photoUrl!.isEmpty
-                                        ? const Icon(Icons.person, color: AppTheme.accent, size: 18)
-                                        : null,
-                                  ),
+                                  _buildStudentAvatar(rep, AppTheme.accent, size: 36),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
@@ -1337,8 +1511,27 @@ class _AssignBiometricRepDialogState extends State<_AssignBiometricRepDialog> {
                               selected: isSel,
                               selectedTileColor: AppTheme.primarySubtle,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              leading: ClipOval(
+                                child: s.photoUrl != null && s.photoUrl!.isNotEmpty
+                                    ? AppNetworkImage(
+                                        imageUrl: s.photoUrl!,
+                                        width: 38,
+                                        height: 38,
+                                        fit: BoxFit.cover,
+                                        errorWidget: CircleAvatar(
+                                          radius: 19,
+                                          backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                                          child: Text(s.name.isNotEmpty ? s.name[0] : 'S'),
+                                        ),
+                                      )
+                                    : CircleAvatar(
+                                        radius: 19,
+                                        backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                                        child: Text(s.name.isNotEmpty ? s.name[0] : 'S'),
+                                      ),
+                              ),
                               title: Text(s.name, style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
-                              subtitle: Text(s.id, style: GoogleFonts.cairo(fontSize: 10)),
+                              subtitle: Text('${s.id} • ${s.hasFace ? "بصمة وجه معتمدة ✓" : "بدون بصمة"}', style: GoogleFonts.cairo(fontSize: 10)),
                               trailing: isSel ? const Icon(Icons.check_circle, color: AppTheme.primary) : null,
                               onTap: () => setState(() => _selectedStudent = s),
                             );

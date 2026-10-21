@@ -136,7 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 20),
 
             // بطاقة الدخول إلى لوحة التحكم والإدارة الأكاديمية (للمشرف العام والممثلين)
-            if (_user!.isAdmin || _user!.canManageLectures || _user!.canManageAnnouncements) ...[
+            if (_user!.isAdmin) ...[
               AppTactileBounce(
                 lowerBound: 0.95,
                 borderRadius: BorderRadius.circular(AppRadius.lg),

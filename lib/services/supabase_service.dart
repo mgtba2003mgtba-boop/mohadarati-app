@@ -1920,7 +1920,7 @@ class SupabaseService {
     try {
       var query = client
           .from('app_users')
-          .select('id, student_id, name, department, stage, section, role, can_publish_lectures, can_publish_announcements, semester, created_at, updated_at');
+          .select('id, student_id, name, department, stage, section, role, can_publish_lectures, can_publish_announcements, semester, photo_url, created_at, updated_at');
 
       if (department != null && department != 'ALL') {
         query = query.eq('department', department);

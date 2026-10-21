@@ -288,7 +288,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
           ),
         ],
       ),
-      floatingActionButton: canPublish
+      floatingActionButton: (_user?.isAdmin == true)
           ? AppTactileBounce(
               lowerBound: 0.94,
               child: Container(

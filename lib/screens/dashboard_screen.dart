@@ -166,29 +166,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       _selectedAnnounceStage = _currentUser!.stage;
     }
 
-    final int tabsCount = _isMujtaba ? 3 : 2;
     int initialTab = 0;
-    if (_isMujtaba) {
-      if (widget.initialTabIndex == 1) {
-        initialTab = 0;
-        _publishModeIndex = 1; // نشر إعلان
-      } else if (widget.initialTabIndex == 2) {
-        initialTab = 1; // إدارة المقررات والطلاب
-        _courseAndUserSegmentIndex = 0;
-      } else if (widget.initialTabIndex >= 3) {
-        initialTab = 2; // رادار العمليات والمحتوى
-      } else {
-        initialTab = 0; // استوديو النشر
-        _publishModeIndex = 0;
-      }
+    if (widget.initialTabIndex == 1) {
+      initialTab = 0;
+      _publishModeIndex = 1; // نشر إعلان
+    } else if (widget.initialTabIndex == 2) {
+      initialTab = 1; // إدارة المقررات والطلاب
+      _courseAndUserSegmentIndex = 0;
+    } else if (widget.initialTabIndex >= 3) {
+      initialTab = 2; // رادار العمليات والمحتوى
     } else {
-      initialTab = widget.initialTabIndex.clamp(0, 1);
+      initialTab = 0; // استوديو النشر
+      _publishModeIndex = 0;
     }
 
     _tabController = TabController(
-      length: tabsCount,
+      length: 3,
       vsync: this,
-      initialIndex: initialTab,
+      initialIndex: initialTab.clamp(0, 2),
     );
 
     _syncLectureSubjectSelection();
@@ -605,16 +600,111 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    if (!_isMujtaba) {
+      return Scaffold(
+        backgroundColor: AppTheme.lightBg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'لوحة التحكم الإدارية',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.admin_panel_settings_rounded, size: 68, color: AppTheme.warning),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'صلاحية إدارية حصرية',
+                  style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'لوحة التحكم مخصصة حصرياً للمشرف العام للمنظومة (مجتبى عواد).\nكممثل للشعبة، يمكنك رفع المحاضرات ونشر التبليغات مباشرة من صفحة المادة داخل التطبيق.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(fontSize: 13, color: AppTheme.textSecondary, height: 1.6),
+                ),
+                const SizedBox(height: 28),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: Text('العودة للمنصة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.textPrimary),
-        title: Text(
-          _isMujtaba ? 'داش بورد المشرف العام (مجتبى عواد)' : 'لوحة ممثل الدفعة والنشر',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.shield_rounded, color: AppTheme.primary, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'مركز القيادة الأكاديمي',
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
+                  ),
+                  Text(
+                    'المشرف العام (مجتبى عواد)',
+                    style: GoogleFonts.cairo(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
+            tooltip: 'تحديث البيانات فورياً',
+            onPressed: () {
+              _loadDashboardData(forceRefresh: true, showSpinner: true);
+              _loadBanners(forceRefresh: true);
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: false,
@@ -623,30 +713,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           indicatorColor: AppTheme.primary,
           indicatorWeight: 3,
           labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12.5),
-          tabs: _isMujtaba
-              ? const [
-                  Tab(icon: Icon(Icons.cloud_upload_rounded), text: 'استوديو النشر'),
-                  Tab(icon: Icon(Icons.manage_accounts_rounded), text: 'المقررات والطلاب'),
-                  Tab(icon: Icon(Icons.radar_rounded), text: 'رادار العمليات'),
-                ]
-              : const [
-                  Tab(icon: Icon(Icons.upload_file_rounded), text: 'نشر المحاضرات'),
-                  Tab(icon: Icon(Icons.campaign_rounded), text: 'نشر إعلان'),
-                ],
+          tabs: const [
+            Tab(icon: Icon(Icons.cloud_upload_rounded), text: 'استوديو النشر'),
+            Tab(icon: Icon(Icons.manage_accounts_rounded), text: 'المقررات والطلاب'),
+            Tab(icon: Icon(Icons.radar_rounded), text: 'رادار العمليات'),
+          ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: _isMujtaba
-            ? [
-                _buildUnifiedPublishTab(),
-                _buildCourseAndDirectoryTab(),
-                _buildRadarAndModerationTab(),
-              ]
-            : [
-                _buildPublishLectureTab(),
-                _buildPublishAnnouncementTab(),
-              ],
+        children: [
+          _buildUnifiedPublishTab(),
+          _buildCourseAndDirectoryTab(),
+          _buildRadarAndModerationTab(),
+        ],
       ),
     );
   }
