@@ -36,7 +36,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
-      (_user?.name.contains('مجتبى') ?? false);
+      _user?.studentId == 'ST-NUST-001630760-413';
 
   @override
   void initState() {

@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
-      (_user?.name.contains('مجتبى') ?? false);
+      _user?.studentId == 'ST-NUST-001630760-413';
 
   String get _effectiveDept {
     final preview = AdminPreviewService();

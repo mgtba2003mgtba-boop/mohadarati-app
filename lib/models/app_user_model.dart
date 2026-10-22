@@ -39,8 +39,7 @@ class AppUserModel {
 
   bool get isAdmin =>
       role == AppConstants.roleAdmin ||
-      studentId == 'ST-NUST-001630760-413' ||
-      name.contains('مجتبى');
+      studentId == 'ST-NUST-001630760-413';
   @deprecated
   bool get isProfessor => false;
   bool get isRepresentative => role == AppConstants.roleRepresentative;
@@ -168,7 +167,6 @@ class AppUserModel {
       'section': section,
       'email': email,
       'phone': phone,
-      'pin_code': pinCode,
       'role': role,
       'can_publish_lectures': canPublishLectures,
       'can_publish_announcements': canPublishAnnouncements,

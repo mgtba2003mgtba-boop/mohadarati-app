@@ -40,7 +40,7 @@ class _TelegramAnnouncementCardState extends State<TelegramAnnouncementCard> wit
     if (user == null) return false;
     return user.isAdmin ||
         user.studentId == 'ST-NUST-001630760-413' ||
-        user.name.contains('مجتبى');
+        user.studentId == 'ST-NUST-001630760-413';
   }
 
   void _showAnnouncementModal(BuildContext context) {

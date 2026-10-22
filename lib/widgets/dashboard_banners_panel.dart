@@ -56,7 +56,7 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
     final user = widget.currentUser;
     if (user == null) return false;
     return user.studentId == 'ST-NUST-001630760-413' ||
-        user.name.contains('مجتبى') ||
+        user.isAdmin ||
         user.isAdmin;
   }
 

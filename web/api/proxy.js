@@ -47,8 +47,16 @@ function isSafeUrl(rawUrl) {
       return false;
     }
 
+    if (hostname === 'api.telegram.org') {
+      return parsed.pathname.startsWith('/file/');
+    }
+    if (hostname === 'f004.backblazeb2.com') {
+      return parsed.pathname.startsWith('/file/mujtaba-student-photos/');
+    }
+    if (hostname.endsWith('.supabase.co') && (hostname.includes('mrubdzgcjofjwirkdfwo') || hostname.includes('rlupqsmqwvidmwrvqrcc'))) {
+      return parsed.pathname.startsWith('/storage/v1/object/public/');
+    }
     if (STRICT_EXACT_DOMAINS.has(hostname)) return true;
-    if (hostname.endsWith('.supabase.co') && (hostname.includes('mrubdzgcjofjwirkdfwo') || hostname.includes('rlupqsmqwvidmwrvqrcc'))) return true;
     if (hostname.endsWith('.vercel.app') && (hostname.includes('mohadarati'))) return true;
 
     return false;

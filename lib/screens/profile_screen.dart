@@ -23,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool get _isMujtabaAdmin =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
-      (_user?.name.contains('مجتبى') ?? false);
+      _user?.studentId == 'ST-NUST-001630760-413';
 
   @override
   void initState() {
@@ -175,14 +175,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
+                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.isAdmin)
                                     ? 'داش بورد مجتبى (المشرف العام)'
                                     : 'لوحة ممثل الدفعة',
                                 style: AppTypography.h3(color: Colors.white),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.name.contains('مجتبى') || _user!.isAdmin)
+                                (_user!.studentId == 'ST-NUST-001630760-413' || _user!.isAdmin)
                                     ? 'مراقبة نشاط الممثلين وإدارة كافة تفاصيل النظام'
                                     : 'إدارة المحاضرات والتبليغات',
                                 style: AppTypography.caption(color: const Color(0xFFE0E7FF)),

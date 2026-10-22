@@ -22,7 +22,7 @@ class AdminPreviewBar extends StatelessWidget {
     if (currentUser == null) return false;
     return currentUser!.isAdmin ||
         currentUser!.studentId == 'ST-NUST-001630760-413' ||
-        currentUser!.name.contains('مجتبى');
+        currentUser!.studentId == 'ST-NUST-001630760-413';
   }
 
   @override

@@ -54,7 +54,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
-      (_user?.name.contains('مجتبى') ?? false);
+      _user?.studentId == 'ST-NUST-001630760-413';
 
   bool get _canManageCourses =>
       _isPrivileged ||

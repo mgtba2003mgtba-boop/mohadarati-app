@@ -78,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool get _isMujtaba {
     if (_currentUser == null) return false;
     return _currentUser!.studentId == 'ST-NUST-001630760-413' ||
-        _currentUser!.name.contains('مجتبى') ||
+        _currentUser!.isAdmin ||
         _currentUser!.isAdmin;
   }
 

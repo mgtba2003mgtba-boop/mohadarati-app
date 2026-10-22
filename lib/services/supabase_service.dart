@@ -32,6 +32,7 @@ class SupabaseService {
   SupabaseService._internal();
 
   final Map<String, _OtpRecord> _otpCache = {};
+  final Map<String, List<DateTime>> _loginFailures = {};
 
   // ── محرك الذاكرة المؤقتة الذكي (Smart In-Memory RAM & Persistent Cache Engine) ───
   final Map<String, dynamic> _memoryCache = {};
@@ -269,6 +270,15 @@ class SupabaseService {
     required String pinCode,
   }) async {
     try {
+      final cleanLoginId = studentId.trim().toUpperCase();
+      final now = DateTime.now();
+      final failures = (_loginFailures[cleanLoginId] ?? [])
+          .where((t) => now.difference(t) < const Duration(minutes: 5))
+          .toList();
+      if (failures.length >= 5) {
+        debugPrint('[-] Security Lockout: Too many failed login attempts for $cleanLoginId');
+        return null;
+      }
       final user = await getAppUserByStudentId(studentId);
       if (user != null) {
         final storedPin = user.pinCode?.trim() ?? '';
@@ -276,6 +286,12 @@ class SupabaseService {
 
         // حماية أمنية صارمة: تحقق مزدوج ذكي (Dual Verification) يقبل القديم والمشفر
         final isMatch = AppConstants.verifyPin(inputPin, storedPin);
+        if (!isMatch) {
+          failures.add(now);
+          _loginFailures[cleanLoginId] = failures;
+        } else {
+          _loginFailures.remove(cleanLoginId);
+        }
         if (isMatch) {
           _currentUser = user;
           _memoryCache.clear();
@@ -741,7 +757,7 @@ class SupabaseService {
 
       final isAuthorized = user.isAdmin ||
           user.studentId == 'ST-NUST-001630760-413' ||
-          user.name.contains('مجتبى') ||
+          user.isAdmin ||
           user.studentId == current.authorId;
 
       if (!isAuthorized) {
@@ -780,7 +796,7 @@ class SupabaseService {
         final user = _currentUser;
         if (user != null && row != null) {
           final authorId = row['author_id']?.toString() ?? '';
-          final isAdmin = user.role == AppConstants.roleAdmin;
+          final isAdmin = user.isAdmin;
           final isAuthor = authorId.isNotEmpty && (authorId == user.id || authorId == user.studentId);
           if (!isAdmin && !isAuthor) {
             debugPrint('[-] Security Block: User ${user.studentId} not authorized to delete announcement $id owned by $authorId');
@@ -1522,7 +1538,7 @@ class SupabaseService {
         final user = _currentUser;
         if (user != null && row != null) {
           final uploaderId = row['uploader_id']?.toString() ?? '';
-          final isAdmin = user.role == AppConstants.roleAdmin || user.isAdmin == true || user.name.contains('مجتبى');
+          final isAdmin = user.isAdmin;
           final isAuthor = uploaderId.isNotEmpty && (uploaderId == user.id || uploaderId == user.studentId);
           final isRep = user.role == AppConstants.roleRepresentative || user.isRepresentative == true;
           if (!isAdmin && !isAuthor && !isRep) {
@@ -1636,6 +1652,7 @@ class SupabaseService {
     bool canAnnouncements = true,
   }) async {
     try {
+      if (_currentUser?.isAdmin != true) return false;
       final normStage = AppConstants.normalizeStage(student.stage);
       final cleanSections = section
           .split(RegExp(r'[,،/\s]+'))
@@ -1670,7 +1687,7 @@ class SupabaseService {
           'can_publish_announcements': canAnnouncements,
           'is_approved': true,
           'photo_url': student.photoUrl,
-          'pin_code': '1234',
+          'pin_code': AppConstants.hashPin('1234'),
         });
       }
       return true;
@@ -1682,6 +1699,7 @@ class SupabaseService {
 
   /// ── سحب التكليف من ممثل وإعادته إلى رتبة طالب ──────────────────────────
   Future<bool> revokeRepresentative(String studentId) async {
+    if (_currentUser?.isAdmin != true) return false;
     try {
       await client.from('app_users').update({
         'role': AppConstants.roleStudent,
@@ -1968,6 +1986,7 @@ class SupabaseService {
     String? department,
   }) async {
     try {
+      if (_currentUser?.isAdmin != true) return false;
       final Map<String, dynamic> updateData = {
         'role': role,
         'can_publish_lectures': canPublishLectures,

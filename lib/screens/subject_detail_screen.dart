@@ -108,7 +108,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
       _user?.studentId == 'ST-NUST-001630760-413' ||
-      (_user?.name.contains('مجتبى') ?? false);
+      _user?.studentId == 'ST-NUST-001630760-413';
 
   String get _effectiveDepartment {
     final preview = AdminPreviewService();
@@ -131,7 +131,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         _user!.canManageLectures ||
         _user!.canManageAnnouncements ||
         _user!.isRepresentative ||
-        _user!.name.contains('مجتبى') ||
+        _user!.isRepresentative ||
         _user!.studentId == 'ST-NUST-001630760-413';
   }
 

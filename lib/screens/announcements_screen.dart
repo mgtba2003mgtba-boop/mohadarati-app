@@ -194,7 +194,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
         u.isRepresentative ||
         u.canManageAnnouncements ||
         u.canPublishAnnouncements ||
-        u.name.contains('مجتبى') ||
+        u.canPublishAnnouncements ||
         u.studentId == 'ST-NUST-001630760-413';
   }
 
