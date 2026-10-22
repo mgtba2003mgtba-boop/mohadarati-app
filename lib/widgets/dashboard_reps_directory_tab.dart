@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_constants.dart';
@@ -35,6 +36,33 @@ class DashboardRepsDirectoryTab extends StatefulWidget {
 }
 
 class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
+  Map<String, int> _lectureCounts = const {};
+  Map<String, int> _announcementCounts = const {};
+  Timer? _searchDebounceTimer;
+
+  void _recomputeCounts() {
+    final lc = <String, int>{};
+    for (final l in widget.allLectures) {
+      if (l.uploaderId.isNotEmpty) {
+        lc[l.uploaderId] = (lc[l.uploaderId] ?? 0) + 1;
+      }
+    }
+    final ac = <String, int>{};
+    for (final a in widget.allAnnouncements) {
+      if (a.authorId.isNotEmpty) {
+        ac[a.authorId] = (ac[a.authorId] ?? 0) + 1;
+      }
+    }
+    _lectureCounts = lc;
+    _announcementCounts = ac;
+  }
+
+  void _onSearchChanged(String val) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted) setState(() => _repSearchQuery = val);
+    });
+  }
   final Map<String, String?> _photoCache = {};
   final Set<String> _pendingPhotoRequests = {};
 
@@ -183,7 +211,23 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
   @override
   void initState() {
     super.initState();
+    _recomputeCounts();
     _loadBiometricSections();
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardRepsDirectoryTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allLectures != widget.allLectures ||
+        oldWidget.allAnnouncements != widget.allAnnouncements) {
+      _recomputeCounts();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchDebounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadBiometricSections() async {
@@ -720,8 +764,8 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
       avatarColor = AppTheme.accent;
     }
 
-    final lecturesCount = widget.allLectures.where((l) => l.uploaderId == rep.studentId).length;
-    final announcesCount = widget.allAnnouncements.where((a) => a.authorId == rep.studentId).length;
+    final lecturesCount = _lectureCounts[rep.studentId] ?? 0;
+    final announcesCount = _announcementCounts[rep.studentId] ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -954,9 +998,17 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
       return matchDept && matchStage && matchSearch;
     }).toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
+    final int displayedCount = filtered.length > _directoryDisplayLimit ? _directoryDisplayLimit : filtered.length;
+    final bool hasMore = filtered.length > _directoryDisplayLimit;
+
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
         // بطاقة إدارة وتكليف ممثلي الشُعب
         Container(
           padding: const EdgeInsets.all(16),
@@ -1311,7 +1363,7 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
 
         TextField(
           style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13),
-          onChanged: (val) => setState(() => _repSearchQuery = val),
+          onChanged: _onSearchChanged,
           decoration: InputDecoration(
             hintText: 'ابحث بالاسم، المعرف الجامعي (ST-...)، الشعبة، أو القسم...',
             hintStyle: GoogleFonts.cairo(color: const Color(0xFF64748B), fontSize: 12),
@@ -1399,24 +1451,50 @@ class _DashboardRepsDirectoryTabState extends State<DashboardRepsDirectoryTab> {
         ),
         const SizedBox(height: 14),
 
+              ],
+            ),
+          ),
+        ),
         if (filtered.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.lightBorder)),
-            child: Center(child: Text('لم يتم العثور على طلاب أو ممثلين مطابقين للبحث', style: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13))),
-          )
-        else ...[
-          ...filtered.take(_directoryDisplayLimit).map((user) => _buildRepCard(user)),
-          if (filtered.length > _directoryDisplayLimit)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                onPressed: () => setState(() => _directoryDisplayLimit += 50),
-                child: Text('عرض المزيد (${filtered.length - _directoryDisplayLimit} طالب إضافي)', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.lightBorder)),
+                child: Center(child: Text('لم يتم العثور على طلاب أو ممثلين مطابقين للبحث', style: GoogleFonts.cairo(color: AppTheme.textMuted, fontSize: 13))),
               ),
             ),
-        ],
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            sliver: SliverList.builder(
+              itemCount: displayedCount + (hasMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index < displayedCount) {
+                  return RepaintBoundary(
+                    key: ValueKey('rep_' + filtered[index].id),
+                    child: _buildRepCard(filtered[index]),
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => setState(() => _directoryDisplayLimit += 50),
+                    child: Text(
+                      'عرض المزيد (' + (filtered.length - _directoryDisplayLimit).toString() + ' طالب إضافي)',
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
       ],
     );
   }

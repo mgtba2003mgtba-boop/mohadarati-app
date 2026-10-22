@@ -6,6 +6,7 @@ const STRICT_EXACT_DOMAINS = new Set([
   'quickchart.io',
   'mrubdzgcjofjwirkdfwo.supabase.co',
   'rlupqsmqwvidmwrvqrcc.supabase.co',
+  'f004.backblazeb2.com',
   'mohadarati.vercel.app',
   'mohadarati-app.vercel.app',
 ]);
