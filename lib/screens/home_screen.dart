@@ -622,17 +622,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   final announcement = banners[index];
                   final imageSrc = announcement.imageUrl!;
 
-                  final rawTitle = announcement.title;
-                  final rawContent = announcement.displayContent;
+                  final rawTitle = announcement.title.trim();
+                  final rawContent = announcement.displayContent.trim();
 
-                  final isBoilerplate = rawContent.contains('إعلان وبوستر رسمي') ||
+                  final isBoilerplateContent = rawContent.contains('إعلان وبوستر رسمي') ||
                       rawContent.contains('إعلان بوستر رسمي') ||
                       rawContent.contains('بوستر رسمي') ||
-                      rawContent.trim() == '[HOME_BANNER]' ||
-                      rawContent.toLowerCase().trim() == 'home banner' ||
-                      rawContent.toLowerCase().trim() == 'home_banner' ||
-                      rawContent.toLowerCase().trim() == 'banner';
-                  final content = isBoilerplate
+                      rawContent == '[HOME_BANNER]' ||
+                      rawContent.toLowerCase() == 'home banner' ||
+                      rawContent.toLowerCase() == 'home_banner' ||
+                      rawContent.toLowerCase() == 'banner';
+
+                  final content = isBoilerplateContent
                       ? ''
                       : rawContent
                           .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
@@ -643,18 +644,28 @@ class _HomeScreenState extends State<HomeScreen> {
                           .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
                           .trim();
 
-                  String title = rawTitle
-                      .replaceAll('إعلان وبوستر رسمي', '')
-                      .replaceAll('إعلان بوستر رسمي', '')
-                      .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
-                      .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
-                      .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
-                      .trim();
-                  if (title.isEmpty || RegExp(r'^\d+$').hasMatch(title)) {
-                    title = 'الكلية التقنية الهندسية';
-                  }
+                  final isBoilerplateTitle = rawTitle == 'الكلية التقنية الهندسية' ||
+                      rawTitle == 'بوستر رسمي' ||
+                      rawTitle == 'إعلان وبوستر رسمي' ||
+                      rawTitle == 'إعلان بوستر رسمي' ||
+                      rawTitle.toLowerCase() == 'banner' ||
+                      rawTitle.toLowerCase() == 'home banner' ||
+                      RegExp(r'^(?:photo[_\d]*|\d+|image[_\d]*)$', caseSensitive: false).hasMatch(rawTitle);
 
-                  final isPureBanner = content.isEmpty || isBoilerplate;
+                  final title = isBoilerplateTitle
+                      ? ''
+                      : rawTitle
+                          .replaceAll('إعلان وبوستر رسمي في الواجهة الرئيسية', '')
+                          .replaceAll('إعلان وبوستر رسمي', '')
+                          .replaceAll('إعلان بوستر رسمي', '')
+                          .replaceAll('بوستر رسمي', '')
+                          .replaceAll('الكلية التقنية الهندسية', '')
+                          .replaceAll(RegExp(r'\[?HOME_BANNER\]?', caseSensitive: false), '')
+                          .replaceAll(RegExp(r'\[?BANNER\]?', caseSensitive: false), '')
+                          .replaceAll(RegExp(r'\bhome[\s_]*banner\b', caseSensitive: false), '')
+                          .trim();
+
+                  final hasOverlayText = title.isNotEmpty || content.isNotEmpty;
 
                   return IgnorePointer(
                     ignoring: true,
@@ -689,63 +700,64 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
 
-                            // 4. تدرج زجاجي سفلي مع نصوص واضحة وزر تكبير تفاعلي
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                padding: const EdgeInsets.fromLTRB(14, 28, 14, 12),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.black.withValues(alpha: 0.85),
-                                      Colors.black.withValues(alpha: 0.35),
-                                      Colors.transparent,
+                            // 4. تدرج زجاجي سفلي مع نصوص واضحة (يظهر فقط إذا أدخل الناشر نصاً فعلياً)
+                            if (hasOverlayText)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(14, 28, 14, 12),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.85),
+                                        Colors.black.withValues(alpha: 0.35),
+                                        Colors.transparent,
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (title.isNotEmpty)
+                                              Text(
+                                                title,
+                                                style: GoogleFonts.cairo(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                  shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            if (content.isNotEmpty) ...[
+                                              if (title.isNotEmpty) const SizedBox(height: 1),
+                                              Text(
+                                                content,
+                                                style: GoogleFonts.cairo(
+                                                  fontSize: 10.5,
+                                                  color: const Color(0xFFE2E8F0),
+                                                  shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     ],
-                                    begin: Alignment.bottomCenter,
-                                    end: Alignment.topCenter,
                                   ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            title,
-                                            style: GoogleFonts.cairo(
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                              shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (!isPureBanner && content.isNotEmpty) ...[
-                                            const SizedBox(height: 1),
-                                            Text(
-                                              content,
-                                              style: GoogleFonts.cairo(
-                                                fontSize: 10.5,
-                                                color: const Color(0xFFE2E8F0),
-                                                shadows: const [Shadow(blurRadius: 4, color: Colors.black87)],
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-
-                                  ],
-                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),

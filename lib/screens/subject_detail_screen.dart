@@ -1085,49 +1085,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     const SizedBox(width: 6),
                     _buildSectionBadge(lecture.section),
                   ],
-                  if (LectureUxService.instance.isLectureNew(lecture)) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF6EE7B7)),
-                      ),
-                      child: Text(
-                        'جديد ✨',
-                        style: GoogleFonts.cairo(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF047857),
-                        ),
-                      ),
-                    ),
-                  ],
                   if (LectureUxService.instance.isLectureCached(lecture.id)) ...[
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFBBF7D0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.offline_pin_rounded, size: 11, color: Color(0xFF16A34A)),
-                          const SizedBox(width: 3),
-                          Text(
-                            'متاح بدون إنترنت',
-                            style: GoogleFonts.cairo(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF15803D),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const Tooltip(
+                      message: 'متاح للفتح بدون إنترنت',
+                      child: Icon(Icons.offline_pin_rounded, size: 16, color: Color(0xFF16A34A)),
                     ),
                   ],
                 ],

@@ -525,18 +525,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
 
     final hasOverride = item.override != null;
-    final unreadCount = LectureUxService.instance.getUnreadLecturesCount(
-      item.originalName,
-      _lectures,
-      displayName: item.displayName,
-    );
-    final totalLecturesCount = _lectures
-        .where((l) => AppConstants.matchesSubject(
-              l.subjectName,
-              item.originalName,
-              displayName: item.displayName,
-            ))
-        .length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -620,32 +608,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             ),
                           ),
                         ],
-                        if (unreadCount > 0) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF6EE7B7)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.auto_awesome_rounded, size: 11, color: Color(0xFF059669)),
-                                const SizedBox(width: 3),
-                                Text(
-                                  unreadCount == 1 ? 'ملزمة جديدة' : '$unreadCount ملازم جديدة',
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF047857),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                         if (item.code != null) ...[
                           const SizedBox(width: 8),
                           Container(
@@ -677,55 +639,29 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    if (subModel?.units != null || totalLecturesCount > 0) ...[
+                    if (subModel?.units != null) ...[
                       const SizedBox(height: 5),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
+                      Row(
                         children: [
-                          if (subModel?.units != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${subModel!.units} وحدات',
-                                    style: AppTypography.tiny(color: const Color(0xFF475569)),
-                                  ),
-                                ],
-                              ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                          if (totalLecturesCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primarySubtle,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.menu_book_rounded, size: 11, color: AppTheme.primary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '$totalLecturesCount محاضرة',
-                                    style: GoogleFonts.cairo(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${subModel!.units} وحدات',
+                                  style: AppTypography.tiny(color: const Color(0xFF475569)),
+                                ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
                     ],

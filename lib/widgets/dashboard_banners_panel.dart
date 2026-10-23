@@ -147,17 +147,6 @@ class _DashboardBannersPanelState extends State<DashboardBannersPanel> {
       return;
     }
     String title = _bannerTitleController.text.trim();
-    if (title.isEmpty) {
-      if (_selectedBannerImage != null) {
-        final nameWithoutExt = _selectedBannerImage!.name.contains('.')
-            ? _selectedBannerImage!.name.substring(0, _selectedBannerImage!.name.lastIndexOf('.'))
-            : _selectedBannerImage!.name;
-        final clean = nameWithoutExt.replaceAll(RegExp(r'[_-]'), ' ').trim();
-        title = clean.isNotEmpty ? clean : 'بوستر رسمي';
-      } else {
-        title = 'بوستر رسمي';
-      }
-    }
 
     setState(() => _isLoading = true);
 
