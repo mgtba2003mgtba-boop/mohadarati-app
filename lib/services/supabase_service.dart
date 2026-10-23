@@ -32,6 +32,9 @@ class SupabaseService {
   SupabaseService._internal();
 
   final Map<String, _OtpRecord> _otpCache = {};
+
+  /// مخطر تفاعلي يُطلق أحدث قائمة إعلانات فور وصولها من السيرفر في الخلفية
+  final ValueNotifier<List<AnnouncementModel>?> announcementsNotifier = ValueNotifier(null);
   final Map<String, List<DateTime>> _loginFailures = {};
 
   // ── محرك الذاكرة المؤقتة الذكي (Smart In-Memory RAM & Persistent Cache Engine) ───
@@ -60,7 +63,14 @@ class SupabaseService {
         final decoded = jsonDecode(raw);
         final data = fromJson(decoded);
         _memoryCache[key] = data;
-        _cacheTimestamps[key] = DateTime.now();
+
+        // استرجاع الطابع الزمني الحقيقي للكاش لمنع تزييفه وضمان التحديث في الخلفية
+        final tsRaw = prefs.getString('cache_ts_$key');
+        if (tsRaw != null && tsRaw.isNotEmpty) {
+          _cacheTimestamps[key] = DateTime.tryParse(tsRaw) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        } else {
+          _cacheTimestamps[key] = DateTime.fromMillisecondsSinceEpoch(0);
+        }
         return data;
       }
     } catch (e) {
@@ -76,11 +86,13 @@ class SupabaseService {
     required dynamic Function() toJson,
   }) async {
     try {
+      final now = DateTime.now();
       _memoryCache[key] = rawData;
-      _cacheTimestamps[key] = DateTime.now();
+      _cacheTimestamps[key] = now;
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cache_$key', jsonEncode(toJson()));
+      await prefs.setString('cache_ts_$key', now.toIso8601String());
     } catch (e) {
       debugPrint('[-] Cache write error for $key: $e');
     }
@@ -91,7 +103,7 @@ class SupabaseService {
     _memoryCache.removeWhere((k, _) => k.contains(pattern));
     _cacheTimestamps.removeWhere((k, _) => k.contains(pattern));
     SharedPreferences.getInstance().then((prefs) {
-      final keys = prefs.getKeys().where((k) => k.startsWith('cache_') && k.contains(pattern)).toList();
+      final keys = prefs.getKeys().where((k) => (k.startsWith('cache_') || k.startsWith('cache_ts_')) && k.contains(pattern)).toList();
       for (final k in keys) {
         prefs.remove(k);
       }
@@ -499,7 +511,7 @@ class SupabaseService {
       if (cached != null && cached.isNotEmpty) {
         // تحديث في الخلفية دون تجميد واجهة المستخدم
         final ts = _cacheTimestamps[cacheKey];
-        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+        if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 30)) {
           _fetchFreshAnnouncementsAndCache(department: department, stage: stage, section: section, cacheKey: cacheKey)
               .catchError((_) => <AnnouncementModel>[]);
         }
@@ -573,6 +585,9 @@ class SupabaseService {
         rawData: list,
         toJson: () => list.map((a) => a.toCacheJson()).toList(),
       );
+
+      // مخطر تفاعلي يُطلق أحدث قائمة إعلانات فور وصولها من السيرفر في الخلفية
+      announcementsNotifier.value = list;
 
       return list;
     } catch (e) {

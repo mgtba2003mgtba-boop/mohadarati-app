@@ -43,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _bannerTimer;
   int _currentBannerPage = 0;
   Timer? _resumeBannerTimer;
+  StreamSubscription<AnnouncementModel>? _announcementInsertSub;
+  StreamSubscription<AnnouncementModel>? _announcementUpdateSub;
 
   // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد وصور التبليغات والجداول)
   List<AnnouncementModel>? _cachedBanners;
@@ -92,6 +94,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _bannerController = PageController(viewportFraction: 1.0);
     AdminPreviewService().addListener(_onAdminPreviewChanged);
+    SupabaseService().announcementsNotifier.addListener(_onFreshAnnouncementsReceived);
+    _announcementInsertSub = AppNotificationService.instance.announcementInsertStream.listen(_handleLiveAnnouncement);
+    _announcementUpdateSub = AppNotificationService.instance.announcementUpdateStream.listen(_handleLiveAnnouncementUpdate);
     _loadData().then((_) {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,9 +114,61 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) _loadData(forceRefresh: true);
   }
 
+  void _onFreshAnnouncementsReceived() {
+    final fresh = SupabaseService().announcementsNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _announcements = fresh;
+        _cachedBanners = null;
+      });
+      _startBannerTimer(_carouselBanners.length);
+      _precacheBanners(_carouselBanners);
+    }
+  }
+
+  void _handleLiveAnnouncement(AnnouncementModel newAnn) {
+    if (!mounted) return;
+    final effectiveDept = _effectiveDept;
+    final effectiveStage = _effectiveStage;
+    final matchDept = newAnn.department == 'ALL' || newAnn.department == effectiveDept;
+    final matchStage = newAnn.stage == 'ALL' ||
+        AppConstants.getStageAliases(effectiveStage).contains(newAnn.stage) ||
+        newAnn.stage == effectiveStage;
+
+    if (matchDept && matchStage) {
+      setState(() {
+        final existingIdx = _announcements.indexWhere((a) => a.id == newAnn.id);
+        if (existingIdx >= 0) {
+          _announcements[existingIdx] = newAnn;
+        } else {
+          _announcements.insert(0, newAnn);
+        }
+        _cachedBanners = null;
+      });
+      _startBannerTimer(_carouselBanners.length);
+      _precacheBanners(_carouselBanners);
+    }
+  }
+
+  void _handleLiveAnnouncementUpdate(AnnouncementModel updatedAnn) {
+    if (!mounted) return;
+    setState(() {
+      final existingIdx = _announcements.indexWhere((a) => a.id == updatedAnn.id);
+      if (existingIdx >= 0) {
+        _announcements[existingIdx] = updatedAnn;
+      }
+      _cachedBanners = null;
+    });
+    _startBannerTimer(_carouselBanners.length);
+    _precacheBanners(_carouselBanners);
+  }
+
   @override
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
+    SupabaseService().announcementsNotifier.removeListener(_onFreshAnnouncementsReceived);
+    _announcementInsertSub?.cancel();
+    _announcementUpdateSub?.cancel();
     _bannerTimer?.cancel();
     _resumeBannerTimer?.cancel();
     _bannerController.dispose();
