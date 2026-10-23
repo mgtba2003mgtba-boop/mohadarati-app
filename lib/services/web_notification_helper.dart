@@ -9,6 +9,10 @@ Future<bool> requestWebNotificationPermission() =>
 String getWebNotificationPermissionStatus() =>
     impl.getWebNotificationPermissionStatus();
 
+/// فحص هل إشعارات الجهاز مفعلة وممنوحة
+Future<bool> areDeviceNotificationsEnabled() =>
+    impl.areDeviceNotificationsEnabled();
+
 /// إرسال إشعار نظام حقيقي متعدد المنصات
 void showWebNotification({
   required String title,

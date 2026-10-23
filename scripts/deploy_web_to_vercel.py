@@ -28,8 +28,8 @@ if os.path.exists(api_dst):
 shutil.copytree(api_src, api_dst)
 print("[+] Copied api/ folder")
 
-# 3. Ensure static web files, mobileconfig, pdf_viewer, and media
-for f in ["mohadarati.mobileconfig", "ios_install_guide.gif", "ios_install_guide.mp4", "pdf_viewer.html", "favicon.png", "manifest.json"]:
+# 3. Ensure static web files, mobileconfig, pdf_viewer, sw-notify, and media
+for f in ["mohadarati.mobileconfig", "ios_install_guide.gif", "ios_install_guide.mp4", "pdf_viewer.html", "favicon.png", "manifest.json", "sw-notify.js"]:
     src_f = os.path.join(WEB_SRC, f)
     if os.path.exists(src_f):
         shutil.copy2(src_f, os.path.join(BUILD_WEB, f))

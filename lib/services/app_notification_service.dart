@@ -32,8 +32,9 @@ class AppNotificationItem {
 
 /// ── خدمة الإشعارات والتنبيهات المباشرة للآيفون والأندرويد ────────────────
 /// ترصد المنشورات والمحاضرات الجديدة فور نشرها في السحابة عبر Supabase Realtime،
-/// وتُصدر إشعارات نظام حقيقية على الهاتف وبانرات داخل التطبيق.
-class AppNotificationService {
+/// وتُصدر إشعارات نظام حقيقية على الهاتف وبانرات تفاعلية داخل التطبيق،
+/// مع محرك استدراك ذكي (Delta Catch-Up Engine) عند فتح التطبيق أو عودته للواجهة.
+class AppNotificationService with WidgetsBindingObserver {
   static final AppNotificationService instance = AppNotificationService._internal();
   factory AppNotificationService() => instance;
   AppNotificationService._internal();
@@ -52,16 +53,20 @@ class AppNotificationService {
 
   RealtimeChannel? _realtimeChannel;
   bool _isSubscribed = false;
+  Timer? _heartbeatTimer;
+  bool _isCheckingDelta = false;
 
   /// إظهار إشعار عائم أعلى الشاشة يدوياً (للتحديثات أو التنبيهات الفورية)
   void showInAppNotification(AppNotificationItem item) {
     _notificationController.add(item);
   }
 
-  /// تهيئة الاتصال المباشر بالقناة السحابية
+  /// تهيئة الاتصال المباشر بالقناة السحابية ومراقبة دورة حياة التطبيق
   void initialize() {
     if (_isSubscribed) return;
     _isSubscribed = true;
+
+    WidgetsBinding.instance.addObserver(this);
 
     try {
       final client = Supabase.instance.client;
@@ -99,15 +104,92 @@ class AppNotificationService {
 
       _realtimeChannel!.subscribe();
       debugPrint('[+] AppNotificationService: Subscribed to live announcements & lectures');
+
+      // فحص الاستدراك الفوري بعد اكتمال تهيئة الإطار (First Frame)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        checkMissedNotifications();
+      });
+
+      // مؤقت نبضي خفيف كل 75 ثانية كضمان إضافي في ظروف الشبكة المتذبذبة
+      _heartbeatTimer = Timer.periodic(const Duration(seconds: 75), (_) {
+        checkMissedNotifications();
+      });
     } catch (e) {
       debugPrint('[-] AppNotificationService initialization error: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // عند فتح الهاتف أو العودة للتطبيق: فحص هل نُشرت تبليغات أو محاضرات أثناء إغلاق التطبيق
+      checkMissedNotifications();
+    }
+  }
+
+  /// محرك استدراك الأحداث المتأخرة (Delta Catch-Up Engine)
+  /// يضمن وصول الإشعارات للطالب حتى لو كان هاتفه مقفولاً أو التطبيق مغلقاً عند النشر
+  Future<void> checkMissedNotifications() async {
+    if (_isCheckingDelta) return;
+    _isCheckingDelta = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastAnnId = prefs.getString('last_notified_ann_id');
+      final lastLecId = prefs.getString('last_notified_lec_id');
+
+      final client = Supabase.instance.client;
+
+      // 1. استعلام أحدث التبليغات
+      final annRes = await client
+          .from('announcements')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(3);
+
+      if (annRes is List && annRes.isNotEmpty) {
+        final latestAnn = annRes.first as Map<String, dynamic>;
+        final latestId = latestAnn['id']?.toString() ?? '';
+
+        if (lastAnnId == null) {
+          // أول تشغيل للتطبيق: حفظ المعرف كعلامة مرجعية دون إزعاج الطالب بتنبيهات قديمة
+          await prefs.setString('last_notified_ann_id', latestId);
+        } else if (latestId.isNotEmpty && latestId != lastAnnId) {
+          // وُجد تبليغ جديد لم يُشعَر به الطالب بعد!
+          await prefs.setString('last_notified_ann_id', latestId);
+          _handleNewAnnouncement(latestAnn);
+        }
+      }
+
+      // 2. استعلام أحدث المحاضرات
+      final lecRes = await client
+          .from('lectures')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(3);
+
+      if (lecRes is List && lecRes.isNotEmpty) {
+        final latestLec = lecRes.first as Map<String, dynamic>;
+        final latestId = latestLec['id']?.toString() ?? '';
+
+        if (lastLecId == null) {
+          await prefs.setString('last_notified_lec_id', latestId);
+        } else if (latestId.isNotEmpty && latestId != lastLecId) {
+          await prefs.setString('last_notified_lec_id', latestId);
+          _handleNewLecture(latestLec);
+        }
+      }
+    } catch (e) {
+      debugPrint('[-] Delta catch-up error: $e');
+    } finally {
+      _isCheckingDelta = false;
     }
   }
 
   void _handleNewAnnouncement(Map<String, dynamic> record) {
     try {
       final subjectName = record['subject_name']?.toString() ?? '';
-      final content = record['content']?.toString() ?? '';
+      final content = record['content']?.toString()?.trim() ?? '';
       final isInternal = subjectName == 'LECTURE_NOTE' ||
           content.contains('[LECTURE_NOTE_V1]') ||
           subjectName == 'SCHEDULE' ||
@@ -118,7 +200,9 @@ class AppNotificationService {
           content.contains('[COURSE_OVERRIDE');
       if (isInternal) return;
 
-      final title = record['title']?.toString() ?? 'إعلان جديد';
+      final rawTitle = record['title']?.toString()?.trim() ?? '';
+      // عنوان ذكي أنيق للإشعار في حال كان البوستر مصوراً بدون نصوص
+      final title = rawTitle.isNotEmpty ? rawTitle : '📌 إعلان وتبليغ رسمي جديد';
       final id = record['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
 
       try {
@@ -137,10 +221,14 @@ class AppNotificationService {
 
       _notificationController.add(notif);
 
+      // تحديث المعرف المرجعي في الذاكرة
+      SharedPreferences.getInstance().then((p) => p.setString('last_notified_ann_id', id));
+
       // إشعار نظام حقيقي على الجهاز (آيفون وأندرويد)
+      final bodyText = content.isNotEmpty ? content : 'تم نشر إعلان رسمي مصور في المنظومة الأكاديمية.';
       showWebNotification(
-        title: '📢 تبليغ جديد: $title',
-        body: content.isNotEmpty ? content : 'تم نشر تبليغ رسمي جديد في المنظومة الأكاديمية.',
+        title: '📢 $title',
+        body: bodyText,
         tag: 'ann_$id',
       );
     } catch (e) {
@@ -172,8 +260,8 @@ class AppNotificationService {
 
   void _handleNewLecture(Map<String, dynamic> record) {
     try {
-      final title = record['title']?.toString() ?? 'محاضرة جديدة';
-      final subjectName = record['subject_name']?.toString() ?? '';
+      final title = record['title']?.toString()?.trim() ?? 'محاضرة دراسية جديدة';
+      final subjectName = record['subject_name']?.toString()?.trim() ?? '';
       final id = record['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
 
       try {
@@ -184,7 +272,7 @@ class AppNotificationService {
 
       final notif = AppNotificationItem(
         id: id,
-        title: subjectName.isNotEmpty ? '📚 محاضرة: $subjectName' : '📚 محاضرة جديدة',
+        title: subjectName.isNotEmpty ? '📚 مادة: $subjectName' : '📚 محاضرة جديدة',
         message: title,
         type: AppNotificationType.lecture,
         targetId: id,
@@ -192,12 +280,13 @@ class AppNotificationService {
 
       _notificationController.add(notif);
 
+      // تحديث المعرف المرجعي في الذاكرة
+      SharedPreferences.getInstance().then((p) => p.setString('last_notified_lec_id', id));
+
       // إشعار نظام حقيقي على الجهاز (آيفون وأندرويد)
       showWebNotification(
-        title: '📚 محاضرة جديدة: $title',
-        body: subjectName.isNotEmpty
-            ? 'تم رفع محاضرة جديدة لمادة $subjectName'
-            : 'تم رفع محاضرة دراسية جديدة في المنظومة.',
+        title: subjectName.isNotEmpty ? '📚 محاضرة: $subjectName' : '📚 محاضرة دراسية جديدة',
+        body: 'تم رفع محاضرة جديدة: $title',
         tag: 'lec_$id',
       );
     } catch (e) {
@@ -205,24 +294,34 @@ class AppNotificationService {
     }
   }
 
-  /// طلب صلاحية الإشعارات وتفعيلها
+  /// طلب صلاحية الإشعارات وتفعيلها فورياً
+  /// يتم استدعاء دالة النظام فوراً لحفظ رمز نقرة المستخدم (User Activation Token) على iOS WebKit
   Future<bool> requestPermission() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notifications_prompted', true);
+    // 1. إطلاق طلب صلاحية النظام فوراً دون أي await مسبق
+    final requestFuture = requestWebNotificationPermission();
 
-    bool granted = true;
-    if (kIsWeb) {
-      granted = await requestWebNotificationPermission();
-    }
+    // 2. تحديث التفضيلات في الخلفية
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notifications_prompted', true);
+    } catch (_) {}
 
-    await prefs.setBool('notifications_enabled', granted);
+    final granted = await requestFuture;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notifications_enabled', granted);
+    } catch (_) {}
+
     return granted;
   }
 
-  /// فحص هل الإشعارات مفعلة
+  /// فحص هل الإشعارات مفعلة وممنوحة على الجهاز
   Future<bool> areNotificationsEnabled() async {
+    final deviceEnabled = await areDeviceNotificationsEnabled();
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('notifications_enabled') ?? true;
+    final prefEnabled = prefs.getBool('notifications_enabled') ?? true;
+    return deviceEnabled && prefEnabled;
   }
 
   /// عرض نافذة الترحيب بطلب تفعيل الإشعارات إذا لم يسبق طلبها
@@ -364,6 +463,8 @@ class AppNotificationService {
   }
 
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _heartbeatTimer?.cancel();
     _realtimeChannel?.unsubscribe();
     _notificationController.close();
     _announcementInsertController.close();

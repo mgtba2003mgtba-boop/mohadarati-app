@@ -6,7 +6,10 @@ import 'dart:js' as js;
 /// طلب إذن الإشعارات من متصفح الآيفون أو الأندرويد في بيئة الويب PWA
 Future<bool> requestWebNotificationPermission() async {
   try {
-    if (html.Notification.supported) {
+    if (js.context.hasProperty('requestAppNotificationPermission')) {
+      final res = await js.context.callMethod('requestAppNotificationPermission');
+      return res == true;
+    } else if (html.Notification.supported) {
       final perm = await html.Notification.requestPermission();
       return perm == 'granted';
     }
@@ -24,6 +27,16 @@ String getWebNotificationPermissionStatus() {
     }
   } catch (_) {}
   return 'unsupported';
+}
+
+/// فحص دقيق هل الإشعارات مقبولة ومفعلة في المتصفح
+Future<bool> areDeviceNotificationsEnabled() async {
+  try {
+    if (html.Notification.supported) {
+      return html.Notification.permission == 'granted';
+    }
+  } catch (_) {}
+  return false;
 }
 
 /// إرسال إشعار نظام حقيقي على شاشة القفل ومركز الإشعارات في الهاتف
