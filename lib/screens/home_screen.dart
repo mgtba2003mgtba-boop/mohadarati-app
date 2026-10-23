@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _bannerController = PageController(viewportFraction: 0.92);
+    _bannerController = PageController(viewportFraction: 1.0);
     AdminPreviewService().addListener(_onAdminPreviewChanged);
     _loadData().then((_) {
       if (mounted) {
@@ -485,9 +485,12 @@ class _HomeScreenState extends State<HomeScreen> {
             onPointerDown: (_) => _pauseBannerAutoScroll(),
             onPointerUp: (_) => _resumeBannerAutoScroll(),
             onPointerCancel: (_) => _resumeBannerAutoScroll(),
-            child: SizedBox(
-              height: 200,
-              child: PageView.builder(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bannerHeight = (constraints.maxWidth * 9 / 16).clamp(185.0, 235.0);
+                return SizedBox(
+                  height: bannerHeight,
+                  child: PageView.builder(
                 controller: _bannerController,
                 physics: const BouncingScrollPhysics(),
                 itemCount: banners.length,
@@ -533,7 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return IgnorePointer(
                     ignoring: true,
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                      margin: EdgeInsets.zero,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: AppTheme.lightBorder.withValues(alpha: 0.8), width: 1),
@@ -544,33 +547,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            // 1. طبقة الخلفية الضبابية المحيطية (Atmospheric Ambient Blurred Backdrop)
+                            // 1. طبقة خلفية داكنة أنيقة
                             Positioned.fill(
-                              child: ImageFiltered(
-                                imageFilter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                                child: Transform.scale(
-                                  scale: 1.18,
-                                  child: AppNetworkImage(
-                                    imageUrl: imageSrc,
-                                    fit: BoxFit.cover,
-                                    errorWidget: Container(color: const Color(0xFF0F172A)),
-                                  ),
-                                ),
-                              ),
+                              child: Container(color: const Color(0xFF0F172A)),
                             ),
 
-                            // 2. تظليل تباين معتم لتثبيت الألوان
+                            // 2. الصورة الأساسية تملأ البانر بالكامل من الحافة إلى الحافة
                             Positioned.fill(
-                              child: Container(
-                                color: Colors.black.withValues(alpha: 0.32),
-                              ),
-                            ),
-
-                            // 3. الصورة الأصلية الحادة كاملة دون أي قص للأطراف (Full Aspect-Preserved Artwork)
-                            Center(
                               child: AppNetworkImage(
                                 imageUrl: imageSrc,
-                                fit: BoxFit.contain,
+                                fit: BoxFit.cover,
                                 placeholder: const Center(
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
                                 ),
@@ -644,6 +630,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+                );
+              },
             ),
           ),
           if (banners.length > 1) ...[

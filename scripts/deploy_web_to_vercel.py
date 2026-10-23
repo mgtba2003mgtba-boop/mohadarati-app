@@ -8,6 +8,11 @@ WEB_SRC = os.path.join(PROJECT_ROOT, "web")
 
 # Read token from environment variable if provided
 token = os.environ.get("GITHUB_TOKEN") or os.environ.get("VERCEL_DEPLOY_TOKEN")
+if not token:
+    token_file = os.path.join(os.path.dirname(__file__), ".deploy_token")
+    if os.path.exists(token_file):
+        with open(token_file, "r") as f:
+            token = f.read().strip()
 
 print(f"[*] Preparing Vercel deployment from: {BUILD_WEB}")
 
@@ -136,6 +141,9 @@ if not os.path.exists(git_dir):
 elif token:
     remote_url = f"https://x-access-token:{token}@github.com/mgtba2003mgtba-boop/mohadarati.git"
     subprocess.run(["git", "remote", "set-url", "origin", remote_url], cwd=BUILD_WEB, check=True)
+
+subprocess.run(["git", "config", "http.postBuffer", "524288000"], cwd=BUILD_WEB, check=True)
+subprocess.run(["git", "config", "http.version", "HTTP/1.1"], cwd=BUILD_WEB, check=True)
 
 # 6. Fetch / reset origin main to ensure clean sync
 print("[*] Staging and committing build/web...")

@@ -7,6 +7,9 @@ FLUTTER_BIN = r"D:\flutter\bin\flutter.bat"
 
 print(f"[*] Project root: {PROJECT_ROOT}")
 
+# Ensure dependencies are resolved in real path before mapping subst drive
+subprocess.run([FLUTTER_BIN, "pub", "get"], cwd=PROJECT_ROOT)
+
 # 1. Clean previous subst if any
 subprocess.run(["subst", "Z:", "/D"], capture_output=True)
 
@@ -28,7 +31,7 @@ target_cwd = "Z:\\" if os.path.exists("Z:\\") else PROJECT_ROOT
 print(f"[*] Building APK in: {target_cwd}")
 
 try:
-    cmd = [FLUTTER_BIN, "build", "apk", "--release", "--split-per-abi"]
+    cmd = [FLUTTER_BIN, "build", "apk", "--release", "--split-per-abi", "--no-pub"]
     res = subprocess.run(cmd, cwd=target_cwd)
     if res.returncode != 0:
         print(f"[!] APK Build failed with exit code: {res.returncode}")
