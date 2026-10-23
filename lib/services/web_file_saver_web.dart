@@ -2,7 +2,8 @@
 import 'dart:html' as html;
 import 'dart:typed_data';
 
-void saveFileInBrowser(Uint8List bytes, String fileName) {
+/// حفظ الملف في المتصفح والآيفون مباشرة عبر Blob دون الانتقال لأي صفحة أو متصفح خارجي
+Future<bool> saveFileInBrowser(Uint8List bytes, String fileName) async {
   try {
     final blob = html.Blob([bytes]);
     final url = html.Url.createObjectUrlFromBlob(blob);
@@ -10,8 +11,9 @@ void saveFileInBrowser(Uint8List bytes, String fileName) {
       ..setAttribute('download', fileName)
       ..click();
     html.Url.revokeObjectUrl(url);
+    return true;
   } catch (e) {
-    // ignore
+    return false;
   }
 }
 

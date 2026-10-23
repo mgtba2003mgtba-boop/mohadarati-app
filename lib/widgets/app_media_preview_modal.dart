@@ -1,13 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
+import '../services/web_file_saver.dart';
+import 'android_inapp_pdf_viewer.dart';
 import 'web_iframe_viewer.dart';
 
 /// نافذة المعاينة التفاعلية الذكية المدمجة بملء الشاشة
-/// تعرض ملفات الـ PDF، الصور، والمستندات داخل التطبيق مباشرة دون تنزيل قسري
+/// تعرض ملفات الـ PDF، الصور، والمستندات داخل التطبيق مباشرة دون تنزيل قسري ودون مغادرة التطبيق
 class AppMediaPreviewModal extends StatefulWidget {
   final String title;
   final String? subtitle;
@@ -60,6 +62,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
   double _rotationAngle = 0; // 0, 90, 180, 270
   bool _useFallback = false;
   int _retryKey = 0;
+  bool _isDownloading = false;
 
   String get _currentImageUrl {
     final raw = widget.rawUrl.trim();
@@ -67,7 +70,6 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     if (!_useFallback) {
       return resolved;
     }
-    // مسار بديل عند تعثر الاتصال: التبديل بين البروكسي والاتصال المباشر تلقائياً
     if (resolved.contains('/api/proxy?url=')) {
       return raw;
     } else {
@@ -102,24 +104,11 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
       return true;
     }
 
-    // في حال عدم وجود امتداد، إذا لم تكن PDF وكانت صورة من تيليجرام
     if (!_isPdf && (lowerUrl.contains('/photos') || lowerName.contains('بوستر') || lowerName.contains('صورة') || lowerName.contains('جدول'))) {
       return true;
     }
 
     return false;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (!kIsWeb && _isPdf) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _openViewer(_embeddedPreviewUrl);
-        }
-      });
-    }
   }
 
   bool get _isDrive {
@@ -130,7 +119,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
   String get _embeddedPreviewUrl {
     final clean = widget.rawUrl.trim();
 
-    // 1. ملفات PDF: فتحها عبر عارض PDF.js المدمج المحلي (بدون Google Docs وبدون تنزيل)
+    // 1. ملفات PDF في بيئة الويب: عارض PDF.js المدمج المحلي بدون فتح تبويب خارجي
     if (_isPdf) {
       final proxied = kIsWeb
           ? AppConstants.resolveImageUrl(clean)
@@ -139,12 +128,12 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
       return '$base?file=${Uri.encodeComponent(proxied)}';
     }
 
-    // 2. صور (في حال تم استدعاء الـ IFrame)
+    // 2. صور
     if (_isImage) {
       return AppConstants.resolveImageUrl(clean);
     }
 
-    // 3. روابط Google Drive القديمة (عرض فقط)
+    // 3. روابط Google Drive
     if (_isDrive) {
       if (clean.contains('/file/d/')) {
         final regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)');
@@ -157,11 +146,9 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
       return clean;
     }
 
-    // 4. مستندات أخرى عبر عارض المستندات كخيار احتياطي
-    return 'https://docs.google.com/viewer?url=${Uri.encodeComponent(clean)}&embedded=true';
+    return clean;
   }
 
-  /// رابط تنزيل الملف الصريح لمن يرغب بحفظ نسخة
   String get _downloadTargetUrl {
     if (widget.explicitDownloadUrl != null && widget.explicitDownloadUrl!.trim().isNotEmpty) {
       return widget.explicitDownloadUrl!.trim();
@@ -169,36 +156,60 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     return widget.rawUrl.trim();
   }
 
-  Future<void> _launchExternal(String url) async {
-    final clean = url.trim();
-    if (clean.isEmpty) return;
+  /// تنزيل الملف وحفظه مباشرة في الجهاز دون فتح أي متصفح خارجي
+  Future<void> _handleDownloadInApp() async {
+    if (_isDownloading) return;
+    setState(() => _isDownloading = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('جاري بدء تنزيل الملف في الخلفية... 📥', style: GoogleFonts.cairo()),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
     try {
-      final uri = Uri.parse(clean);
-      if (uri.scheme != 'https' && uri.scheme != 'http') return;
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final client = http.Client();
+      final res = await client.get(Uri.parse(_downloadTargetUrl)).timeout(const Duration(minutes: 5));
+
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        final fname = widget.fileName ?? '${widget.title}.pdf';
+        await saveFileInBrowser(res.bodyBytes, fname);
+
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                kIsWeb
+                    ? 'تم تنزيل الملف بنجاح إلى ملفات جهازك 📥'
+                    : 'تم حفظ الملف بنجاح في مجلد التنزيلات (Downloads/محاضراتي) 📥',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: const Color(0xFF059669),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        throw Exception('رمز الاستجابة: ${res.statusCode}');
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذر فتح الرابط: $e'), backgroundColor: AppTheme.danger),
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('تعذر إكمال التنزيل: $e', style: GoogleFonts.cairo()),
+            backgroundColor: AppTheme.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
-    }
-  }
-
-  Future<void> _openViewer(String embedUrl) async {
-    final clean = embedUrl.trim();
-    if (clean.isEmpty) return;
-    try {
-      final uri = Uri.parse(clean);
-      if (uri.scheme != 'https' && uri.scheme != 'http') return;
-      final can = await canLaunchUrl(uri);
-      if (can) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await _launchExternal(widget.rawUrl);
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
       }
-    } catch (_) {
-      await _launchExternal(widget.rawUrl);
     }
   }
 
@@ -277,24 +288,17 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
             ),
           ],
 
-          // فتح المعاينة في تبويب مستقل عند الحاجة
+          // تنزيل الملف مباشرة داخل التطبيق دون أي متصفح
           IconButton(
-            icon: const Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 20),
-            tooltip: 'ملء الشاشة',
-            onPressed: () {
-              if (_isImage) {
-                _launchExternal(resolvedImageUrl);
-              } else {
-                _launchExternal(_embeddedPreviewUrl);
-              }
-            },
-          ),
-
-          // خيار اختياري هادئ لحفظ نسخة على الجهاز
-          IconButton(
-            icon: const Icon(Icons.download_rounded, color: Colors.white60, size: 20),
-            tooltip: 'تنزيل',
-            onPressed: () => _launchExternal(_downloadTargetUrl),
+            icon: _isDownloading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_rounded, color: Colors.white, size: 22),
+            tooltip: 'تنزيل وحفظ في الجهاز',
+            onPressed: _isDownloading ? null : _handleDownloadInApp,
           ),
         ],
       ),
@@ -306,7 +310,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     );
   }
 
-  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan) مع دعم التبديل السحابي الآلي (Failover)
+  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan)
   Widget _buildImageViewer(String imageUrl) {
     return Container(
       color: const Color(0xFF0F172A),
@@ -350,7 +354,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     );
   }
 
-  /// عارض المستندات والـ PDF المدمج دون أي تحميل قسري
+  /// عارض المستندات والـ PDF المدمج أصيلاً داخل التطبيق بدون أي متصفح خارجي
   Widget _buildDocumentViewer(String embedUrl) {
     if (kIsWeb) {
       return SizedBox.expand(
@@ -361,7 +365,13 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
       );
     }
 
-    // على أنظمة الهواتف (Android & iOS)
+    if (_isPdf) {
+      return AndroidInAppPdfViewer(
+        url: widget.rawUrl,
+        title: widget.title,
+      );
+    }
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -391,8 +401,8 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                   shape: BoxShape.circle,
                   border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4), width: 2),
                 ),
-                child: Icon(
-                  _isPdf ? Icons.picture_as_pdf_rounded : Icons.description_rounded,
+                child: const Icon(
+                  Icons.description_rounded,
                   color: AppTheme.accent,
                   size: 38,
                 ),
@@ -421,11 +431,10 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
               ],
               const SizedBox(height: 24),
 
-              // الزر الأساسي: فتح وقراءة المحاضرة بملء الشاشة
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _openViewer(embedUrl),
+                  onPressed: _handleDownloadInApp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
@@ -433,48 +442,10 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.remove_red_eye_rounded, size: 20),
+                  icon: const Icon(Icons.download_rounded, size: 20),
                   label: Text(
-                    'معاينة',
+                    'تنزيل الملف في جهازك',
                     style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // خيار فتح عبر قارئ الـ PDF الخاص بالهاتف
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _launchExternal(widget.rawUrl),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFCBD5E1),
-                    side: const BorderSide(color: Color(0xFF475569)),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.menu_book_rounded, size: 18, color: AppTheme.accent),
-                  label: Text(
-                    'فتح في تطبيق خارجي',
-                    style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // زر التنزيل والحفظ
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () => _launchExternal(_downloadTargetUrl),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF94A3B8),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  icon: const Icon(Icons.download_rounded, size: 16),
-                  label: Text(
-                    'تنزيل',
-                    style: GoogleFonts.cairo(fontSize: 12),
                   ),
                 ),
               ),
@@ -499,36 +470,18 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
               style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => setState(() {
-                    _useFallback = false;
-                    _retryKey++;
-                  }),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-                  label: Text('إعادة المحاولة', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _launchExternal(widget.rawUrl),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 16, color: Colors.white70),
-                  label: Text('فتح في المتصفح', style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12)),
-                ),
-              ],
+            ElevatedButton.icon(
+              onPressed: () => setState(() {
+                _useFallback = false;
+                _retryKey++;
+              }),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+              label: Text('إعادة المحاولة', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

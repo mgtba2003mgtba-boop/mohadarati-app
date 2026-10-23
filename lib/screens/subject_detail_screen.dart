@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
 import '../core/constants/biometric_subjects.dart';
 import '../core/theme/app_theme.dart';
@@ -422,10 +423,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     if (targetUrl != null && targetUrl.isNotEmpty) {
       if (isDownload) {
-        await _launchUrlExternal(
-          targetUrl,
-          errorMsg: 'تعذر بدء تحميل المحاضرة',
-        );
+        await _downloadLectureInApp(lecture, targetUrl);
       } else {
         if (!mounted) return;
         AppMediaPreviewModal.show(
@@ -442,6 +440,129 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('رابط المحاضرة غير متوفر')),
+        );
+      }
+    }
+  }
+
+  /// تنزيل المحاضرة وحفظها في جهاز الطالب مباشرة دون فتح متصفح خارجي
+  Future<void> _downloadLectureInApp(LectureModel lecture, String targetUrl) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final fileName = lecture.fileName ?? '${lecture.title}.pdf';
+
+    double dlProgress = 0.05;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.downloading_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'جاري تنزيل المحاضرة...',
+                          style: GoogleFonts.cairo(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Text(
+                        '${(dlProgress * 100).toInt()}%',
+                        style: GoogleFonts.cairo(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: dlProgress.clamp(0.0, 1.0),
+                      backgroundColor: AppTheme.lightBorder,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    try {
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(targetUrl));
+      final streamedResponse = await client.send(request);
+
+      final totalBytes = streamedResponse.contentLength ?? 0;
+      int receivedBytes = 0;
+      final List<int> bytesList = [];
+
+      await for (var chunk in streamedResponse.stream) {
+        bytesList.addAll(chunk);
+        receivedBytes += chunk.length;
+        if (totalBytes > 0 && mounted) {
+          dlProgress = (receivedBytes / totalBytes).clamp(0.05, 0.95);
+        }
+      }
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      final Uint8List fileBytes = Uint8List.fromList(bytesList);
+      if (fileBytes.isNotEmpty) {
+        await saveFileInBrowser(fileBytes, fileName);
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                kIsWeb
+                    ? 'تم تنزيل المحاضرة بنجاح إلى ملفات جهازك 📥'
+                    : 'تم حفظ المحاضرة بنجاح في مجلد التنزيلات (Downloads/محاضراتي) 📥',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: const Color(0xFF059669),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        throw Exception('الملف فارغ');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('تعذر تنزيل المحاضرة: $e'),
+            backgroundColor: AppTheme.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }

@@ -3,11 +3,18 @@ package iq.edu.nust.nust_student_portal
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -15,19 +22,24 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL_UPDATER = "iq.edu.nust.mohadarati/updater"
     private val CHANNEL_NOTIFICATIONS = "iq.edu.nust.mohadarati/notifications"
+    private val CHANNEL_PDF = "iq.edu.nust.mohadarati/pdf"
     private val NOTIF_CHANNEL_ID = "nust_live_notifications_v1"
+
+    private var currentPdfRenderer: PdfRenderer? = null
+    private var currentPfd: ParcelFileDescriptor? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         createNotificationChannel()
 
-        // 1. قناة التحديثات وتثبيت الـ APK
+        // 1. قناة التحديثات، التثبيت، وحفظ الملفات في التنزيلات
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_UPDATER).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getVersionCode" -> {
@@ -86,6 +98,39 @@ class MainActivity : FlutterActivity() {
                         }
                     } else {
                         result.error("INVALID_PATH", "File path is null", null)
+                    }
+                }
+                "saveToDownloads" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    val fileName = call.argument<String>("fileName") ?: "lecture.pdf"
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                val contentValues = ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                                    put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/محاضراتي")
+                                }
+                                val resolver = context.contentResolver
+                                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                                if (uri != null) {
+                                    resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                                    result.success(true)
+                                } else {
+                                    result.success(false)
+                                }
+                            } else {
+                                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "محاضراتي")
+                                if (!dir.exists()) dir.mkdirs()
+                                val file = File(dir, fileName)
+                                file.writeBytes(bytes)
+                                result.success(true)
+                            }
+                        } catch (e: Exception) {
+                            result.error("SAVE_ERROR", e.message, null)
+                        }
+                    } else {
+                        result.error("NO_DATA", "File bytes are null or empty", null)
                     }
                 }
                 else -> result.notImplemented()
@@ -180,6 +225,89 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // 3. محرك معاينة وقراءة ملفات الـ PDF الأصلي المدمج (In-App Native PDF Renderer)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_PDF).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openPdf" -> {
+                    synchronized(this) {
+                        try {
+                            val filePath = call.argument<String>("filePath")
+                            if (filePath == null) {
+                                result.error("ARG_ERROR", "filePath is required", null)
+                                return@setMethodCallHandler
+                            }
+                            val file = File(filePath)
+                            if (!file.exists()) {
+                                result.error("FILE_NOT_FOUND", "PDF file does not exist", null)
+                                return@setMethodCallHandler
+                            }
+
+                            currentPdfRenderer?.close()
+                            currentPfd?.close()
+
+                            currentPfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                            currentPdfRenderer = PdfRenderer(currentPfd!!)
+                            val pageCount = currentPdfRenderer!!.pageCount
+
+                            result.success(mapOf("pageCount" to pageCount))
+                        } catch (e: Exception) {
+                            result.error("PDF_OPEN_ERROR", e.message, null)
+                        }
+                    }
+                }
+                "renderPage" -> {
+                    synchronized(this) {
+                        try {
+                            val renderer = currentPdfRenderer
+                            if (renderer == null) {
+                                result.error("NO_PDF", "No PDF currently open", null)
+                                return@setMethodCallHandler
+                            }
+                            val pageIndex = call.argument<Int>("pageIndex") ?: 0
+                            val targetWidth = call.argument<Int>("targetWidth") ?: 1080
+
+                            if (pageIndex < 0 || pageIndex >= renderer.pageCount) {
+                                result.error("INVALID_PAGE", "Page index out of bounds", null)
+                                return@setMethodCallHandler
+                            }
+
+                            val page = renderer.openPage(pageIndex)
+                            val w = targetWidth.coerceAtLeast(300)
+                            val h = ((w.toFloat() / page.width) * page.height).toInt().coerceAtLeast(300)
+
+                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                            bitmap.eraseColor(Color.WHITE)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            page.close()
+
+                            val stream = ByteArrayOutputStream()
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 88, stream)
+                            val bytes = stream.toByteArray()
+                            bitmap.recycle()
+
+                            result.success(bytes)
+                        } catch (e: Exception) {
+                            result.error("PAGE_RENDER_ERROR", e.message, null)
+                        }
+                    }
+                }
+                "closePdf" -> {
+                    synchronized(this) {
+                        try {
+                            currentPdfRenderer?.close()
+                            currentPdfRenderer = null
+                            currentPfd?.close()
+                            currentPfd = null
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("CLOSE_ERROR", e.message, null)
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     private fun createNotificationChannel() {
@@ -196,5 +324,15 @@ class MainActivity : FlutterActivity() {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        synchronized(this) {
+            currentPdfRenderer?.close()
+            currentPdfRenderer = null
+            currentPfd?.close()
+            currentPfd = null
+        }
+        super.onDestroy()
     }
 }

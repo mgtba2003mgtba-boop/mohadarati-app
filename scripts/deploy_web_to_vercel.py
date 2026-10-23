@@ -89,7 +89,7 @@ version_data = {
     "version": app_v,
     "android_version_code": android_vc,
     "build_number": str(build_time),
-    "release_notes": "تصميم جديد وعصري لخانة الجداول مع معاينة فورية ومباشرة بدون أزرار، وتكبير تفاعلي بملء الشاشة.",
+    "release_notes": "معاينة وتنزيل المحاضرات مباشرة داخل التطبيق دون الحاجة لمتصفح خارجي، ودعم الحفظ التلقائي في مجلد التنزيلات.",
     "apk_url": "https://mohadarati.vercel.app/Mohadarati.apk",
     "deployed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 }
