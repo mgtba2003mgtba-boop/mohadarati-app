@@ -45,17 +45,15 @@ class SupabaseService {
   final Map<String, DateTime> _cacheTimestamps = {};
 
   /// جلب البيانات من الذاكرة المؤقتة المحلية (RAM أولاً ثم SharedPreferences)
+  /// معمارية Local-First: البيانات المحلية دائمة ومتاحة فوراً في وضع عدم الاتصال (Offline)
   Future<T?> _getCachedData<T>({
     required String key,
     required T Function(dynamic json) fromJson,
-    Duration maxAge = const Duration(minutes: 15),
+    Duration maxAge = const Duration(days: 365),
   }) async {
-    // 1. فحص ذاكرة الوصول العشوائي RAM (فوري في أقل من 0.001 ثانية)
-    if (_memoryCache.containsKey(key)) {
-      final ts = _cacheTimestamps[key];
-      if (ts != null && DateTime.now().difference(ts) < maxAge) {
-        return _memoryCache[key] as T?;
-      }
+    // 1. فحص ذاكرة الوصول السريع RAM (استرجاع فوري في أقل من 0.001 ثانية)
+    if (_memoryCache.containsKey(key) && _memoryCache[key] != null) {
+      return _memoryCache[key] as T?;
     }
 
     // 2. فحص التخزين المحلي الدائم SharedPreferences عبر المتصفح/الجهاز
@@ -67,7 +65,7 @@ class SupabaseService {
         final data = fromJson(decoded);
         _memoryCache[key] = data;
 
-        // استرجاع الطابع الزمني الحقيقي للكاش لمنع تزييفه وضمان التحديث في الخلفية
+        // استرجاع الطابع الزمني الحقيقي للكاش
         final tsRaw = prefs.getString('cache_ts_$key');
         if (tsRaw != null && tsRaw.isNotEmpty) {
           _cacheTimestamps[key] = DateTime.tryParse(tsRaw) ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -1244,10 +1242,20 @@ class SupabaseService {
 
     // 1. عرض فوري في 0.01 ثانية من الكاش المحلي
     if (!forceRefresh) {
-      final cached = await _getCachedData<List<ScheduleModel>>(
+      var cached = await _getCachedData<List<ScheduleModel>>(
         key: cacheKey,
         fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
       );
+
+      // بحث تفاضلي في كاش الجداول العام لنفس المرحلة والقسم إن لم يُعثر على كاش الشعبة المحددة (Local-First Offline)
+      if ((cached == null || cached.isEmpty) && section != 'ALL') {
+        final fallbackKey = 'schedules_${department}_${stage}_ALL_${type ?? "ALL"}';
+        cached = await _getCachedData<List<ScheduleModel>>(
+          key: fallbackKey,
+          fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
+        );
+      }
+
       if (cached != null && cached.isNotEmpty) {
         final ts = _cacheTimestamps[cacheKey];
         if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 30)) {
@@ -1387,11 +1395,17 @@ class SupabaseService {
       return filtered;
     } catch (e) {
       debugPrint('[-] Error fetching schedules (falling back to cache): $e');
-      final cached = await _getCachedData<List<ScheduleModel>>(
+      var cached = await _getCachedData<List<ScheduleModel>>(
         key: cacheKey,
         fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
-        maxAge: const Duration(days: 30),
       );
+      if ((cached == null || cached.isEmpty) && section != 'ALL') {
+        final fallbackKey = 'schedules_${department}_${stage}_ALL_${type ?? "ALL"}';
+        cached = await _getCachedData<List<ScheduleModel>>(
+          key: fallbackKey,
+          fromJson: (json) => (json as List).map((item) => ScheduleModel.fromJson(item)).toList(),
+        );
+      }
       return cached ?? [];
     }
   }
@@ -1463,10 +1477,20 @@ class SupabaseService {
 
     // 1. عرض فوري في 0.01 ثانية من الكاش المحلي مع فحص سلامة المعرفات
     if (!forceRefresh) {
-      final cached = await _getCachedData<List<LectureModel>>(
+      var cached = await _getCachedData<List<LectureModel>>(
         key: cacheKey,
         fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
       );
+
+      // بحث تفاضلي في الكاش الاحتياطي لنفس المرحلة والقسم إن لم يُعثر على الكاش المحدد (Local-First Offline)
+      if ((cached == null || cached.isEmpty) && section != 'ALL') {
+        final fallbackKey = 'lectures_${department ?? "ALL"}_${stage ?? "ALL"}_ALL_${semester ?? 0}';
+        cached = await _getCachedData<List<LectureModel>>(
+          key: fallbackKey,
+          fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
+        );
+      }
+
       if (cached != null && cached.isNotEmpty) {
         // حماية من الكاش القديم المشوه: إذا كانت هناك محاضرات بلا معرّف ID سحابي، نتخلص من الكاش فوراً
         final hasCorruptedIds = cached.any((l) => l.id.trim().isEmpty);
@@ -1520,7 +1544,7 @@ class SupabaseService {
         query = query.eq('semester', semester);
       }
 
-      final res = await query.order('created_at', ascending: false).timeout(const Duration(seconds: 8));
+      final res = await query.order('created_at', ascending: false).timeout(const Duration(seconds: 5));
 
       var list = (res as List).map((item) => LectureModel.fromJson(item)).toList();
 
@@ -1548,11 +1572,17 @@ class SupabaseService {
       return list;
     } catch (e) {
       debugPrint('[-] Error fetching lectures (falling back to cache): $e');
-      final cached = await _getCachedData<List<LectureModel>>(
+      var cached = await _getCachedData<List<LectureModel>>(
         key: cacheKey,
         fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
-        maxAge: const Duration(days: 30),
       );
+      if ((cached == null || cached.isEmpty) && section != 'ALL') {
+        final fallbackKey = 'lectures_${department ?? "ALL"}_${stage ?? "ALL"}_ALL_${semester ?? 0}';
+        cached = await _getCachedData<List<LectureModel>>(
+          key: fallbackKey,
+          fromJson: (json) => (json as List).map((item) => LectureModel.fromJson(item)).toList(),
+        );
+      }
       return cached ?? [];
     }
   }
@@ -2146,7 +2176,7 @@ class SupabaseService {
     }
   }
 
-  /// ── جلب تقسيم الدرجات ودرجة الطالب للمادة (تظهر فقط إذا فعّلها الأستاذ is_published = true) ───
+  /// ── جلب تقسيم الدرجات ودرجة الطالب للمادة (كاش فوري ومزامنة خلفية Local-First) ───
   Future<SubjectGradeViewData?> fetchSubjectGradeForStudent({
     required String studentId,
     required String subjectName,
@@ -2154,6 +2184,51 @@ class SupabaseService {
     required String department,
     required String stage,
     bool forceRefresh = false,
+  }) async {
+    final cleanStudentId = studentId.trim();
+    final cleanDept = department.trim();
+    final normStage = AppConstants.normalizeStage(stage);
+    final cacheKey = 'grade_${cleanStudentId}_${subjectName}_${cleanDept}_$normStage';
+
+    // 1. استرجاع فوري من الكاش المحلي في 0ms
+    if (!forceRefresh) {
+      final cached = await _getCachedData<SubjectGradeViewData>(
+        key: cacheKey,
+        fromJson: (json) => SubjectGradeViewData.fromJson(Map<String, dynamic>.from(json as Map)),
+      );
+      if (cached != null) {
+        final ts = _cacheTimestamps[cacheKey];
+        if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 45)) {
+          _fetchFreshSubjectGradeAndCache(
+            studentId: cleanStudentId,
+            subjectName: subjectName,
+            displayName: displayName,
+            department: cleanDept,
+            stage: stage,
+            cacheKey: cacheKey,
+          ).catchError((_) => null);
+        }
+        return cached;
+      }
+    }
+
+    return await _fetchFreshSubjectGradeAndCache(
+      studentId: cleanStudentId,
+      subjectName: subjectName,
+      displayName: displayName,
+      department: cleanDept,
+      stage: stage,
+      cacheKey: cacheKey,
+    );
+  }
+
+  Future<SubjectGradeViewData?> _fetchFreshSubjectGradeAndCache({
+    required String studentId,
+    required String subjectName,
+    String? displayName,
+    required String department,
+    required String stage,
+    required String cacheKey,
   }) async {
     final cleanStudentId = studentId.trim();
     final cleanDept = department.trim();
@@ -2166,7 +2241,7 @@ class SupabaseService {
           .from('subject_grade_configs')
           .select('*')
           .eq('is_published', true)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 4));
 
       final configs = (cfgRows as List)
           .map((r) => SubjectGradeConfigModel.fromJson(Map<String, dynamic>.from(r as Map)))
@@ -2210,7 +2285,7 @@ class SupabaseService {
             .from('student_subject_grades')
             .select('*')
             .eq('student_id', cleanStudentId)
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 4));
 
         final gradesList = (gradeRows as List)
             .map((r) => StudentSubjectGradeModel.fromJson(Map<String, dynamic>.from(r as Map)))
@@ -2225,13 +2300,25 @@ class SupabaseService {
         }
       }
 
-      return SubjectGradeViewData(
+      final result = SubjectGradeViewData(
         config: matchedConfig,
         studentGrade: studentGrade,
       );
+
+      await _setCachedData(
+        key: cacheKey,
+        rawData: result,
+        toJson: () => result.toJson(),
+      );
+
+      return result;
     } catch (e) {
-      debugPrint('[-] Error fetching subject grade for student: $e');
-      return null;
+      debugPrint('[-] Error fetching subject grade for student (falling back to cache): $e');
+      final cached = await _getCachedData<SubjectGradeViewData>(
+        key: cacheKey,
+        fromJson: (json) => SubjectGradeViewData.fromJson(Map<String, dynamic>.from(json as Map)),
+      );
+      return cached;
     }
   }
 

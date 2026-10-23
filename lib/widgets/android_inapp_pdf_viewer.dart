@@ -1,19 +1,24 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../core/theme/app_theme.dart';
 import '../services/native_pdf_service.dart';
+import '../services/lecture_ux_service.dart';
+import '../services/local_document_cache_service.dart';
 
 class AndroidInAppPdfViewer extends StatefulWidget {
   final String url;
   final String title;
+  final String? fileName;
+  final String? lectureId;
 
   const AndroidInAppPdfViewer({
     super.key,
     required this.url,
     required this.title,
+    this.fileName,
+    this.lectureId,
   });
 
   @override
@@ -40,25 +45,28 @@ class _AndroidInAppPdfViewerState extends State<AndroidInAppPdfViewer> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _loadingStatus = 'جاري تجهيز المستند...';
+      _loadingStatus = 'جاري فحص الذاكرة المحلية والتحقق من التخزين...';
       _downloadProgress = 0.05;
     });
 
     try {
-      // 1. تحديد مسار الكاش المحلي
-      const updaterChannel = MethodChannel('iq.edu.nust.mohadarati/updater');
-      final cacheDirStr = await updaterChannel.invokeMethod<String>('getCacheDir');
-      final cacheDir = cacheDirStr != null ? Directory(cacheDirStr) : Directory.systemTemp;
+      // 1. فحص هل الملف موجود مسبقاً في كاش الجهاز أو مجلد التنزيلات (0ms Offline)
+      final existingPath = await LocalDocumentCacheService.findExistingDocumentPath(
+        lectureId: widget.lectureId ?? '',
+        fileName: widget.fileName,
+        title: widget.title,
+        url: widget.url,
+      );
 
-      final urlHash = widget.url.hashCode.abs();
-      final localFile = File('${cacheDir.path}/doc_$urlHash.pdf');
-
-      // 2. فحص إن كان الملف محملاً مسبقاً في الكاش المحلي (Offline Cache)
-      if (await localFile.exists() && (await localFile.length()) > 1024) {
-        _cachedFilePath = localFile.path;
+      if (existingPath != null) {
+        _cachedFilePath = existingPath;
+        if (widget.lectureId != null && widget.lectureId!.isNotEmpty) {
+          LectureUxService.instance.markLectureCached(widget.lectureId!);
+        }
       } else {
+        // 2. إذا لم يكن متوفراً محلياً، نبدأ التنزيل من السحابة وحفظه في الكاش
         setState(() {
-          _loadingStatus = 'جاري تنزيل صفحات المحاضرة...';
+          _loadingStatus = 'جاري تنزيل صفحات المحاضرة وحفظها محلياً...';
           _downloadProgress = 0.2;
         });
 
@@ -87,12 +95,22 @@ class _AndroidInAppPdfViewerState extends State<AndroidInAppPdfViewer> {
           throw Exception('الملف فارغ أو تعذر الوصول إليه.');
         }
 
-        await localFile.writeAsBytes(bytes);
-        _cachedFilePath = localFile.path;
+        final savedPath = await LocalDocumentCacheService.saveDocumentToCache(
+          lectureId: widget.lectureId ?? '',
+          fileName: widget.fileName,
+          url: widget.url,
+          bytes: bytes,
+        );
+
+        _cachedFilePath = savedPath;
+      }
+
+      if (_cachedFilePath == null || _cachedFilePath!.isEmpty) {
+        throw Exception('تعذر حفظ الملف محلياً.');
       }
 
       setState(() {
-        _loadingStatus = 'جاري تصيير الصفحات...';
+        _loadingStatus = 'جاري تصيير صفحات المستند...';
         _downloadProgress = 0.9;
       });
 
@@ -110,9 +128,20 @@ class _AndroidInAppPdfViewerState extends State<AndroidInAppPdfViewer> {
       }
     } catch (e) {
       if (mounted) {
+        final errStr = e.toString();
+        final isOffline = errStr.contains('SocketException') ||
+            errStr.contains('ClientException') ||
+            errStr.contains('Failed host lookup') ||
+            errStr.contains('Network is unreachable') ||
+            errStr.contains('Connection refused');
+
+        final userFriendlyMsg = isOffline
+            ? 'المحاضرة غير متوفرة في الذاكرة المحلية حالياً.\nيرجى الاتصال بالإنترنت مرة واحدة فقط لمعاينتها أو تنزيلها، لتصبح محفوظة ومتاحة دائماً بدون إنترنت.'
+            : errStr.replaceFirst('Exception: ', '');
+
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = userFriendlyMsg;
         });
       }
     }

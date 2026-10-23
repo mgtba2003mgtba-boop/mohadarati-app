@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_user_model.dart';
 import 'supabase_service.dart';
@@ -57,7 +58,7 @@ class SyncMutation {
 /// ── محرك المزامنة غير المتصلة (Offline-First State Sync Engine) ───────────
 /// مصمم خصيصاً لتحمل ظروف الإنترنت المتقطعة وحفظ عمليات الطلبة والممثلين
 /// محلياً في ذاكرة التخزين الدائمة وإعادة إرسالها تلقائياً فور عودة الاتصال.
-class OfflineSyncService {
+class OfflineSyncService with WidgetsBindingObserver {
   static final OfflineSyncService _instance = OfflineSyncService._internal();
   factory OfflineSyncService() => _instance;
   OfflineSyncService._internal();
@@ -78,6 +79,7 @@ class OfflineSyncService {
   /// تهيئة المحرك واستعادة العمليات العالقة من التخزين الدائم
   Future<void> initialize() async {
     try {
+      WidgetsBinding.instance.addObserver(this);
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_storageKey);
       if (raw != null && raw.isNotEmpty) {
@@ -109,6 +111,13 @@ class OfflineSyncService {
     // محاولة مزامنة فورية فور الإقلاع إن وُجدت عمليات معلقة
     if (hasPending) {
       Future.delayed(const Duration(seconds: 3), () => syncPendingMutations());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && hasPending && !_isSyncing) {
+      syncPendingMutations();
     }
   }
 
@@ -290,5 +299,6 @@ class OfflineSyncService {
 
   void dispose() {
     _autoSyncTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
   }
 }

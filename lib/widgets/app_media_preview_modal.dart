@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
 import '../services/web_file_saver.dart';
+import '../services/local_document_cache_service.dart';
 import 'android_inapp_pdf_viewer.dart';
 import 'web_iframe_viewer.dart';
 
@@ -17,6 +20,7 @@ class AppMediaPreviewModal extends StatefulWidget {
   final String? explicitDownloadUrl;
   final String? fileName;
   final String? mimeType;
+  final String? lectureId;
 
   const AppMediaPreviewModal({
     super.key,
@@ -26,6 +30,7 @@ class AppMediaPreviewModal extends StatefulWidget {
     this.explicitDownloadUrl,
     this.fileName,
     this.mimeType,
+    this.lectureId,
   });
 
   /// دالة إظهار نافذة المعاينة المدمجة
@@ -37,6 +42,7 @@ class AppMediaPreviewModal extends StatefulWidget {
     String? downloadUrl,
     String? fileName,
     String? mimeType,
+    String? lectureId,
   }) {
     return Navigator.push<void>(
       context,
@@ -48,6 +54,7 @@ class AppMediaPreviewModal extends StatefulWidget {
           explicitDownloadUrl: downloadUrl,
           fileName: fileName,
           mimeType: mimeType,
+          lectureId: lectureId,
         ),
       ),
     );
@@ -156,27 +163,52 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     return widget.rawUrl.trim();
   }
 
-  /// تنزيل الملف وحفظه مباشرة في الجهاز دون فتح أي متصفح خارجي
+  /// تنزيل الملف وحفظه مباشرة في الجهاز دون فتح أي متصفح خارجي (مع فحص الكاش المحلي أولاً)
   Future<void> _handleDownloadInApp() async {
     if (_isDownloading) return;
     setState(() => _isDownloading = true);
 
     final messenger = ScaffoldMessenger.of(context);
+    final fname = widget.fileName ?? '${widget.title}.pdf';
+
     messenger.showSnackBar(
       SnackBar(
-        content: Text('جاري بدء تنزيل الملف في الخلفية... 📥', style: GoogleFonts.cairo()),
+        content: Text('جاري حفظ الملف في مجلد التنزيلات... 📥', style: GoogleFonts.cairo()),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
 
     try {
-      final client = http.Client();
-      final res = await client.get(Uri.parse(_downloadTargetUrl)).timeout(const Duration(minutes: 5));
+      // 1. فحص هل الملف مخزن مسبقاً في كاش الجهاز المحلي (Offline Local-First 0ms)
+      Uint8List? fileBytes = await LocalDocumentCacheService.getCachedDocumentBytes(
+        lectureId: widget.lectureId ?? '',
+        fileName: widget.fileName,
+        title: widget.title,
+        url: widget.rawUrl,
+      );
 
-      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
-        final fname = widget.fileName ?? '${widget.title}.pdf';
-        await saveFileInBrowser(res.bodyBytes, fname);
+      // 2. إذا لم يكن في الكاش المحلي، تنزيله من السحابة
+      if (fileBytes == null) {
+        final client = http.Client();
+        final res = await client.get(Uri.parse(_downloadTargetUrl)).timeout(const Duration(minutes: 5));
+
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          fileBytes = res.bodyBytes;
+          // حفظه أيضاً في كاش التطبيق ليكون متاحاً للمعاينة بدون إنترنت
+          await LocalDocumentCacheService.saveDocumentToCache(
+            lectureId: widget.lectureId ?? '',
+            fileName: widget.fileName,
+            url: widget.rawUrl,
+            bytes: fileBytes,
+          );
+        } else {
+          throw Exception('رمز الاستجابة: ${res.statusCode}');
+        }
+      }
+
+      if (fileBytes.isNotEmpty) {
+        await saveFileInBrowser(fileBytes, fname);
 
         if (mounted) {
           messenger.showSnackBar(
@@ -194,7 +226,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           );
         }
       } else {
-        throw Exception('رمز الاستجابة: ${res.statusCode}');
+        throw Exception('الملف فارغ');
       }
     } catch (e) {
       if (mounted) {
@@ -310,7 +342,7 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
     );
   }
 
-  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan)
+  /// عارض الصور التفاعلي (Interactive Pinch-to-Zoom & Pan مع كاش محلي أوفلاين)
   Widget _buildImageViewer(String imageUrl) {
     return Container(
       color: const Color(0xFF0F172A),
@@ -321,33 +353,58 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
           maxScale: 8.0,
           child: RotatedBox(
             quarterTurns: (_rotationAngle / 90).round(),
-            child: Image.network(
-              imageUrl,
-              key: ValueKey('preview_img_${_retryKey}_$imageUrl'),
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                if (!_useFallback) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _useFallback = true;
-                        _retryKey++;
-                      });
-                    }
-                  });
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
-                  );
-                }
-                return _buildErrorState('تعذر فتح الملف');
-              },
-            ),
+            child: !kIsWeb
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    key: ValueKey('preview_img_${_retryKey}_$imageUrl'),
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+                    ),
+                    errorWidget: (context, url, error) {
+                      if (!_useFallback) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _useFallback = true;
+                              _retryKey++;
+                            });
+                          }
+                        });
+                        return const Center(
+                          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+                        );
+                      }
+                      return _buildErrorState('تعذر فتح الملف بدون إنترنت، ولم يتم حفظه مسبقاً');
+                    },
+                  )
+                : Image.network(
+                    imageUrl,
+                    key: ValueKey('preview_img_${_retryKey}_$imageUrl'),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      if (!_useFallback) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _useFallback = true;
+                              _retryKey++;
+                            });
+                          }
+                        });
+                        return const Center(
+                          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2.5),
+                        );
+                      }
+                      return _buildErrorState('تعذر فتح الملف');
+                    },
+                  ),
           ),
         ),
       ),
@@ -369,6 +426,8 @@ class _AppMediaPreviewModalState extends State<AppMediaPreviewModal> {
       return AndroidInAppPdfViewer(
         url: widget.rawUrl,
         title: widget.title,
+        fileName: widget.fileName,
+        lectureId: widget.lectureId,
       );
     }
 

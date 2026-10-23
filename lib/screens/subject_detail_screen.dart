@@ -20,6 +20,7 @@ import '../services/telegram_uploader_service.dart';
 import '../services/admin_preview_service.dart';
 import '../services/lecture_ux_service.dart';
 import '../services/web_file_saver.dart';
+import '../services/local_document_cache_service.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
 import '../widgets/telegram_poll_card.dart';
@@ -407,21 +408,25 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     String? targetUrl;
 
     if (lecture.telegramFileId != null && lecture.telegramFileId!.isNotEmpty) {
-      final fresh = await TelegramUploaderService().resolveFileUrl(lecture.telegramFileId!);
-      if (fresh != null && fresh.isNotEmpty) {
-        targetUrl = fresh;
-      }
+      try {
+        final fresh = await TelegramUploaderService()
+            .resolveFileUrl(lecture.telegramFileId!)
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+        if (fresh != null && fresh.isNotEmpty) {
+          targetUrl = fresh;
+        }
+      } catch (_) {}
     }
 
     if (targetUrl == null || targetUrl.isEmpty) {
       if (lecture.driveUrl.startsWith('http')) {
         targetUrl = lecture.driveUrl;
       } else {
-        targetUrl = isDownload ? lecture.downloadUrl : lecture.streamUrl;
+        targetUrl = (isDownload ? lecture.downloadUrl : lecture.streamUrl) ?? 'local';
       }
     }
 
-    if (targetUrl != null && targetUrl.isNotEmpty) {
+    if (targetUrl.isNotEmpty) {
       if (isDownload) {
         await _downloadLectureInApp(lecture, targetUrl);
       } else {
@@ -434,6 +439,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           downloadUrl: lecture.downloadUrl ?? targetUrl,
           fileName: lecture.fileName ?? lecture.title,
           mimeType: lecture.mimeType,
+          lectureId: lecture.id,
         );
       }
     } else {
@@ -445,10 +451,39 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     }
   }
 
-  /// تنزيل المحاضرة وحفظها في جهاز الطالب مباشرة دون فتح متصفح خارجي
+  /// تنزيل المحاضرة وحفظها في جهاز الطالب مباشرة دون فتح متصفح خارجي (مع فحص الكاش المحلي أولاً)
   Future<void> _downloadLectureInApp(LectureModel lecture, String targetUrl) async {
     final messenger = ScaffoldMessenger.of(context);
     final fileName = lecture.fileName ?? '${lecture.title}.pdf';
+
+    // 1. فحص هل الملف مخزن مسبقاً في كاش الجهاز المحلي (حفظ فوري 0ms بدون استهلاك إنترنت)
+    final cachedBytes = await LocalDocumentCacheService.getCachedDocumentBytes(
+      lectureId: lecture.id,
+      fileName: fileName,
+      title: lecture.title,
+      url: targetUrl,
+    );
+
+    if (cachedBytes != null && cachedBytes.isNotEmpty) {
+      await saveFileInBrowser(cachedBytes, fileName);
+      LectureUxService.instance.markLectureCached(lecture.id);
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              kIsWeb
+                  ? 'تم تنزيل المحاضرة بنجاح إلى ملفات جهازك 📥'
+                  : 'تم حفظ المحاضرة من الذاكرة المحلية بنجاح في مجلد التنزيلات (Downloads/محاضراتي) 📥',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: const Color(0xFF059669),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
 
     double dlProgress = 0.05;
 
@@ -536,6 +571,16 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       final Uint8List fileBytes = Uint8List.fromList(bytesList);
       if (fileBytes.isNotEmpty) {
         await saveFileInBrowser(fileBytes, fileName);
+
+        // حفظها في كاش النظام الدائم لفتحها لاحقاً بدون إنترنت
+        await LocalDocumentCacheService.saveDocumentToCache(
+          lectureId: lecture.id,
+          fileName: fileName,
+          url: targetUrl,
+          bytes: fileBytes,
+        );
+        LectureUxService.instance.markLectureCached(lecture.id);
+
         if (mounted) {
           messenger.showSnackBar(
             SnackBar(

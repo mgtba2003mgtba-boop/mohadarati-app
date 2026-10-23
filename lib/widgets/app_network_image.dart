@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/constants/app_constants.dart';
 
 /// ويدجت ذكي وموحد لعرض الصور السحابية بدون مشاكل CORS
@@ -63,6 +64,27 @@ class AppNetworkImage extends StatelessWidget {
     final int? targetCacheHeight = (!kIsWeb && hasFiniteHeight)
         ? (height! * 2.5).toInt().clamp(100, 1200)
         : null;
+
+    if (!kIsWeb) {
+      return CachedNetworkImage(
+        imageUrl: resolved,
+        width: width,
+        height: height,
+        memCacheWidth: targetCacheWidth,
+        memCacheHeight: targetCacheHeight,
+        fit: fit,
+        placeholder: (context, url) =>
+            placeholder ??
+            _ImageShimmerSkeleton(
+              width: width,
+              height: height,
+            ),
+        errorWidget: (context, url, error) {
+          debugPrint('[-] AppNetworkImage load error for $resolved: $error');
+          return errorWidget ?? _defaultErrorWidget();
+        },
+      );
+    }
 
     return Image.network(
       resolved,

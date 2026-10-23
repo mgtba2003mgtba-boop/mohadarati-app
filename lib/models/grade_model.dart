@@ -196,4 +196,16 @@ class SubjectGradeViewData {
     if (studentGrade == null) return false;
     return studentGrade!.scores.isNotEmpty || studentGrade!.note.trim().isNotEmpty;
   }
+
+  Map<String, dynamic> toJson() => {
+    'config': config.toJson(),
+    'studentGrade': studentGrade?.toJson(),
+  };
+
+  factory SubjectGradeViewData.fromJson(Map<String, dynamic> json) => SubjectGradeViewData(
+    config: SubjectGradeConfigModel.fromJson(Map<String, dynamic>.from(json['config'] ?? {})),
+    studentGrade: json['studentGrade'] != null
+        ? StudentSubjectGradeModel.fromJson(Map<String, dynamic>.from(json['studentGrade']))
+        : null,
+  );
 }
