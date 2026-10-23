@@ -62,7 +62,17 @@ class _ScheduleScreenState extends State<ScheduleScreen>
       _selectedScheduleSection = user.section!;
     }
     AdminPreviewService().addListener(_onAdminPreviewChanged);
+    SupabaseService().schedulesNotifier.addListener(_onFreshSchedulesReceived);
     _loadSchedules();
+  }
+
+  void _onFreshSchedulesReceived() {
+    final fresh = SupabaseService().schedulesNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _schedules = fresh;
+      });
+    }
   }
 
   void _onAdminPreviewChanged() {
@@ -81,6 +91,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   @override
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
+    SupabaseService().schedulesNotifier.removeListener(_onFreshSchedulesReceived);
     _tabController.dispose();
     super.dispose();
   }

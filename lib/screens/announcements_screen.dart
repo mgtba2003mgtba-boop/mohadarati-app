@@ -41,6 +41,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   @override
   void initState() {
     super.initState();
+    SupabaseService().announcementsNotifier.addListener(_onFreshAnnouncementsReceived);
     _loadAnnouncements(showSpinner: true);
 
     // ── الاستماع اللحظي لتحديث التفاعلات عبر WebSocket لجميع المستخدمين ──
@@ -83,8 +84,22 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     });
   }
 
+  void _onFreshAnnouncementsReceived() {
+    final fresh = SupabaseService().announcementsNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _announcements = fresh.where((a) {
+          final isHomeBannerOnly = (a.category == 'banner' || a.subjectName == 'BANNER' || a.content.contains('[HOME_BANNER]')) &&
+              (a.content.replaceAll(RegExp(r'\[.*?\]'), '').trim().isEmpty);
+          return !isHomeBannerOnly;
+        }).toList();
+      });
+    }
+  }
+
   @override
   void dispose() {
+    SupabaseService().announcementsNotifier.removeListener(_onFreshAnnouncementsReceived);
     _announcementInsertSub?.cancel();
     _announcementUpdateSub?.cancel();
     super.dispose();

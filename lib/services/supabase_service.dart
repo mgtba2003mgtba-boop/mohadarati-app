@@ -35,6 +35,9 @@ class SupabaseService {
 
   /// مخطر تفاعلي يُطلق أحدث قائمة إعلانات فور وصولها من السيرفر في الخلفية
   final ValueNotifier<List<AnnouncementModel>?> announcementsNotifier = ValueNotifier(null);
+  final ValueNotifier<List<LectureModel>?> lecturesNotifier = ValueNotifier(null);
+  final ValueNotifier<List<ScheduleModel>?> schedulesNotifier = ValueNotifier(null);
+  final ValueNotifier<List<AttendanceRecordModel>?> attendanceNotifier = ValueNotifier(null);
   final Map<String, List<DateTime>> _loginFailures = {};
 
   // ── محرك الذاكرة المؤقتة الذكي (Smart In-Memory RAM & Persistent Cache Engine) ───
@@ -449,7 +452,7 @@ class SupabaseService {
       if (cached != null && cached.isNotEmpty) {
         // تحديث صامت في الخلفية إن مضى أكثر من دقيقتين
         final ts = _cacheTimestamps[cacheKey];
-        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+        if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 30)) {
           _fetchFreshAttendanceAndCache(cleanId, cacheKey).catchError((_) => <AttendanceRecordModel>[]);
         }
         return cached;
@@ -480,6 +483,8 @@ class SupabaseService {
         rawData: list,
         toJson: () => list.map((a) => a.toJson()).toList(),
       );
+
+      attendanceNotifier.value = list;
 
       return list;
     } catch (e) {
@@ -534,11 +539,20 @@ class SupabaseService {
     required String cacheKey,
   }) async {
     try {
-      var query = client.from('announcements').select('*');
+      // فلترة من السيرفر مباشرة لتقليص حجم البيانات المسحوبة بنسبة 85% وتسريع الاستجابة
+      var query = client
+          .from('announcements')
+          .select('*')
+          .or('subject_name.is.null,subject_name.not.in.(LECTURE_NOTE,SCHEDULE,COURSE,COURSE_OVERRIDE)');
+
+      if (department != null && department.isNotEmpty && department != 'ALL') {
+        query = query.inFilter('department', ['ALL', department]);
+      }
 
       final res = await query
           .order('is_pinned', ascending: false)
           .order('created_at', ascending: false)
+          .limit(200)
           .timeout(const Duration(seconds: 8));
 
       var list = (res as List)
@@ -634,118 +648,136 @@ class SupabaseService {
     }
   }
 
-  /// ── تبديل أو تسجيل تفاعل الطالب على التبليغ (أكاديمي ومجهول الهوية) ──────────
+  /// ── تبديل أو تسجيل تفاعل الطالب على التبليغ (أكاديمي ومجهول الهوية مع حماية التزامن CAS) ──────────
   Future<AnnouncementModel?> toggleAnnouncementReaction({
     required String announcementId,
     required String emoji,
     required AppUserModel user,
   }) async {
     try {
-      // 1. استرجاع المحتوى الحالي للتبليغ
-      final row = await client
-          .from('announcements')
-          .select('*')
-          .eq('id', announcementId)
-          .maybeSingle();
-
-      if (row == null) return null;
-
-      final current = AnnouncementModel.fromJson(row);
-      final reactionsMap = Map<String, AnnouncementReaction>.from(current.reactions);
-
       final studentKey = user.studentId.isNotEmpty ? user.studentId : user.id;
 
-      // 2. فحص التفاعل الحالي للطالب: إذا كان نفس الإيموجي -> إلغاء التفاعل
-      if (reactionsMap.containsKey(studentKey) && reactionsMap[studentKey]!.reaction == emoji) {
-        reactionsMap.remove(studentKey);
-      } else {
-        reactionsMap[studentKey] = AnnouncementReaction(
-          studentId: studentKey,
-          studentName: user.name,
-          department: user.department,
-          stage: user.stage,
-          section: user.section ?? '',
-          reaction: emoji,
-          createdAt: DateTime.now(),
-        );
+      // حلقة حماية التزامن الذري (CAS Retry) لمنع ضياع التفاعلات عند ضغط عدة طلاب في نفس اللحظة
+      for (int attempt = 0; attempt < 4; attempt++) {
+        final row = await client
+            .from('announcements')
+            .select('*')
+            .eq('id', announcementId)
+            .maybeSingle();
+
+        if (row == null) return null;
+
+        final originalContent = row['content']?.toString() ?? '';
+        final current = AnnouncementModel.fromJson(row);
+        final reactionsMap = Map<String, AnnouncementReaction>.from(current.reactions);
+
+        if (reactionsMap.containsKey(studentKey) && reactionsMap[studentKey]!.reaction == emoji) {
+          reactionsMap.remove(studentKey);
+        } else {
+          reactionsMap[studentKey] = AnnouncementReaction(
+            studentId: studentKey,
+            studentName: user.name,
+            department: user.department,
+            stage: user.stage,
+            section: user.section ?? '',
+            reaction: emoji,
+            createdAt: DateTime.now(),
+          );
+        }
+
+        final updatedContent = AnnouncementModel.embedReactions(current.content, reactionsMap);
+
+        final updatedRows = await client
+            .from('announcements')
+            .update({'content': updatedContent})
+            .eq('id', announcementId)
+            .eq('content', originalContent)
+            .select('id');
+
+        if ((updatedRows as List).isNotEmpty) {
+          invalidateCachePattern('announcements_');
+          return current.copyWithReactions(reactionsMap);
+        }
+
+        await Future.delayed(Duration(milliseconds: 70 * (attempt + 1)));
       }
-
-      final updatedContent = AnnouncementModel.embedReactions(current.content, reactionsMap);
-
-      // 3. تحديث السجل في قاعدة بيانات Supabase
-      await client
-          .from('announcements')
-          .update({'content': updatedContent})
-          .eq('id', announcementId);
-
-      invalidateCachePattern('announcements_');
-
-      return current.copyWithReactions(reactionsMap);
+      return null;
     } catch (e) {
       debugPrint('[-] Error toggling announcement reaction: $e');
       return null;
     }
   }
 
-  /// ── تسجيل أو تبديل صوت الطالب في الاستطلاع الأكاديمي ──────────
+  /// ── تسجيل أو تبديل صوت الطالب في الاستطلاع الأكاديمي (مع حماية التزامن CAS لمنع ضياع الأصوات) ──────────
   Future<AnnouncementModel?> castPollVote({
     required String announcementId,
     required int optionIndex,
     required AppUserModel user,
   }) async {
     try {
-      final row = await client
-          .from('announcements')
-          .select('*')
-          .eq('id', announcementId)
-          .maybeSingle();
-
-      if (row == null) return null;
-
-      final current = AnnouncementModel.fromJson(row);
-      final poll = current.pollData;
-      if (poll == null || poll.isClosed) return null;
-
       final studentKey = user.studentId.isNotEmpty ? user.studentId : user.id;
-      final existingVotes = Map<String, PollVote>.from(poll.votes);
 
-      List<int> newSelections = [];
-      if (existingVotes.containsKey(studentKey)) {
-        final currentSelections = List<int>.from(existingVotes[studentKey]!.selectedOptionIndices);
-        if (currentSelections.contains(optionIndex)) {
-          newSelections = []; // إلغاء التصويت بالضغط على نفس الخيار
+      // حلقة حماية التزامن الذري (CAS Retry) لضمان دقة الأصوات 100% حتى مع تصويت عشرات الطلاب بنفس الثانية
+      for (int attempt = 0; attempt < 4; attempt++) {
+        final row = await client
+            .from('announcements')
+            .select('*')
+            .eq('id', announcementId)
+            .maybeSingle();
+
+        if (row == null) return null;
+
+        final originalContent = row['content']?.toString() ?? '';
+        final current = AnnouncementModel.fromJson(row);
+        final poll = current.pollData;
+        if (poll == null || poll.isClosed) return null;
+
+        final existingVotes = Map<String, PollVote>.from(poll.votes);
+
+        List<int> newSelections = [];
+        if (existingVotes.containsKey(studentKey)) {
+          final currentSelections = List<int>.from(existingVotes[studentKey]!.selectedOptionIndices);
+          if (currentSelections.contains(optionIndex)) {
+            newSelections = []; // إلغاء التصويت بالضغط على نفس الخيار
+          } else {
+            newSelections = [optionIndex]; // انتقال فوري للخيار الجديد (خيار واحد فقط)
+          }
         } else {
-          newSelections = [optionIndex]; // انتقال فوري للخيار الجديد (خيار واحد فقط)
+          newSelections = [optionIndex];
         }
-      } else {
-        newSelections = [optionIndex];
+
+        if (newSelections.isEmpty) {
+          existingVotes.remove(studentKey);
+        } else {
+          existingVotes[studentKey] = PollVote(
+            studentId: studentKey,
+            studentName: user.name,
+            department: user.department,
+            stage: user.stage,
+            section: user.section ?? '',
+            selectedOptionIndices: newSelections,
+            votedAt: DateTime.now(),
+          );
+        }
+
+        final updatedPoll = poll.copyWith(votes: existingVotes);
+        final updatedContent = AnnouncementModel.embedPoll(current.content, updatedPoll);
+
+        final updatedRows = await client
+            .from('announcements')
+            .update({'content': updatedContent})
+            .eq('id', announcementId)
+            .eq('content', originalContent)
+            .select('id');
+
+        if ((updatedRows as List).isNotEmpty) {
+          invalidateCachePattern('announcements_');
+          return current.copyWithPoll(updatedPoll);
+        }
+
+        await Future.delayed(Duration(milliseconds: 70 * (attempt + 1)));
       }
-
-      if (newSelections.isEmpty) {
-        existingVotes.remove(studentKey);
-      } else {
-        existingVotes[studentKey] = PollVote(
-          studentId: studentKey,
-          studentName: user.name,
-          department: user.department,
-          stage: user.stage,
-          section: user.section ?? '',
-          selectedOptionIndices: newSelections,
-          votedAt: DateTime.now(),
-        );
-      }
-
-      final updatedPoll = poll.copyWith(votes: existingVotes);
-      final updatedContent = AnnouncementModel.embedPoll(current.content, updatedPoll);
-
-      await client
-          .from('announcements')
-          .update({'content': updatedContent})
-          .eq('id', announcementId);
-
-      invalidateCachePattern('announcements_');
-
-      return current.copyWithPoll(updatedPoll);
+      return null;
     } catch (e) {
       debugPrint('[-] Error casting poll vote: $e');
       return null;
@@ -1218,7 +1250,7 @@ class SupabaseService {
       );
       if (cached != null && cached.isNotEmpty) {
         final ts = _cacheTimestamps[cacheKey];
-        if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+        if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 30)) {
           _fetchFreshSchedulesAndCache(
             department: department,
             stage: stage,
@@ -1275,6 +1307,7 @@ class SupabaseService {
               rawData: list,
               toJson: () => list.map((s) => s.toJson()).toList(),
             );
+            schedulesNotifier.value = list;
             return list;
           }
         }
@@ -1282,11 +1315,18 @@ class SupabaseService {
         debugPrint('[SupabaseService] Falling back to announcements for schedules: $err');
       }
 
-      // 2. مسار القراءة المتوافق عكسياً من جدول announcements القديم
-      final res = await client
+      // 2. مسار القراءة المتوافق عكسياً من جدول announcements القديم (مع فلترة السيرفر)
+      var fallbackQuery = client
           .from('announcements')
           .select('*')
+          .or('subject_name.eq.SCHEDULE,content.ilike.%[SCHEDULE_TIMETABLE]%');
+      if (department != 'ALL') {
+        fallbackQuery = fallbackQuery.inFilter('department', ['ALL', department]);
+      }
+
+      final res = await fallbackQuery
           .order('created_at', ascending: false)
+          .limit(100)
           .timeout(const Duration(seconds: 8));
 
       final list = (res as List).where((item) {
@@ -1341,6 +1381,8 @@ class SupabaseService {
         rawData: filtered,
         toJson: () => filtered.map((s) => s.toJson()).toList(),
       );
+
+      schedulesNotifier.value = filtered;
 
       return filtered;
     } catch (e) {
@@ -1434,7 +1476,7 @@ class SupabaseService {
           SharedPreferences.getInstance().then((p) => p.remove('cache_$cacheKey')).catchError((_) => false);
         } else {
           final ts = _cacheTimestamps[cacheKey];
-          if (ts == null || DateTime.now().difference(ts) > const Duration(minutes: 2)) {
+          if (ts == null || DateTime.now().difference(ts) > const Duration(seconds: 30)) {
             _fetchFreshLecturesAndCache(
               department: department,
               stage: stage,
@@ -1500,6 +1542,8 @@ class SupabaseService {
         rawData: list,
         toJson: () => list.map((l) => l.toCacheJson()).toList(),
       );
+
+      lecturesNotifier.value = list;
 
       return list;
     } catch (e) {

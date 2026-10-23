@@ -174,6 +174,7 @@
       <span class="page-indicator" id="zoom-level">100%</span>
       <button id="zoom-in-btn" class="btn" title="تكبير">+</button>
       <button id="fit-width-btn" class="btn btn-primary" title="ملاءمة العرض">ملاءمة الشاشة</button>
+      <span id="offline-badge" style="display:none; font-size:11px; font-weight:700; color:#34D399; background:#064E3B; border:1px solid #059669; border-radius:6px; padding:4px 8px;">✓ محفوظ بدون إنترنت</span>
     </div>
   </header>
 
@@ -230,11 +231,45 @@
 
     async function loadDocument(fileUrl) {
       try {
-        const loadingTask = pdfjsLib.getDocument({
-          url: fileUrl,
+        const offlineBadge = document.getElementById('offline-badge');
+        let pdfParams = {
           cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
           cMapPacked: true,
-        });
+        };
+
+        // نظام الحفظ التلقائي للملازم لتعمل بدون إنترنت داخل القاعات الدراسية
+        let loadedFromBuffer = false;
+        if ('caches' in window && !fileUrl.startsWith('blob:')) {
+          try {
+            const cache = await caches.open('mohadarati-pdf-offline-v1');
+            const cachedResp = await cache.match(fileUrl);
+            if (cachedResp && cachedResp.ok) {
+              const buf = await cachedResp.arrayBuffer();
+              if (buf && buf.byteLength > 100) {
+                pdfParams.data = new Uint8Array(buf);
+                loadedFromBuffer = true;
+                if (offlineBadge) offlineBadge.style.display = 'inline-block';
+              }
+            } else {
+              const netResp = await fetch(fileUrl);
+              if (netResp && netResp.ok) {
+                try { await cache.put(fileUrl, netResp.clone()); } catch (_) {}
+                const buf = await netResp.arrayBuffer();
+                if (buf && buf.byteLength > 100) {
+                  pdfParams.data = new Uint8Array(buf);
+                  loadedFromBuffer = true;
+                  if (offlineBadge) offlineBadge.style.display = 'inline-block';
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!loadedFromBuffer) {
+          pdfParams.url = fileUrl;
+        }
+
+        const loadingTask = pdfjsLib.getDocument(pdfParams);
 
         pdfDoc = await loadingTask.promise;
         totalPages = pdfDoc.numPages;

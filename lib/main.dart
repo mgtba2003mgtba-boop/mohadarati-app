@@ -6,6 +6,7 @@ import 'services/supabase_service.dart';
 import 'services/auto_update_service.dart';
 import 'services/app_notification_service.dart';
 import 'services/offline_sync_service.dart';
+import 'services/lecture_ux_service.dart';
 import 'widgets/in_app_notification_overlay.dart';
 import 'screens/splash_screen.dart';
 
@@ -23,6 +24,9 @@ void main() async {
 
   // تفعيل محرك المزامنة غير المتصلة لحفظ وإرسال العمليات في ظروف الإنترنت الضعيفة
   OfflineSyncService().initialize();
+
+  // تفعيل خدمة شارات الملازم الجديدة وحالة الحفظ بدون إنترنت
+  LectureUxService.instance.initialize();
 
   runApp(const NustStudentPortalApp());
 }

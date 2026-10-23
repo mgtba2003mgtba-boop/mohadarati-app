@@ -17,6 +17,7 @@ import '../services/app_notification_service.dart';
 import '../services/supabase_service.dart';
 import '../services/telegram_uploader_service.dart';
 import '../services/admin_preview_service.dart';
+import '../services/lecture_ux_service.dart';
 import '../services/web_file_saver.dart';
 import '../widgets/app_media_preview_modal.dart';
 import '../widgets/telegram_announcement_card.dart';
@@ -137,6 +138,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   StreamSubscription<AnnouncementModel>? _announcementInsertSub;
   StreamSubscription<AnnouncementModel>? _announcementUpdateSub;
+  StreamSubscription<LectureModel>? _lectureInsertSub;
 
   @override
   void initState() {
@@ -146,7 +148,25 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+    LectureUxService.instance.markSubjectSeen(
+      widget.subjectName,
+      displayName: widget.displayName,
+    );
+    LectureUxService.instance.addListener(_onUxChanged);
+    SupabaseService().lecturesNotifier.addListener(_onFreshLecturesReceived);
+    SupabaseService().attendanceNotifier.addListener(_onFreshAttendanceReceived);
     _loadSubjectData(showSpinner: true);
+
+    // ── الاستماع اللحظي للمحاضرات الجديدة ──
+    _lectureInsertSub = AppNotificationService.instance.lectureInsertStream.listen((inserted) {
+      if (!mounted) return;
+      if (_matchesSubject(inserted.subjectName) && !_subjectLectures.any((l) => l.id == inserted.id)) {
+        setState(() {
+          _subjectLectures.insert(0, inserted);
+          _rebuildSectionCounts();
+        });
+      }
+    });
 
     // ── الاستماع اللحظي لتحديث التفاعلات السحابية للتبليغات ──
     _announcementUpdateSub = AppNotificationService().announcementUpdateStream.listen((updated) {
@@ -174,12 +194,40 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     });
   }
 
+  void _onUxChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onFreshLecturesReceived() {
+    final fresh = SupabaseService().lecturesNotifier.value;
+    if (fresh != null && mounted) {
+      final filtered = fresh.where((l) => _matchesSubject(l.subjectName)).toList();
+      setState(() {
+        _subjectLectures = filtered;
+        _rebuildSectionCounts();
+      });
+    }
+  }
+
+  void _onFreshAttendanceReceived() {
+    final fresh = SupabaseService().attendanceNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _subjectAttendanceRecords = fresh.where((r) => _matchesSubject(r.subjectName)).toList();
+      });
+    }
+  }
+
   @override
   void dispose() {
+    LectureUxService.instance.removeListener(_onUxChanged);
+    SupabaseService().lecturesNotifier.removeListener(_onFreshLecturesReceived);
+    SupabaseService().attendanceNotifier.removeListener(_onFreshAttendanceReceived);
     _tabController.dispose();
     _searchQueryNotifier.dispose();
     _announcementInsertSub?.cancel();
     _announcementUpdateSub?.cancel();
+    _lectureInsertSub?.cancel();
     super.dispose();
   }
 
@@ -344,6 +392,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   Future<void> _launchLectureMedia(LectureModel lecture, {required bool isDownload}) async {
+    LectureUxService.instance.markLectureCached(lecture.id);
     // التحقق أولاً إن كانت المحاضرة مقسمة إلى أجزاء سحابية (ملف كبير > 19MB تم رفعه بنجاح)
     final partsDesc = (lecture.telegramFileId != null && lecture.telegramFileId!.startsWith('telegram:parts:'))
         ? lecture.telegramFileId!
@@ -1035,6 +1084,51 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   if (_user?.isAdmin == true) ...[
                     const SizedBox(width: 6),
                     _buildSectionBadge(lecture.section),
+                  ],
+                  if (LectureUxService.instance.isLectureNew(lecture)) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF6EE7B7)),
+                      ),
+                      child: Text(
+                        'جديد ✨',
+                        style: GoogleFonts.cairo(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF047857),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (LectureUxService.instance.isLectureCached(lecture.id)) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.offline_pin_rounded, size: 11, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'متاح بدون إنترنت',
+                            style: GoogleFonts.cairo(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF15803D),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ],
               ),

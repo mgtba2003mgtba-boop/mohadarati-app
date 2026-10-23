@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,6 +13,8 @@ import '../services/supabase_service.dart';
 import '../services/attendance_service.dart';
 import '../services/admin_preview_service.dart';
 import '../services/course_customization_service.dart';
+import '../services/app_notification_service.dart';
+import '../services/lecture_ux_service.dart';
 import '../widgets/study_book_animation.dart';
 import '../widgets/app_icon_badge.dart';
 import '../widgets/app_tactile_bounce.dart';
@@ -50,6 +53,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
   OverallAttendanceSummary? _attendanceSummary;
   String _searchQuery = '';
   int _selectedSemester = 1;
+  StreamSubscription<LectureModel>? _lectureInsertSub;
 
   bool get _isPrivileged =>
       _user?.isAdmin == true ||
@@ -89,6 +93,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
     _selectedSemester = _user?.semester ?? 1;
     AdminPreviewService().addListener(_onAdminPreviewChanged);
     CourseCustomizationService().addListener(_onCustomizationChanged);
+    SupabaseService().lecturesNotifier.addListener(_onFreshLecturesReceived);
+    SupabaseService().attendanceNotifier.addListener(_onFreshAttendanceReceived);
+    LectureUxService.instance.addListener(_onCustomizationChanged);
+    _lectureInsertSub = AppNotificationService.instance.lectureInsertStream.listen(_handleLiveLecture);
     _loadCourses();
   }
 
@@ -100,10 +108,47 @@ class _CoursesScreenState extends State<CoursesScreen> {
     if (mounted) setState(() {});
   }
 
+  void _onFreshLecturesReceived() {
+    final fresh = SupabaseService().lecturesNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _lectures = fresh;
+      });
+    }
+  }
+
+  void _onFreshAttendanceReceived() {
+    final fresh = SupabaseService().attendanceNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _attendanceSummary = AttendanceService.processAttendanceRecords(fresh);
+      });
+    }
+  }
+
+  void _handleLiveLecture(LectureModel newLec) {
+    if (!mounted) return;
+    final matchDept = newLec.department == 'ALL' || newLec.department == _effectiveDept;
+    final matchStage = newLec.stage == 'ALL' ||
+        AppConstants.getStageAliases(_effectiveStage).contains(newLec.stage) ||
+        newLec.stage == _effectiveStage;
+    if (matchDept && matchStage) {
+      setState(() {
+        if (!_lectures.any((l) => l.id == newLec.id)) {
+          _lectures.insert(0, newLec);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
     CourseCustomizationService().removeListener(_onCustomizationChanged);
+    SupabaseService().lecturesNotifier.removeListener(_onFreshLecturesReceived);
+    SupabaseService().attendanceNotifier.removeListener(_onFreshAttendanceReceived);
+    LectureUxService.instance.removeListener(_onCustomizationChanged);
+    _lectureInsertSub?.cancel();
     super.dispose();
   }
 
@@ -480,6 +525,18 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
 
     final hasOverride = item.override != null;
+    final unreadCount = LectureUxService.instance.getUnreadLecturesCount(
+      item.originalName,
+      _lectures,
+      displayName: item.displayName,
+    );
+    final totalLecturesCount = _lectures
+        .where((l) => AppConstants.matchesSubject(
+              l.subjectName,
+              item.originalName,
+              displayName: item.displayName,
+            ))
+        .length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -563,6 +620,32 @@ class _CoursesScreenState extends State<CoursesScreen> {
                             ),
                           ),
                         ],
+                        if (unreadCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF6EE7B7)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.auto_awesome_rounded, size: 11, color: Color(0xFF059669)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  unreadCount == 1 ? 'ملزمة جديدة' : '$unreadCount ملازم جديدة',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF047857),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (item.code != null) ...[
                           const SizedBox(width: 8),
                           Container(
@@ -594,29 +677,55 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    if (subModel?.units != null) ...[
+                    if (subModel?.units != null || totalLecturesCount > 0) ...[
                       const SizedBox(height: 5),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                          if (subModel?.units != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${subModel!.units} وحدات',
+                                    style: AppTypography.tiny(color: const Color(0xFF475569)),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${subModel!.units} وحدات',
-                                  style: AppTypography.tiny(color: const Color(0xFF475569)),
-                                ),
-                              ],
+                          if (totalLecturesCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primarySubtle,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.menu_book_rounded, size: 11, color: AppTheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$totalLecturesCount محاضرة',
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],

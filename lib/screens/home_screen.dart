@@ -20,6 +20,7 @@ import 'profile_screen.dart';
 import 'subject_detail_screen.dart';
 import '../services/admin_preview_service.dart';
 import '../services/app_notification_service.dart';
+import '../services/lecture_ux_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _resumeBannerTimer;
   StreamSubscription<AnnouncementModel>? _announcementInsertSub;
   StreamSubscription<AnnouncementModel>? _announcementUpdateSub;
+  StreamSubscription<LectureModel>? _lectureInsertSub;
 
   // قائمة البوسترات والإعلانات الرسمية المعتمدة فقط للواجهة الرئيسية (تستبعد تبليغات المواد وصور التبليغات والجداول)
   List<AnnouncementModel>? _cachedBanners;
@@ -95,8 +97,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _bannerController = PageController(viewportFraction: 1.0);
     AdminPreviewService().addListener(_onAdminPreviewChanged);
     SupabaseService().announcementsNotifier.addListener(_onFreshAnnouncementsReceived);
+    SupabaseService().lecturesNotifier.addListener(_onFreshLecturesReceived);
+    LectureUxService.instance.addListener(_onUxStateChanged);
     _announcementInsertSub = AppNotificationService.instance.announcementInsertStream.listen(_handleLiveAnnouncement);
     _announcementUpdateSub = AppNotificationService.instance.announcementUpdateStream.listen(_handleLiveAnnouncementUpdate);
+    _lectureInsertSub = AppNotificationService.instance.lectureInsertStream.listen(_handleLiveLecture);
     _loadData().then((_) {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -123,6 +128,36 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       _startBannerTimer(_carouselBanners.length);
       _precacheBanners(_carouselBanners);
+    }
+  }
+
+  void _onFreshLecturesReceived() {
+    final fresh = SupabaseService().lecturesNotifier.value;
+    if (fresh != null && mounted) {
+      setState(() {
+        _lectures = fresh;
+      });
+    }
+  }
+
+  void _onUxStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _handleLiveLecture(LectureModel newLec) {
+    if (!mounted) return;
+    final effectiveDept = _effectiveDept;
+    final effectiveStage = _effectiveStage;
+    final matchDept = newLec.department == 'ALL' || newLec.department == effectiveDept;
+    final matchStage = newLec.stage == 'ALL' ||
+        AppConstants.getStageAliases(effectiveStage).contains(newLec.stage) ||
+        newLec.stage == effectiveStage;
+    if (matchDept && matchStage) {
+      setState(() {
+        if (!_lectures.any((l) => l.id == newLec.id)) {
+          _lectures.insert(0, newLec);
+        }
+      });
     }
   }
 
@@ -167,8 +202,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     AdminPreviewService().removeListener(_onAdminPreviewChanged);
     SupabaseService().announcementsNotifier.removeListener(_onFreshAnnouncementsReceived);
+    SupabaseService().lecturesNotifier.removeListener(_onFreshLecturesReceived);
+    LectureUxService.instance.removeListener(_onUxStateChanged);
     _announcementInsertSub?.cancel();
     _announcementUpdateSub?.cancel();
+    _lectureInsertSub?.cancel();
     _bannerTimer?.cancel();
     _resumeBannerTimer?.cancel();
     _bannerController.dispose();
@@ -335,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
     final isSelected = _currentIndex == index;
+    final unreadLectures = index == 1 ? LectureUxService.instance.getTotalUnreadLecturesCount(_lectures) : 0;
     return Expanded(
       child: AppTactileBounce(
         lowerBound: 0.94,
@@ -356,10 +395,37 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  isSelected ? activeIcon : inactiveIcon,
-                  color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
-                  size: 21,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      isSelected ? activeIcon : inactiveIcon,
+                      color: isSelected ? AppTheme.primary : const Color(0xFF64748B),
+                      size: 21,
+                    ),
+                    if (unreadLectures > 0)
+                      Positioned(
+                        top: -3,
+                        right: -6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          child: Text(
+                            unreadLectures > 9 ? '+9' : '$unreadLectures',
+                            style: GoogleFonts.cairo(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(

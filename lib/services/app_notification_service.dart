@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
 import '../models/announcement_model.dart';
+import '../models/lecture_model.dart';
+import 'supabase_service.dart';
 import 'web_notification_helper.dart';
 
 enum AppNotificationType { announcement, lecture, update }
@@ -44,6 +46,9 @@ class AppNotificationService {
 
   final _announcementUpdateController = StreamController<AnnouncementModel>.broadcast();
   Stream<AnnouncementModel> get announcementUpdateStream => _announcementUpdateController.stream;
+
+  final _lectureInsertController = StreamController<LectureModel>.broadcast();
+  Stream<LectureModel> get lectureInsertStream => _lectureInsertController.stream;
 
   RealtimeChannel? _realtimeChannel;
   bool _isSubscribed = false;
@@ -118,6 +123,7 @@ class AppNotificationService {
 
       try {
         final ann = AnnouncementModel.fromJson(record);
+        SupabaseService().invalidateCachePattern('announcements_');
         _announcementInsertController.add(ann);
       } catch (_) {}
 
@@ -157,6 +163,7 @@ class AppNotificationService {
       if (isInternal) return;
 
       final ann = AnnouncementModel.fromJson(record);
+      SupabaseService().invalidateCachePattern('announcements_');
       _announcementUpdateController.add(ann);
     } catch (e) {
       debugPrint('[-] Error handling updated announcement/reactions: $e');
@@ -168,6 +175,12 @@ class AppNotificationService {
       final title = record['title']?.toString() ?? 'محاضرة جديدة';
       final subjectName = record['subject_name']?.toString() ?? '';
       final id = record['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      try {
+        final lec = LectureModel.fromJson(record);
+        SupabaseService().invalidateCachePattern('lectures_');
+        _lectureInsertController.add(lec);
+      } catch (_) {}
 
       final notif = AppNotificationItem(
         id: id,
@@ -355,5 +368,6 @@ class AppNotificationService {
     _notificationController.close();
     _announcementInsertController.close();
     _announcementUpdateController.close();
+    _lectureInsertController.close();
   }
 }
